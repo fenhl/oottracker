@@ -1,0 +1,20 @@
+[package]
+name = "oottracker-gui"
+version = "0.1.0"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.3"
+iced_futures = "0.1"
+
+[dependencies.iced]
+version = "0.1"
+features = ["image", "tokio"]
+
+[dependencies.oottracker]
+path = "../oottracker"
+
+[dependencies.tokio]
+version = "0.2"
+features = ["net", "stream"]
