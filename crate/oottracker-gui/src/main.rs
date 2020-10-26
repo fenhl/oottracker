@@ -3,10 +3,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use {
-    std::path::{
-        Path,
-        PathBuf,
-    },
     iced::{
         Application,
         Background,
@@ -18,7 +14,6 @@ use {
         Subscription,
         widget::{
             Column,
-            Image,
             Row,
             Text,
             button::{
@@ -28,6 +23,10 @@ use {
             container::{
                 self,
                 Container,
+            },
+            image::{
+                self,
+                Image,
             },
         },
         window,
@@ -368,243 +367,282 @@ impl TrackerCell {
     }
 
     fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> {
-        let xopar_images = asset_path().join("xopar-images");
-        let xopar_images_count = asset_path().join("xopar-images-count");
-        let xopar_images_dimmed = asset_path().join("xopar-images-dimmed");
-        let xopar_images_overlay = asset_path().join("xopar-images-overlay");
-        let xopar_images_overlay_dimmed = asset_path().join("xopar-images-overlay-dimmed");
+        macro_rules! xopar_image {
+            (@count_inner $filename:ident $count:expr, $($n:literal),*) => {{
+                match $count {
+                    $(
+                        $n => include_bytes!(concat!("../../../assets/xopar-images-count/", stringify!($filename), "_", stringify!($n), ".png")).to_vec(),
+                    )*
+                    _ => unreachable!(),
+                }
+            }};
+            ($filename:ident) => {{
+                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images/", stringify!($filename), ".png")).to_vec()))
+            }};
+            (count = $count:expr, $filename:ident) => {{
+                Image::new(image::Handle::from_memory(xopar_image!(@count_inner $filename $count,
+                    1, 2, 3, 4, 5, 6, 7, 8, 9,
+                    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+                    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+                    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+                    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+                    60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+                    70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+                    80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
+                    90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
+                    100
+                )))
+            }};
+            (dimmed $filename:ident) => {{
+                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images-dimmed/", stringify!($filename), ".png")).to_vec()))
+            }};
+            (undim = $undim:expr, $filename:ident) => {{
+                if $undim {
+                    xopar_image!($filename)
+                } else {
+                    xopar_image!(dimmed $filename)
+                }
+            }};
+            (overlay $filename:ident) => {{
+                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images-overlay/", stringify!($filename), ".png")).to_vec()))
+            }};
+            (overlay_dimmed $filename:ident) => {{
+                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images-overlay-dimmed/", stringify!($filename), ".png")).to_vec()))
+            }};
+        }
         let content = match self {
-            TrackerCell::LightMedallionLocation => Image::new(xopar_images.join(match state.knowledge.light_medallion_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(50)),
-            TrackerCell::ForestMedallionLocation => Image::new(xopar_images.join(match state.knowledge.forest_medallion_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(50)),
-            TrackerCell::FireMedallionLocation => Image::new(xopar_images.join(match state.knowledge.fire_medallion_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(50)),
-            TrackerCell::WaterMedallionLocation => Image::new(xopar_images.join(match state.knowledge.water_medallion_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(50)),
-            TrackerCell::ShadowMedallionLocation => Image::new(xopar_images.join(match state.knowledge.shadow_medallion_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(50)),
-            TrackerCell::SpiritMedallionLocation => Image::new(xopar_images.join(match state.knowledge.spirit_medallion_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(50)),
-            TrackerCell::LightMedallion => Image::new(if state.save.quest_items.contains(QuestItems::LIGHT_MEDALLION) { &xopar_images } else { &xopar_images_dimmed }.join("light_medallion.png")),
-            TrackerCell::ForestMedallion => Image::new(if state.save.quest_items.contains(QuestItems::FOREST_MEDALLION) { &xopar_images } else { &xopar_images_dimmed }.join("forest_medallion.png")),
-            TrackerCell::FireMedallion => Image::new(if state.save.quest_items.contains(QuestItems::FIRE_MEDALLION) { &xopar_images } else { &xopar_images_dimmed }.join("fire_medallion.png")),
-            TrackerCell::WaterMedallion => Image::new(if state.save.quest_items.contains(QuestItems::WATER_MEDALLION) { &xopar_images } else { &xopar_images_dimmed }.join("water_medallion.png")),
-            TrackerCell::ShadowMedallion => Image::new(if state.save.quest_items.contains(QuestItems::SHADOW_MEDALLION) { &xopar_images } else { &xopar_images_dimmed }.join("shadow_medallion.png")),
-            TrackerCell::SpiritMedallion => Image::new(if state.save.quest_items.contains(QuestItems::SPIRIT_MEDALLION) { &xopar_images } else { &xopar_images_dimmed }.join("spirit_medallion.png")),
-            TrackerCell::AdultTrade => Image::new(match state.save.inv.adult_trade_item {
-                AdultTradeItem::None => xopar_images_dimmed.join("blue_egg.png"),
-                AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => xopar_images.join("blue_egg.png"),
-                AdultTradeItem::Cojiro => xopar_images.join("cojiro.png"),
-                AdultTradeItem::OddMushroom => xopar_images.join("odd_mushroom.png"),
-                AdultTradeItem::OddPotion => xopar_images.join("odd_poultice.png"),
-                AdultTradeItem::PoachersSaw => xopar_images.join("poachers_saw.png"),
-                AdultTradeItem::BrokenSword => xopar_images.join("broken_sword.png"),
-                AdultTradeItem::Prescription => xopar_images.join("prescription.png"),
-                AdultTradeItem::EyeballFrog => xopar_images.join("eyeball_frog.png"),
-                AdultTradeItem::Eyedrops => xopar_images.join("eye_drops.png"),
-                AdultTradeItem::ClaimCheck => xopar_images.join("claim_check.png"),
-            }),
-            TrackerCell::Skulltula => Image::new(if state.save.skull_tokens == 0 { xopar_images_dimmed.join("golden_skulltula.png") } else { xopar_images_count.join(format!("skulls_{}.png", state.save.skull_tokens)) }),
-            TrackerCell::KokiriEmeraldLocation => Image::new(xopar_images.join(match state.knowledge.kokiri_emerald_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(33)),
-            TrackerCell::KokiriEmerald => Image::new(if state.save.quest_items.contains(QuestItems::KOKIRI_EMERALD) { &xopar_images } else { &xopar_images_dimmed }.join("kokiri_emerald.png")).width(Length::Units(33)),
-            TrackerCell::GoronRubyLocation => Image::new(xopar_images.join(match state.knowledge.goron_ruby_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(34)),
-            TrackerCell::GoronRuby => Image::new(if state.save.quest_items.contains(QuestItems::GORON_RUBY) { &xopar_images } else { &xopar_images_dimmed }.join("goron_ruby.png")).width(Length::Units(34)),
-            TrackerCell::ZoraSapphireLocation => Image::new(xopar_images.join(match state.knowledge.zora_sapphire_location {
-                DungeonRewardLocation::Unknown => "unknown_text.png",
-                DungeonRewardLocation::DekuTree => "deku_text.png",
-                DungeonRewardLocation::DodongosCavern => "dc_text.png",
-                DungeonRewardLocation::JabuJabu => "jabu_text.png",
-                DungeonRewardLocation::ForestTemple => "forest_text.png",
-                DungeonRewardLocation::FireTemple => "fire_text.png",
-                DungeonRewardLocation::WaterTemple => "water_text.png",
-                DungeonRewardLocation::ShadowTemple => "shadow_text.png",
-                DungeonRewardLocation::SpiritTemple => "spirit_text.png",
-                DungeonRewardLocation::LinksPocket => "free_text.png",
-            })).width(Length::Units(33)),
-            TrackerCell::ZoraSapphire => Image::new(if state.save.quest_items.contains(QuestItems::ZORA_SAPPHIRE) { &xopar_images } else { &xopar_images_dimmed }.join("zora_sapphire.png")).width(Length::Units(33)),
-            TrackerCell::Bottle => Image::new(if state.save.inv.bottles > 0 { &xopar_images } else { &xopar_images_dimmed }.join("bottle.png")), //TODO only undim if the bottle can be trivially emptied; Ruto's Letter support
-            TrackerCell::Scale => Image::new(match state.save.upgrades.scale() {
-                Upgrades::SILVER_SCALE => xopar_images.join("silver_scale.png"),
-                Upgrades::GOLD_SCALE => xopar_images.join("gold_scale.png"),
-                _ => xopar_images_dimmed.join("silver_scale.png"),
-            }),
-            TrackerCell::Slingshot => Image::new(if state.save.inv.slingshot { &xopar_images } else { &xopar_images_dimmed }.join("slingshot.png")),
-            TrackerCell::Bombs => Image::new(match (state.save.upgrades.bomb_bag(), state.save.inv.bombchus) {
-                (Upgrades::NONE, false) => xopar_images_dimmed.join("bomb_bag.png"),
-                (Upgrades::NONE, true) => xopar_images_overlay_dimmed.join("bomb_bag_bombchu.png"),
-                (_, false) => xopar_images.join("bomb_bag.png"),
-                (_, true) => xopar_images_overlay.join("bomb_bag_bombchu.png"),
-            }),
-            TrackerCell::Boomerang => Image::new(if state.save.inv.boomerang { &xopar_images } else { &xopar_images_dimmed }.join("boomerang.png")),
-            TrackerCell::Strength => Image::new(match state.save.upgrades.strength() {
-                Upgrades::GORON_BRACELET => xopar_images.join("goron_bracelet.png"),
-                Upgrades::SILVER_GAUNTLETS => xopar_images.join("silver_gauntlets.png"),
-                Upgrades::GOLD_GAUNTLETS => xopar_images.join("gold_gauntlets.png"),
-                _ => xopar_images_dimmed.join("goron_bracelet.png"),
-            }),
-            TrackerCell::Magic => Image::new(match (state.save.magic, state.save.inv.lens) {
-                (MagicCapacity::None, false) => xopar_images_dimmed.join("magic.png"),
-                (MagicCapacity::None, true) => xopar_images_overlay_dimmed.join("magic_lens.png"),
-                (_, false) => xopar_images.join("magic.png"),
-                (_, true) => xopar_images_overlay.join("magic_lens.png"),
-            }),
-            TrackerCell::Spells => Image::new(match (state.save.inv.dins_fire, state.save.inv.farores_wind) {
-                (false, false) => xopar_images_dimmed.join("composite_magic.png"),
-                (false, true) => xopar_images.join("faores_wind.png"),
-                (true, false) => xopar_images.join("dins_fire.png"),
-                (true, true) => xopar_images.join("composite_magic.png"),
-            }),
-            TrackerCell::Hookshot => Image::new(match state.save.inv.hookshot {
-                Hookshot::None => xopar_images_dimmed.join("hookshot.png"),
-                Hookshot::Hookshot => xopar_images.join("hookshot_accessible.png"),
-                Hookshot::Longshot => xopar_images.join("longshot_accessible.png"),
-            }),
-            TrackerCell::Bow => Image::new(match (state.save.inv.bow, state.save.inv.ice_arrows) {
-                (false, false) => xopar_images_dimmed.join("bow.png"),
-                (false, true) => xopar_images_overlay_dimmed.join("bow_ice_arrows.png"),
-                (true, false) => xopar_images.join("bow.png"),
-                (true, true) => xopar_images_overlay.join("bow_ice_arrows.png"),
-            }),
-            TrackerCell::Arrows => Image::new(match (state.save.inv.fire_arrows, state.save.inv.light_arrows) {
-                (false, false) => xopar_images_dimmed.join("composite_arrows.png"),
-                (false, true) => xopar_images.join("light_arrows.png"),
-                (true, false) => xopar_images.join("fire_arrows.png"),
-                (true, true) => xopar_images.join("composite_arrows.png"),
-            }),
-            TrackerCell::Hammer => Image::new(if state.save.inv.hammer { &xopar_images } else { &xopar_images_dimmed }.join("hammer.png")),
-            TrackerCell::Boots => Image::new(match (state.save.equipment.contains(Equipment::IRON_BOOTS), state.save.equipment.contains(Equipment::HOVER_BOOTS)) {
-                (false, false) => xopar_images_dimmed.join("composite_boots.png"),
-                (false, true) => xopar_images.join("hover_boots.png"),
-                (true, false) => xopar_images.join("iron_boots.png"),
-                (true, true) => xopar_images.join("composite_boots.png"),
-            }),
-            TrackerCell::MirrorShield => Image::new(if state.save.equipment.contains(Equipment::MIRROR_SHIELD) { &xopar_images } else { &xopar_images_dimmed }.join("mirror_shield.png")),
-            TrackerCell::ChildTrade => Image::new(match state.save.inv.child_trade_item {
-                ChildTradeItem::None => xopar_images_dimmed.join("white_egg.png"),
-                ChildTradeItem::WeirdEgg => xopar_images.join("white_egg.png"),
-                ChildTradeItem::Chicken => xopar_images.join("white_chicken.png"),
-                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask => xopar_images.join("zelda_letter.png"),
-                ChildTradeItem::KeatonMask => xopar_images.join("keaton_mask.png"),
-                ChildTradeItem::SkullMask => xopar_images.join("skull_mask.png"),
-                ChildTradeItem::SpookyMask => xopar_images.join("spooky_mask.png"),
-                ChildTradeItem::BunnyHood => xopar_images.join("bunny_hood.png"),
-                ChildTradeItem::MaskOfTruth => xopar_images.join("mask_of_truth.png"),
-            }),
-            TrackerCell::Ocarina => Image::new(match (state.save.inv.ocarina, state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG)) { //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
-                (false, false) => xopar_images_dimmed.join("ocarina.png"),
-                (false, true) => xopar_images_overlay_dimmed.join("ocarina_scarecrow.png"),
-                (true, false) => xopar_images.join("ocarina.png"),
-                (true, true) => xopar_images_overlay.join("ocarina_scarecrow.png"),
-            }),
-            TrackerCell::Beans => Image::new(if state.save.inv.beans { &xopar_images } else { &xopar_images_dimmed }.join("beans.png")), //TODO overlay with number bought if autotracker is on?
-            TrackerCell::SwordCard => Image::new(match (state.save.equipment.contains(Equipment::KOKIRI_SWORD), state.save.quest_items.contains(QuestItems::GERUDO_CARD)) {
-                (false, false) => xopar_images_dimmed.join("composite_ksword_gcard.png"),
-                (false, true) => xopar_images.join("gerudo_card.png"),
-                (true, false) => xopar_images.join("kokiri_sword.png"),
-                (true, true) => xopar_images.join("composite_ksword_gcard.png"),
-            }),
-            TrackerCell::Tunics => Image::new(match (state.save.equipment.contains(Equipment::GORON_TUNIC), state.save.equipment.contains(Equipment::ZORA_TUNIC)) {
-                (false, false) => xopar_images_dimmed.join("composite_tunics.png"),
-                (false, true) => xopar_images.join("zora_tunic.png"),
-                (true, false) => xopar_images.join("goron_tunic.png"),
-                (true, true) => xopar_images.join("composite_tunics.png"),
-            }),
-            TrackerCell::Triforce => Image::new(if state.save.triforce_pieces == 0 { xopar_images_dimmed.join("triforce.png") } else { xopar_images_count.join(format!("force_{}.png", state.save.triforce_pieces)) }),
-            TrackerCell::ZeldasLullaby => Image::new(if state.save.quest_items.contains(QuestItems::ZELDAS_LULLABY) { &xopar_images } else { &xopar_images_dimmed }.join("lullaby.png")),
-            TrackerCell::EponasSong => Image::new(if state.save.quest_items.contains(QuestItems::EPONAS_SONG) { &xopar_images } else { &xopar_images_dimmed }.join("epona.png")),
-            TrackerCell::SariasSong => Image::new(if state.save.quest_items.contains(QuestItems::SARIAS_SONG) { &xopar_images } else { &xopar_images_dimmed }.join("saria.png")),
-            TrackerCell::SunsSong => Image::new(if state.save.quest_items.contains(QuestItems::SUNS_SONG) { &xopar_images } else { &xopar_images_dimmed }.join("sun.png")),
-            TrackerCell::SongOfTime => Image::new(if state.save.quest_items.contains(QuestItems::SONG_OF_TIME) { &xopar_images } else { &xopar_images_dimmed }.join("time.png")),
-            TrackerCell::SongOfStorms => Image::new(if state.save.quest_items.contains(QuestItems::SONG_OF_STORMS) { &xopar_images } else { &xopar_images_dimmed }.join("storms.png")),
-            TrackerCell::Minuet => Image::new(if state.save.quest_items.contains(QuestItems::MINUET_OF_FOREST) { &xopar_images } else { &xopar_images_dimmed }.join("minuet.png")),
-            TrackerCell::Bolero => Image::new(if state.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE) { &xopar_images } else { &xopar_images_dimmed }.join("bolero.png")),
-            TrackerCell::Serenade => Image::new(if state.save.quest_items.contains(QuestItems::SERENADE_OF_WATER) { &xopar_images } else { &xopar_images_dimmed }.join("serenade.png")),
-            TrackerCell::Requiem => Image::new(if state.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT) { &xopar_images } else { &xopar_images_dimmed }.join("requiem.png")),
-            TrackerCell::Nocturne => Image::new(if state.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW) { &xopar_images } else { &xopar_images_dimmed }.join("nocturne.png")),
-            TrackerCell::Prelude => Image::new(if state.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT) { &xopar_images } else { &xopar_images_dimmed }.join("prelude.png")),
+            TrackerCell::LightMedallionLocation => match state.knowledge.light_medallion_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(50)),
+            TrackerCell::ForestMedallionLocation => match state.knowledge.forest_medallion_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(50)),
+            TrackerCell::FireMedallionLocation => match state.knowledge.fire_medallion_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(50)),
+            TrackerCell::WaterMedallionLocation => match state.knowledge.water_medallion_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(50)),
+            TrackerCell::ShadowMedallionLocation => match state.knowledge.shadow_medallion_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(50)),
+            TrackerCell::SpiritMedallionLocation => match state.knowledge.spirit_medallion_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(50)),
+            TrackerCell::LightMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::LIGHT_MEDALLION), light_medallion),
+            TrackerCell::ForestMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::FOREST_MEDALLION), forest_medallion),
+            TrackerCell::FireMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::FIRE_MEDALLION), fire_medallion),
+            TrackerCell::WaterMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::WATER_MEDALLION), water_medallion),
+            TrackerCell::ShadowMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SHADOW_MEDALLION), shadow_medallion),
+            TrackerCell::SpiritMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SPIRIT_MEDALLION), spirit_medallion),
+            TrackerCell::AdultTrade => match state.save.inv.adult_trade_item {
+                AdultTradeItem::None => xopar_image!(dimmed blue_egg),
+                AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => xopar_image!(blue_egg),
+                AdultTradeItem::Cojiro => xopar_image!(cojiro),
+                AdultTradeItem::OddMushroom => xopar_image!(odd_mushroom),
+                AdultTradeItem::OddPotion => xopar_image!(odd_poultice),
+                AdultTradeItem::PoachersSaw => xopar_image!(poachers_saw),
+                AdultTradeItem::BrokenSword => xopar_image!(broken_sword),
+                AdultTradeItem::Prescription => xopar_image!(prescription),
+                AdultTradeItem::EyeballFrog => xopar_image!(eyeball_frog),
+                AdultTradeItem::Eyedrops => xopar_image!(eye_drops),
+                AdultTradeItem::ClaimCheck => xopar_image!(claim_check),
+            },
+            TrackerCell::Skulltula => if state.save.skull_tokens == 0 { xopar_image!(dimmed golden_skulltula) } else { xopar_image!(count = state.save.skull_tokens, skulls) },
+            TrackerCell::KokiriEmeraldLocation => match state.knowledge.kokiri_emerald_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(33)),
+            TrackerCell::KokiriEmerald => xopar_image!(undim = state.save.quest_items.contains(QuestItems::KOKIRI_EMERALD), kokiri_emerald).width(Length::Units(33)),
+            TrackerCell::GoronRubyLocation => match state.knowledge.goron_ruby_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(34)),
+            TrackerCell::GoronRuby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(34)),
+            TrackerCell::ZoraSapphireLocation => match state.knowledge.zora_sapphire_location {
+                DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
+                DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
+                DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
+                DungeonRewardLocation::JabuJabu => xopar_image!(jabu_text),
+                DungeonRewardLocation::ForestTemple => xopar_image!(forest_text),
+                DungeonRewardLocation::FireTemple => xopar_image!(fire_text),
+                DungeonRewardLocation::WaterTemple => xopar_image!(water_text),
+                DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
+                DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
+                DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
+            }.width(Length::Units(33)),
+            TrackerCell::ZoraSapphire => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZORA_SAPPHIRE), zora_sapphire).width(Length::Units(33)),
+            TrackerCell::Bottle => xopar_image!(undim = state.save.inv.bottles > 0, bottle), //TODO only undim if the bottle can be trivially emptied; Ruto's Letter support
+            TrackerCell::Scale => match state.save.upgrades.scale() {
+                Upgrades::SILVER_SCALE => xopar_image!(silver_scale),
+                Upgrades::GOLD_SCALE => xopar_image!(gold_scale),
+                _ => xopar_image!(dimmed silver_scale),
+            },
+            TrackerCell::Slingshot => xopar_image!(undim = state.save.inv.slingshot, slingshot),
+            TrackerCell::Bombs => match (state.save.upgrades.bomb_bag(), state.save.inv.bombchus) {
+                (Upgrades::NONE, false) => xopar_image!(dimmed bomb_bag),
+                (Upgrades::NONE, true) => xopar_image!(overlay_dimmed bomb_bag_bombchu),
+                (_, false) => xopar_image!(bomb_bag),
+                (_, true) => xopar_image!(overlay bomb_bag_bombchu),
+            },
+            TrackerCell::Boomerang => xopar_image!(undim = state.save.inv.boomerang, boomerang),
+            TrackerCell::Strength => match state.save.upgrades.strength() {
+                Upgrades::GORON_BRACELET => xopar_image!(goron_bracelet),
+                Upgrades::SILVER_GAUNTLETS => xopar_image!(silver_gauntlets),
+                Upgrades::GOLD_GAUNTLETS => xopar_image!(gold_gauntlets),
+                _ => xopar_image!(dimmed goron_bracelet),
+            },
+            TrackerCell::Magic => match (state.save.magic, state.save.inv.lens) {
+                (MagicCapacity::None, false) => xopar_image!(dimmed magic),
+                (MagicCapacity::None, true) => xopar_image!(overlay_dimmed magic_lens),
+                (_, false) => xopar_image!(magic),
+                (_, true) => xopar_image!(overlay magic_lens),
+            },
+            TrackerCell::Spells => match (state.save.inv.dins_fire, state.save.inv.farores_wind) {
+                (false, false) => xopar_image!(dimmed composite_magic),
+                (false, true) => xopar_image!(faores_wind),
+                (true, false) => xopar_image!(dins_fire),
+                (true, true) => xopar_image!(composite_magic),
+            },
+            TrackerCell::Hookshot => match state.save.inv.hookshot {
+                Hookshot::None => xopar_image!(dimmed hookshot),
+                Hookshot::Hookshot => xopar_image!(hookshot_accessible),
+                Hookshot::Longshot => xopar_image!(longshot_accessible),
+            },
+            TrackerCell::Bow => match (state.save.inv.bow, state.save.inv.ice_arrows) {
+                (false, false) => xopar_image!(dimmed bow),
+                (false, true) => xopar_image!(overlay_dimmed bow_ice_arrows),
+                (true, false) => xopar_image!(bow),
+                (true, true) => xopar_image!(overlay bow_ice_arrows),
+            },
+            TrackerCell::Arrows => match (state.save.inv.fire_arrows, state.save.inv.light_arrows) {
+                (false, false) => xopar_image!(dimmed composite_arrows),
+                (false, true) => xopar_image!(light_arrows),
+                (true, false) => xopar_image!(fire_arrows),
+                (true, true) => xopar_image!(composite_arrows),
+            },
+            TrackerCell::Hammer => xopar_image!(undim = state.save.inv.hammer, hammer),
+            TrackerCell::Boots => match (state.save.equipment.contains(Equipment::IRON_BOOTS), state.save.equipment.contains(Equipment::HOVER_BOOTS)) {
+                (false, false) => xopar_image!(dimmed composite_boots),
+                (false, true) => xopar_image!(hover_boots),
+                (true, false) => xopar_image!(iron_boots),
+                (true, true) => xopar_image!(composite_boots),
+            },
+            TrackerCell::MirrorShield => xopar_image!(undim = state.save.equipment.contains(Equipment::MIRROR_SHIELD), mirror_shield),
+            TrackerCell::ChildTrade => match state.save.inv.child_trade_item {
+                ChildTradeItem::None => xopar_image!(dimmed white_egg),
+                ChildTradeItem::WeirdEgg => xopar_image!(white_egg),
+                ChildTradeItem::Chicken => xopar_image!(white_chicken),
+                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask => xopar_image!(zelda_letter),
+                ChildTradeItem::KeatonMask => xopar_image!(keaton_mask),
+                ChildTradeItem::SkullMask => xopar_image!(skull_mask),
+                ChildTradeItem::SpookyMask => xopar_image!(spooky_mask),
+                ChildTradeItem::BunnyHood => xopar_image!(bunny_hood),
+                ChildTradeItem::MaskOfTruth => xopar_image!(mask_of_truth),
+            },
+            TrackerCell::Ocarina => match (state.save.inv.ocarina, state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG)) { //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
+                (false, false) => xopar_image!(dimmed ocarina),
+                (false, true) => xopar_image!(overlay_dimmed ocarina_scarecrow),
+                (true, false) => xopar_image!(ocarina),
+                (true, true) => xopar_image!(overlay ocarina_scarecrow),
+            },
+            TrackerCell::Beans => xopar_image!(undim = state.save.inv.beans, beans), //TODO overlay with number bought if autotracker is on?
+            TrackerCell::SwordCard => match (state.save.equipment.contains(Equipment::KOKIRI_SWORD), state.save.quest_items.contains(QuestItems::GERUDO_CARD)) {
+                (false, false) => xopar_image!(dimmed composite_ksword_gcard),
+                (false, true) => xopar_image!(gerudo_card),
+                (true, false) => xopar_image!(kokiri_sword),
+                (true, true) => xopar_image!(composite_ksword_gcard),
+            },
+            TrackerCell::Tunics => match (state.save.equipment.contains(Equipment::GORON_TUNIC), state.save.equipment.contains(Equipment::ZORA_TUNIC)) {
+                (false, false) => xopar_image!(dimmed composite_tunics),
+                (false, true) => xopar_image!(zora_tunic),
+                (true, false) => xopar_image!(goron_tunic),
+                (true, true) => xopar_image!(composite_tunics),
+            },
+            TrackerCell::Triforce => if state.save.triforce_pieces == 0 { xopar_image!(dimmed triforce) } else { xopar_image!(count = state.save.triforce_pieces, force) },
+            TrackerCell::ZeldasLullaby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZELDAS_LULLABY), lullaby),
+            TrackerCell::EponasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::EPONAS_SONG), epona),
+            TrackerCell::SariasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SARIAS_SONG), saria),
+            TrackerCell::SunsSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SUNS_SONG), sun),
+            TrackerCell::SongOfTime => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_TIME), time),
+            TrackerCell::SongOfStorms => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_STORMS), storms),
+            TrackerCell::Minuet => xopar_image!(undim = state.save.quest_items.contains(QuestItems::MINUET_OF_FOREST), minuet),
+            TrackerCell::Bolero => xopar_image!(undim = state.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE), bolero),
+            TrackerCell::Serenade => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SERENADE_OF_WATER), serenade),
+            TrackerCell::Requiem => xopar_image!(undim = state.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT), requiem),
+            TrackerCell::Nocturne => xopar_image!(undim = state.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW), nocturne),
+            TrackerCell::Prelude => xopar_image!(undim = state.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT), prelude),
         };
         if let Some(cell_button) = cell_button {
             Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(*self).into()
@@ -780,13 +818,6 @@ impl Application for State {
     fn subscription(&self) -> Subscription<Message> {
         Subscription::from_recipe(tcp_server::Subscription)
     }
-}
-
-fn asset_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent().expect("crate dir has no parent")
-        .parent().expect("crates dir has no parent")
-        .join("assets")
 }
 
 fn main() {
