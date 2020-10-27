@@ -324,7 +324,7 @@ impl TrackerCell {
                 ChildTradeItem::None => ChildTradeItem::WeirdEgg,
                 ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
                 ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
-                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask => ChildTradeItem::KeatonMask,
+                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::KeatonMask, //TODO for SOLD OUT, check trade quest progress
                 ChildTradeItem::KeatonMask => ChildTradeItem::SkullMask,
                 ChildTradeItem::SkullMask => ChildTradeItem::SpookyMask,
                 ChildTradeItem::SpookyMask => ChildTradeItem::BunnyHood,
@@ -604,7 +604,7 @@ impl TrackerCell {
                 ChildTradeItem::None => xopar_image!(dimmed white_egg),
                 ChildTradeItem::WeirdEgg => xopar_image!(white_egg),
                 ChildTradeItem::Chicken => xopar_image!(white_chicken),
-                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask => xopar_image!(zelda_letter),
+                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => xopar_image!(zelda_letter), //TODO for SOLD OUT, check trade quest progress
                 ChildTradeItem::KeatonMask => xopar_image!(keaton_mask),
                 ChildTradeItem::SkullMask => xopar_image!(skull_mask),
                 ChildTradeItem::SpookyMask => xopar_image!(spooky_mask),

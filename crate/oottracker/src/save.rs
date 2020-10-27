@@ -172,6 +172,7 @@ pub enum ChildTradeItem {
     ZoraMask,
     GerudoMask,
     MaskOfTruth,
+    SoldOut,
 }
 
 impl TryFrom<u8> for ChildTradeItem {
@@ -191,6 +192,7 @@ impl TryFrom<u8> for ChildTradeItem {
             item_ids::ZORA_MASK => Ok(ChildTradeItem::ZoraMask),
             item_ids::GERUDO_MASK => Ok(ChildTradeItem::GerudoMask),
             item_ids::MASK_OF_TRUTH => Ok(ChildTradeItem::MaskOfTruth),
+            item_ids::SOLD_OUT => Ok(ChildTradeItem::SoldOut),
             _ => Err(raw_data),
         }
     }
@@ -211,6 +213,7 @@ impl From<ChildTradeItem> for u8 {
             ChildTradeItem::ZoraMask => item_ids::ZORA_MASK,
             ChildTradeItem::GerudoMask => item_ids::GERUDO_MASK,
             ChildTradeItem::MaskOfTruth => item_ids::MASK_OF_TRUTH,
+            ChildTradeItem::SoldOut => item_ids::SOLD_OUT,
         }
     }
 }
