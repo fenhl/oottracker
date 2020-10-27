@@ -2386,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2401,11 +2401,11 @@ dependencies = [
 
 [[package]]
 name = "oottracker-bizhawk"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "oottracker-csharp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libc",
  "oottracker",
@@ -2413,7 +2413,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-gui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures 0.3.7",
  "iced",
@@ -2424,7 +2424,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-utils"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "derive_more",
