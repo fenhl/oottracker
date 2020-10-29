@@ -212,7 +212,7 @@ async fn write_release_notes() -> Result<String, Error> {
 async fn main() -> Result<(), Error> {
     eprintln!("building oottracker-mac-intel.app");
     Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo").await?;
-    fs::create_dir("asssets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
+    fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     fs::copy("target/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
     eprintln!("packing oottracker-mac-intel.dmg");
     Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-intel.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil").await?;
