@@ -6,5 +6,5 @@ set -e
 cd "${0:a:h}"/..
 
 /opt/git/github.com/fenhl/syncbin/master/bin/rust --no-project
-git pull --ff
+git pull --ff-only
 cargo run --release --package=oottracker-utils --bin=oottracker-release
