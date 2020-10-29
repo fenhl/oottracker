@@ -9,7 +9,7 @@ use {
     derive_more::From,
     tokio::process::Command,
 };
-#[cfg(target = "macos")]
+#[cfg(target_os = "macos")]
 use tokio::fs;
 #[cfg(windows)]
 use {
