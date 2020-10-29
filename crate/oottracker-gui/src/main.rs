@@ -715,6 +715,7 @@ impl Application for State {
                 Packet::Goodbye => unreachable!(), // Goodbye is not yielded from proto::read
                 Packet::SaveDelta(delta) => self.model.save = &self.model.save + &delta,
                 Packet::SaveInit(save) => self.model.save = save,
+                Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
             },
         }
         Command::none()

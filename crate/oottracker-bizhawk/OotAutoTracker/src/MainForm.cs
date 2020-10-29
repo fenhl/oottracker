@@ -64,6 +64,14 @@ namespace Net.Fenhl.OotAutoTracker
         internal static extern void saves_diff_free(IntPtr diff);
         [DllImport("oottracker")]
         internal static extern IoResultHandle saves_diff_send(TcpStreamHandle tcp_stream, IntPtr diff);
+        [DllImport("oottracker")]
+        internal static extern KnowledgeHandle knowledge_none();
+        [DllImport("oottracker")]
+        internal static extern KnowledgeHandle knowledge_vanilla();
+        [DllImport("oottracker")]
+        internal static extern void knowledge_free(IntPtr knowledge);
+        [DllImport("oottracker")]
+        internal static extern IoResultHandle knowledge_send(TcpStreamHandle tcp_stream, KnowledgeHandle knowledge);
     }
 
     internal class TcpStreamResultHandle : SafeHandle
@@ -391,6 +399,52 @@ namespace Net.Fenhl.OotAutoTracker
         }
     }
 
+    internal class KnowledgeHandle : SafeHandle
+    {
+        internal KnowledgeHandle() : base(IntPtr.Zero, true) { }
+
+        public override bool IsInvalid
+        {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle()
+        {
+            if (!this.IsInvalid)
+            {
+                Native.knowledge_free(handle);
+            }
+            return true;
+        }
+    }
+
+    class Knowledge : IDisposable
+    {
+        private KnowledgeHandle knowledge;
+
+        internal Knowledge(bool isVanilla)
+        {
+            if (isVanilla)
+            {
+                knowledge = Native.knowledge_vanilla();
+            }
+            else
+            {
+                knowledge = Native.knowledge_none();
+            }
+        }
+
+        internal IoResult Send(TcpStream tcp_stream)
+        {
+            return new IoResult(Native.knowledge_send(tcp_stream.tcp_stream, knowledge));
+        }
+
+        public void Dispose()
+        {
+            knowledge.Dispose();
+        }
+    }
+
     [ExternalTool("OoT autotracker")]
 	public sealed class MainForm : Form, IExternalToolForm
     {
@@ -403,6 +457,7 @@ namespace Net.Fenhl.OotAutoTracker
 
 		private IMemoryApi _memAPI => _maybeMemAPI ?? throw new NullReferenceException();
 
+        private bool isVanilla;
         private TcpStream? stream;
         private List<byte> prevSaveData = new List<byte>();
         private Save? prevSave;
@@ -425,29 +480,53 @@ namespace Net.Fenhl.OotAutoTracker
             if (this.prevSave != null) this.prevSave.Dispose();
             this.prevSave = null;
             label_Save.Text = "Save: waiting for game";
-            if (GlobalWin.Game.Name != "Null")
+            if (GlobalWin.Game.Name == "Null")
             {
-				label_Game.Text = $"Playing {GlobalWin.Game.Name}";
-                using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback))
+                label_Game.Text = "Not playing anything";
+            }
+            else
+            {
+                var rom_ident = _memAPI.ReadByteRange(0x20, 0x18, "ROM");
+                if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0"))))
                 {
-                    if (stream_res.IsOk())
+                    label_Game.Text = $"Game: Expected OoT or OoTR, found {GlobalWin.Game.Name} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})";
+                }
+                else
+                {
+                    var version = rom_ident.GetRange(0x15, 3);
+                    this.isVanilla = Enumerable.SequenceEqual(version, new List<byte>(new byte[] { 0, 0, 0 }));
+                    if (this.isVanilla)
                     {
-                        if (this.stream != null) this.stream.Disconnect().Dispose();
-                        this.stream = new TcpStream(stream_res);
-                        label_Connection.Text = "Connected";
+                        label_Game.Text = "Playing OoT (vanilla)";
                     }
                     else
                     {
-                        using (StringHandle err = stream_res.DebugErr())
+                        label_Game.Text = $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}";
+                    }
+                    using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback))
+                    {
+                        if (stream_res.IsOk())
                         {
-                            label_Connection.Text = $"Failed to connect: {err.AsString()}";
+                            if (this.stream != null) this.stream.Disconnect().Dispose();
+                            this.stream = new TcpStream(stream_res);
+                            label_Connection.Text = "Connected";
+                            if (this.isVanilla)
+                            {
+                                using (var knowledge = new Knowledge(true))
+                                {
+                                    knowledge.Send(this.stream);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            using (StringHandle err = stream_res.DebugErr())
+                            {
+                                label_Connection.Text = $"Failed to connect: {err.AsString()}";
+                            }
                         }
                     }
                 }
-			}
-			else
-            {
-				label_Game.Text = "Not playing anything";
             }
         }
 

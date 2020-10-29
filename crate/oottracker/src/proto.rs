@@ -16,7 +16,10 @@ use {
         net::TcpStream,
         prelude::*,
     },
-    crate::save,
+    crate::{
+        knowledge,
+        save,
+    },
 };
 
 pub const TCP_PORT: u16 = 24801;
@@ -60,10 +63,13 @@ pub enum Packet {
     Goodbye,
     SaveDelta(save::Delta),
     SaveInit(save::Save),
+    KnowledgeInit(knowledge::Knowledge),
 }
 
 #[derive(Debug, From, Clone)]
 pub enum PacketReadError {
+    #[from]
+    DungeonRewardLocation(knowledge::DungeonRewardLocationReadError),
     Io(Arc<io::Error>),
     #[from]
     SaveData(save::SaveDataReadError),
@@ -85,6 +91,7 @@ impl Protocol for Packet {
             0 => Packet::Goodbye,
             1 => Packet::SaveDelta(save::Delta::read(tcp_stream).await?),
             2 => Packet::SaveInit(save::Save::read(tcp_stream).await?),
+            3 => Packet::KnowledgeInit(knowledge::Knowledge::read(tcp_stream).await?),
             n => return Err(PacketReadError::UnknownPacketId(n)),
         })
     }
@@ -100,6 +107,10 @@ impl Protocol for Packet {
                 2u8.write(tcp_stream).await?;
                 save.write(tcp_stream).await?;
             }
+            Packet::KnowledgeInit(knowledge) => {
+                3u8.write(tcp_stream).await?;
+                knowledge.write(tcp_stream).await?;
+            }
         }
         Ok(())
     }
@@ -114,6 +125,10 @@ impl Protocol for Packet {
             Packet::SaveInit(save) => {
                 2u8.write_sync(tcp_stream)?;
                 save.write_sync(tcp_stream)?;
+            }
+            Packet::KnowledgeInit(knowledge) => {
+                3u8.write_sync(tcp_stream)?;
+                knowledge.write_sync(tcp_stream)?;
             }
         }
         Ok(())

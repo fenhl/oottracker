@@ -15,6 +15,7 @@ use {
     },
     libc::c_char,
     oottracker::{
+        knowledge::*,
         proto::{
             self,
             Packet,
@@ -28,12 +29,23 @@ use {
 pub struct HandleOwned<T: ?Sized>(*mut T); //TODO *mut Fragile<T>
 
 impl<T: ?Sized> HandleOwned<T> {
+    fn new(value: T) -> HandleOwned<T>
+    where T: Sized {
+        HandleOwned(Box::into_raw(Box::new(value)))
+    }
+
     /// # Safety
     ///
     /// `self` must point at a valid `T`. This function takes ownership of the `T`.
     unsafe fn into_box(self) -> Box<T> {
         assert!(!self.0.is_null());
         Box::from_raw(self.0)
+    }
+}
+
+impl<T: Default> Default for HandleOwned<T> {
+    fn default() -> HandleOwned<T> {
+        HandleOwned(Box::into_raw(Box::default()))
     }
 }
 
@@ -48,7 +60,7 @@ impl<T: ?Sized> HandleOwned<T> {
             proto::VERSION.write_sync(&mut tcp_stream)?;
             Ok(tcp_stream)
         });
-    HandleOwned(Box::into_raw(Box::new(tcp_stream)))
+    HandleOwned::new(tcp_stream)
 }
 
 /// # Safety
@@ -64,7 +76,7 @@ impl<T: ?Sized> HandleOwned<T> {
             proto::VERSION.write_sync(&mut tcp_stream)?;
             Ok(tcp_stream)
         });
-    HandleOwned(Box::into_raw(Box::new(tcp_stream)))
+    HandleOwned::new(tcp_stream)
 }
 
 /// # Safety
@@ -85,7 +97,7 @@ impl<T: ?Sized> HandleOwned<T> {
 ///
 /// `tcp_stream_res` must point at a valid `io::Result<TcpStream>`. This function takes ownership of the `Result`.
 #[no_mangle] pub unsafe extern "C" fn tcp_stream_result_unwrap(tcp_stream_res: HandleOwned<io::Result<TcpStream>>) -> HandleOwned<TcpStream> {
-    HandleOwned(Box::into_raw(Box::new(tcp_stream_res.into_box().unwrap())))
+    HandleOwned::new(tcp_stream_res.into_box().unwrap())
 }
 
 /// # Safety
@@ -114,7 +126,7 @@ impl<T: ?Sized> HandleOwned<T> {
 /// `tcp_stream` must point at a valid `TcpStream`. This function takes ownership of the `TcpStream`.
 #[no_mangle] pub unsafe extern "C" fn tcp_stream_disconnect(tcp_stream: HandleOwned<TcpStream>) -> HandleOwned<io::Result<()>> {
     let mut tcp_stream = tcp_stream.into_box();
-    HandleOwned(Box::into_raw(Box::new(Packet::Goodbye.write_sync(&mut tcp_stream))))
+    HandleOwned::new(Packet::Goodbye.write_sync(&mut tcp_stream))
 }
 
 /// # Safety
@@ -144,7 +156,7 @@ impl<T: ?Sized> HandleOwned<T> {
 #[no_mangle] pub unsafe extern "C" fn save_from_save_data(start: *const u8) -> HandleOwned<Result<Save, SaveDataDecodeError>> {
     assert!(!start.is_null());
     let save_data = slice::from_raw_parts(start, SIZE);
-    HandleOwned(Box::into_raw(Box::new(Save::from_save_data(save_data))))
+    HandleOwned::new(Save::from_save_data(save_data))
 }
 
 /// # Safety
@@ -165,7 +177,7 @@ impl<T: ?Sized> HandleOwned<T> {
 ///
 /// `save_res` must point at a valid `Result<Save, SaveDataDecodeError>`. This function takes ownership of the `Result`.
 #[no_mangle] pub unsafe extern "C" fn save_result_unwrap(save_res: HandleOwned<Result<Save, SaveDataDecodeError>>) -> HandleOwned<Save> {
-    HandleOwned(Box::into_raw(Box::new(save_res.into_box().unwrap())))
+    HandleOwned::new(save_res.into_box().unwrap())
 }
 
 /// # Safety
@@ -193,7 +205,7 @@ impl<T: ?Sized> HandleOwned<T> {
 ///
 /// `tcp_stream` must be a unique pointer at a valid `TcpStream` and `save` must point at a valid `Save`.
 #[no_mangle] pub unsafe extern "C" fn save_send(tcp_stream: *mut TcpStream, save: *const Save) -> HandleOwned<io::Result<()>> {
-    HandleOwned(Box::into_raw(Box::new(Packet::SaveInit((&*save).clone()).write_sync(&mut *tcp_stream))))
+    HandleOwned::new(Packet::SaveInit((&*save).clone()).write_sync(&mut *tcp_stream))
 }
 
 /// # Safety
@@ -207,7 +219,7 @@ impl<T: ?Sized> HandleOwned<T> {
 ///
 /// `old_save` and `new_save` must point at valid `Save`s.
 #[no_mangle] pub unsafe extern "C" fn saves_diff(old_save: *const Save, new_save: *const Save) -> HandleOwned<Delta> {
-    HandleOwned(Box::into_raw(Box::new(&*new_save - &*old_save)))
+    HandleOwned::new(&*new_save - &*old_save)
 }
 
 /// # Safety
@@ -223,5 +235,29 @@ impl<T: ?Sized> HandleOwned<T> {
 ///
 /// `diff` must point at a valid `Delta`. This function takes ownership of the `Delta`.
 #[no_mangle] pub unsafe extern "C" fn saves_diff_send(tcp_stream: *mut TcpStream, diff: HandleOwned<Delta>) -> HandleOwned<io::Result<()>> {
-    HandleOwned(Box::into_raw(Box::new(Packet::SaveDelta(*diff.into_box()).write_sync(&mut *tcp_stream))))
+    HandleOwned::new(Packet::SaveDelta(*diff.into_box()).write_sync(&mut *tcp_stream))
+}
+
+#[no_mangle] pub extern "C" fn knowledge_none() -> HandleOwned<Knowledge> {
+    HandleOwned::default()
+}
+
+#[no_mangle] pub extern "C" fn knowledge_vanilla() -> HandleOwned<Knowledge> {
+    HandleOwned::new(Knowledge::vanilla())
+}
+
+/// # Safety
+///
+/// `knowledge` must point at a valid `Knowledge`. This function takes ownership of the `Knowledge`.
+#[no_mangle] pub unsafe extern "C" fn knowledge_free(knowledge: HandleOwned<Knowledge>) {
+    let _ = knowledge.into_box();
+}
+
+/// # Safety
+///
+/// `tcp_stream` must be a unique pointer at a valid `TcpStream`.
+///
+/// `knowledge` must point at a valid `Knowledge`.
+#[no_mangle] pub unsafe extern "C" fn knowledge_send(tcp_stream: *mut TcpStream, knowledge: *const Knowledge) -> HandleOwned<io::Result<()>> {
+    HandleOwned::new(Packet::KnowledgeInit((&*knowledge).clone()).write_sync(&mut *tcp_stream))
 }
