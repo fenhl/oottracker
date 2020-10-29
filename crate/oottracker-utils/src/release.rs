@@ -179,7 +179,7 @@ async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release) -> 
 #[cfg(windows)]
 async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
     eprintln!("updating repo on bureflux");
-    Command::new("ssh").arg("bureflux").arg("git").arg("--git-dir=/opt/git/github.com/fenhl/oottracker/master/.git").arg("pull").arg("--ff").check("ssh").await?;
+    Command::new("ssh").arg("bureflux").arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff'").check("ssh").await?;
     eprintln!("connecting to bureflux");
     Command::new("ssh").arg("bureflux").arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").check("ssh").await?;
     eprintln!("downloading oottracker-mac-intel.dmg from bureflux");
