@@ -528,8 +528,8 @@ impl TrackerCell {
                 DungeonRewardLocation::ShadowTemple => xopar_image!(shadow_text),
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
-            }.width(Length::Units(34)),
-            TrackerCell::GoronRuby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(34)),
+            }.width(Length::Units(33)),
+            TrackerCell::GoronRuby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(33)),
             TrackerCell::ZoraSapphireLocation => match state.knowledge.zora_sapphire_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
@@ -737,6 +737,7 @@ impl Application for State {
                 .push(cell!(WaterMedallionLocation))
                 .push(cell!(ShadowMedallionLocation))
                 .push(cell!(SpiritMedallionLocation))
+                .spacing(1)
             )
             .push(Row::new()
                 .push(cell!(LightMedallion))
@@ -745,6 +746,7 @@ impl Application for State {
                 .push(cell!(WaterMedallion))
                 .push(cell!(ShadowMedallion))
                 .push(cell!(SpiritMedallion))
+                .spacing(1)
             )
             .push(Row::new()
                 .push(cell!(AdultTrade))
@@ -752,17 +754,21 @@ impl Application for State {
                 .push(Column::new()
                     .push(cell!(KokiriEmeraldLocation))
                     .push(cell!(KokiriEmerald))
+                    .spacing(1)
                 )
                 .push(Column::new()
                     .push(cell!(GoronRubyLocation))
                     .push(cell!(GoronRuby))
+                    .spacing(1)
                 )
                 .push(Column::new()
                     .push(cell!(ZoraSapphireLocation))
                     .push(cell!(ZoraSapphire))
+                    .spacing(1)
                 )
                 .push(cell!(Bottle))
                 .push(cell!(Scale))
+                .spacing(1)
             )
             .push(Row::new()
                 .push(cell!(Slingshot))
@@ -771,6 +777,7 @@ impl Application for State {
                 .push(cell!(Strength))
                 .push(cell!(Magic))
                 .push(cell!(Spells))
+                .spacing(1)
             )
             .push(Row::new()
                 .push(cell!(Hookshot))
@@ -779,6 +786,7 @@ impl Application for State {
                 .push(cell!(Hammer)) 
                 .push(cell!(Boots))
                 .push(cell!(MirrorShield))
+                .spacing(1)
             )
             .push(Row::new()
                 .push(cell!(ChildTrade))
@@ -787,12 +795,13 @@ impl Application for State {
                 .push(cell!(SwordCard))
                 .push(cell!(Tunics))
                 .push(cell!(Triforce)) //TODO if triforce hunt is off and autotracker is on, replace with something else (big poes?)
+                .spacing(1)
             );
         let view = if let Some(ref notification) = self.notification {
             view.push(Row::new()
                 .push(Text::new(format!("{:?}", notification)).color([1.0, 1.0, 1.0])) //TODO Display instead of Debug
                 .push(Button::new(&mut self.dismiss_notification_button, Text::new("X").color([1.0, 0.0, 0.0])).on_press(Message::DismissNotification))
-                .height(Length::Units(100))
+                .height(Length::Units(101))
             )
         } else {
             view.push(Row::new() //TODO overlay with song checks
@@ -802,6 +811,7 @@ impl Application for State {
                     .push(cell!(SunsSong))
                     .push(cell!(SongOfTime))
                     .push(cell!(SongOfStorms))
+                    .spacing(1)
                 )
                 .push(Row::new() //TODO overlay with song checks
                     .push(cell!(Minuet))
@@ -810,9 +820,10 @@ impl Application for State {
                     .push(cell!(Requiem))
                     .push(cell!(Nocturne))
                     .push(cell!(Prelude))
+                    .spacing(1)
                 )
         };
-        Container::new(view).style(ContainerStyle).into()
+        Container::new(view.spacing(1).padding(1)).style(ContainerStyle).into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -823,7 +834,7 @@ impl Application for State {
 fn main() {
     State::run(Settings {
         window: window::Settings {
-            size: (50 * 6, 18 + 50 * 7),
+            size: (50 * 6 + 7, 18 + 50 * 7 + 9),
             resizable: false,
             ..window::Settings::default()
         },
