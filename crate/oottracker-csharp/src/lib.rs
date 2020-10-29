@@ -49,6 +49,10 @@ impl<T: Default> Default for HandleOwned<T> {
     }
 }
 
+#[no_mangle] pub extern "C" fn version() -> HandleOwned<c_char> {
+    HandleOwned(CString::new(oottracker::version().to_string()).unwrap().into_raw())
+}
+
 /// # Safety
 ///
 /// `addr` must point at the start of a valid slice of length 4 and must not be mutated for the duration of the function call.

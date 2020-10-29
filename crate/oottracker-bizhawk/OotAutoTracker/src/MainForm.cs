@@ -17,6 +17,8 @@ namespace Net.Fenhl.OotAutoTracker
     internal class Native
     {
         [DllImport("oottracker")]
+        internal static extern StringHandle version();
+        [DllImport("oottracker")]
         internal static extern TcpStreamResultHandle connect_ipv4(byte[] addr);
         [DllImport("oottracker")]
         internal static extern TcpStreamResultHandle connect_ipv6(byte[] addr);
@@ -448,6 +450,7 @@ namespace Net.Fenhl.OotAutoTracker
     [ExternalTool("OoT autotracker")]
 	public sealed class MainForm : Form, IExternalToolForm
     {
+        private Label label_Version;
         private Label label_Game;
         private Label label_Connection;
         private Label label_Save;
@@ -615,42 +618,52 @@ namespace Net.Fenhl.OotAutoTracker
 
         private void InitializeComponent()
         {
+            this.label_Version = new System.Windows.Forms.Label();
             this.label_Game = new System.Windows.Forms.Label();
             this.label_Connection = new System.Windows.Forms.Label();
             this.label_Save = new System.Windows.Forms.Label();
             this.SuspendLayout();
+            //
+            // label_Version
+            //
+            this.label_Version.AutoSize = true;
+            this.label_Version.Location = new System.Drawing.Point(12, 9);
+            this.label_Version.Name = "label_Version";
+            this.label_Version.Size = new System.Drawing.Size(96, 25);
+            this.label_Version.TabIndex = 0;
+            this.label_Version.Text = $"OoT autotracker version {Native.version().AsString()}";
             // 
             // label_Game
             // 
             this.label_Game.AutoSize = true;
-            this.label_Game.Location = new System.Drawing.Point(12, 9);
+            this.label_Game.Location = new System.Drawing.Point(12, 34);
             this.label_Game.Name = "label_Game";
             this.label_Game.Size = new System.Drawing.Size(96, 25);
-            this.label_Game.TabIndex = 0;
-            this.label_Game.Text = "Game: loading";
+            this.label_Game.TabIndex = 1;
             this.label_Game.Text = "Game: loading";
             // 
             // label_Connection
             // 
             this.label_Connection.AutoSize = true;
-            this.label_Connection.Location = new System.Drawing.Point(12, 34);
+            this.label_Connection.Location = new System.Drawing.Point(12, 59);
             this.label_Connection.Name = "label_Connection";
             this.label_Connection.Size = new System.Drawing.Size(96, 25);
-            this.label_Connection.TabIndex = 1;
+            this.label_Connection.TabIndex = 2;
             this.label_Connection.Text = "Connection: waiting for game";
             // 
             // label_Save
             // 
             this.label_Save.AutoSize = true;
-            this.label_Save.Location = new System.Drawing.Point(12, 59);
+            this.label_Save.Location = new System.Drawing.Point(12, 84);
             this.label_Save.Name = "label_Save";
             this.label_Save.Size = new System.Drawing.Size(96, 25);
-            this.label_Save.TabIndex = 2;
+            this.label_Save.TabIndex = 3;
             this.label_Save.Text = "Save: waiting for game";
             // 
             // MainForm
             // 
             this.ClientSize = new System.Drawing.Size(274, 229);
+            this.Controls.Add(this.label_Version);
             this.Controls.Add(this.label_Game);
             this.Controls.Add(this.label_Connection);
             this.Controls.Add(this.label_Save);

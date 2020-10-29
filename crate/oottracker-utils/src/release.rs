@@ -79,8 +79,10 @@ async fn release_client() -> Result<reqwest::Client, Error> {
 }
 
 fn version() -> Version {
-    //TODO make sure versions of all crates are equal
-    Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version")
+    let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
+    assert_eq!(version, oottracker::version());
+    //TODO also compare other crates' versions
+    version
 }
 
 async fn setup() -> Result<(reqwest::Client, Repo), Error> {

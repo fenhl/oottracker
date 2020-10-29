@@ -21,6 +21,9 @@ version = "0.99"
 default-features = false
 features = ["from"]
 
+[dependencies.oottracker]
+path = "../oottracker"
+
 [dependencies.reqwest]
 version = "0.10"
 default-features = false
