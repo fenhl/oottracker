@@ -6,7 +6,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using System.Windows.Forms;
 
 using BizHawk.Client.Common;
@@ -447,7 +446,8 @@ namespace Net.Fenhl.OotAutoTracker
         }
     }
 
-    [ExternalTool("OoT autotracker")]
+    [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
+    [ExternalToolEmbeddedIcon("Net.Fenhl.OotAutoTracker.icon.ico")]
 	public sealed class MainForm : Form, IExternalToolForm
     {
         private Label label_Version;
@@ -548,7 +548,7 @@ namespace Net.Fenhl.OotAutoTracker
                     {
                         Save save = new Save(state_res);
                         {
-                            using (StringHandle debug = save.Debug()) label_Save.Text = $"Save data ok, last checked {DateTime.Now}, debug: {debug.AsString()}";
+                            using (StringHandle debug = save.Debug()) label_Save.Text = $"Save data ok, last checked {DateTime.Now}";
                             if (prevSave == null)
                             {
                                 if (this.stream != null)
@@ -623,6 +623,7 @@ namespace Net.Fenhl.OotAutoTracker
             this.label_Connection = new System.Windows.Forms.Label();
             this.label_Save = new System.Windows.Forms.Label();
             this.SuspendLayout();
+            this.Icon = Properties.Resources.icon;
             //
             // label_Version
             //
@@ -670,7 +671,6 @@ namespace Net.Fenhl.OotAutoTracker
             this.Name = "MainForm";
             this.ResumeLayout(false);
             this.PerformLayout();
-
         }
     }
 }

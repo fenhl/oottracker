@@ -1,8 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<LangVersion>8.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<TargetFramework>net48</TargetFramework>
+		<ApplicationIcon>icon.ico</ApplicationIcon>
+		<RootNamespace>Net.Fenhl.OotAutoTracker</RootNamespace>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0" PrivateAssets="all" />
@@ -14,9 +16,25 @@
 		<Reference Include="BizHawk.WinForms.Controls" HintPath="$(ProjectDir)../BizHawk/dll/BizHawk.WinForms.Controls.dll" />
 	</ItemGroup>
 	<ItemGroup>
-	  <None Update="oottracker.dll">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
+	    <None Update="oottracker.dll">
+	        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	    </None>
+	</ItemGroup>
+	<ItemGroup>
+	    <EmbeddedResource Include="icon.ico" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Compile Update="Properties\Resources.Designer.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>Resources.resx</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+	<ItemGroup>
+	    <EmbeddedResource Update="Properties\Resources.resx">
+	        <Generator>PublicResXFileCodeGenerator</Generator>
+	        <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+	    </EmbeddedResource>
 	</ItemGroup>
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<Copy SourceFiles="$(OutputPath)$(MSBuildProjectName).dll" DestinationFolder="$(ProjectDir)../BizHawk/ExternalTools" />

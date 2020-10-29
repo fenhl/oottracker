@@ -1,4 +1,4 @@
-This is a tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include auto-tracking for [BizHawk](http://tasvideos.org/BizHawk.html).
+This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include auto-tracking for [BizHawk](http://tasvideos.org/BizHawk.html).
 
 # Download
 
