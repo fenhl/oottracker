@@ -192,6 +192,17 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release) -
 }
 
 #[cfg(windows)]
+async fn build_web() -> Result<(), Error> {
+    eprintln!("building for wasm");
+    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").arg("--target=wasm32-unknown-unknown").check("cargo").await?;
+    Command::new("wasm-bindgen").arg("target/wasm32-unknown-unknown/release/oottracker-gui.wasm").arg("--out-dir=assets/wasm").arg("--target=web").check("wasm-bindgen").await?;
+    eprintln!("uploading web app");
+    Command::new("scp").arg("assets/wasm/*").arg("mercredi:/var/www/oottracker.fenhl.net").check("scp").await?;
+    Command::new("scp").arg("-r").arg("assets/xopar-*").arg("mercredi:/var/www/oottracker.fenhl.net/assets").check("scp").await?;
+    Ok(())
+}
+
+#[cfg(windows)]
 async fn write_release_notes() -> Result<String, Error> {
     eprintln!("editing release notes");
     let mut release_notes_file = tempfile::Builder::new()
@@ -227,14 +238,16 @@ async fn main() -> Result<(), Error> {
     let release_notes = release_notes?;
     eprintln!("creating release");
     let release = repo.create_release(&client, format!("OoT Tracker {}", version()), format!("v{}", version()), release_notes).await?;
-    let (build_bizhawk_res, build_gui_res, build_macos_res) = tokio::join!(
+    let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
         build_bizhawk(&client, &repo, &release),
         build_gui(&client, &repo, &release),
         build_macos(&client, &repo, &release),
+        build_web(),
     );
     let () = build_bizhawk_res?;
     let () = build_gui_res?;
     let () = build_macos_res?;
+    let () = build_web_res?;
     eprintln!("publishing release");
     repo.publish_release(&client, release).await?;
     Ok(())
