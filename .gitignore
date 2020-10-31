@@ -1,6 +1,10 @@
 /assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui
 /assets/oottracker-mac-intel.dmg
 /assets/release-token
+/assets/wasm/oottracker-gui_bg.wasm
+/assets/wasm/oottracker-gui_bg.wasm.d.ts
+/assets/wasm/oottracker-gui.d.ts
+/assets/wasm/oottracker-gui.js
 /crate/oottracker-bizhawk/OotAutoTracker/BizHawk
 /crate/oottracker-bizhawk/OotAutoTracker/src/.vs
 /crate/oottracker-bizhawk/OotAutoTracker/src/bin

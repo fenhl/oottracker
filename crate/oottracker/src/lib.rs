@@ -9,7 +9,7 @@ pub use crate::{
 pub mod event_chk_inf;
 mod item_ids;
 pub mod knowledge;
-pub mod proto;
+#[cfg(not(target_arch = "wasm32"))] pub mod proto;
 pub mod save;
 
 pub fn version() -> Version {

@@ -9,10 +9,8 @@ use {
     derive_more::From,
     tokio::process::Command,
 };
-#[cfg(target_os = "macos")]
-use tokio::fs;
-#[cfg(windows)]
-use {
+#[cfg(target_os = "macos")] use tokio::fs;
+#[cfg(windows)] use {
     std::{
         cmp::Ordering::*,
         env,
@@ -41,8 +39,7 @@ use {
     },
 };
 
-#[cfg(windows)]
-mod github;
+#[cfg(windows)] mod github;
 
 #[derive(Debug, From)]
 enum Error {

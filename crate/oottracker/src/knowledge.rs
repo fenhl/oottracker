@@ -3,8 +3,10 @@ use {
         io,
         sync::Arc,
     },
-    async_trait::async_trait,
     smart_default::SmartDefault,
+};
+#[cfg(not(target_arch = "wasm32"))] use {
+    async_trait::async_trait,
     tokio::net::TcpStream,
     crate::proto::Protocol,
 };
@@ -36,6 +38,7 @@ impl From<io::Error> for DungeonRewardLocationReadError {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Protocol for DungeonRewardLocation {
     type ReadError = DungeonRewardLocationReadError;
@@ -117,6 +120,7 @@ impl Knowledge {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Protocol for Knowledge {
     type ReadError = DungeonRewardLocationReadError;

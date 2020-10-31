@@ -14,6 +14,7 @@ use {
         Subscription,
         widget::{
             Column,
+            Image,
             Row,
             Text,
             button::{
@@ -24,25 +25,38 @@ use {
                 self,
                 Container,
             },
-            image::{
-                self,
-                Image,
-            },
         },
         window,
     },
     oottracker::{
         event_chk_inf::*,
         knowledge::*,
-        proto::{
-            self,
-            Packet,
-        },
         save::*,
     },
 };
+#[cfg(not(target_arch = "wasm32"))] use {
+    iced::image,
+    oottracker::proto::{
+        self,
+        Packet,
+    },
+};
 
-mod tcp_server;
+#[cfg(not(target_arch = "wasm32"))] mod tcp_server;
+
+macro_rules! embed_image {
+    ($path:expr) => {{
+        #[cfg(not(target_arch = "wasm32"))] {
+            Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/", $path)).to_vec()))
+        }
+        #[cfg(target_arch = "wasm32")] {
+            Image::new(concat!("assets/", $path))
+        }
+    }};
+}
+
+const WIDTH: u32 = 50 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
+const HEIGHT: u32 = 18 + 50 * 7 + 9; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 1px spacing
 
 struct ContainerStyle;
 
@@ -371,16 +385,16 @@ impl TrackerCell {
             (@count_inner $filename:ident $count:expr, $($n:literal),*) => {{
                 match $count {
                     $(
-                        $n => include_bytes!(concat!("../../../assets/xopar-images-count/", stringify!($filename), "_", stringify!($n), ".png")).to_vec(),
+                        $n => embed_image!(concat!("xopar-images-count/", stringify!($filename), "_", stringify!($n), ".png")),
                     )*
                     _ => unreachable!(),
                 }
             }};
             ($filename:ident) => {{
-                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images/", stringify!($filename), ".png")).to_vec()))
+                embed_image!(concat!("xopar-images/", stringify!($filename), ".png"))
             }};
             (count = $count:expr, $filename:ident) => {{
-                Image::new(image::Handle::from_memory(xopar_image!(@count_inner $filename $count,
+                xopar_image!(@count_inner $filename $count,
                     1, 2, 3, 4, 5, 6, 7, 8, 9,
                     10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                     20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
@@ -392,10 +406,10 @@ impl TrackerCell {
                     80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
                     90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
                     100
-                )))
+                )
             }};
             (dimmed $filename:ident) => {{
-                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images-dimmed/", stringify!($filename), ".png")).to_vec()))
+                embed_image!(concat!("xopar-images-dimmed/", stringify!($filename), ".png"))
             }};
             (undim = $undim:expr, $filename:ident) => {{
                 if $undim {
@@ -405,12 +419,13 @@ impl TrackerCell {
                 }
             }};
             (overlay $filename:ident) => {{
-                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images-overlay/", stringify!($filename), ".png")).to_vec()))
+                embed_image!(concat!("xopar-images-overlay/", stringify!($filename), ".png"))
             }};
             (overlay_dimmed $filename:ident) => {{
-                Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/xopar-images-overlay-dimmed/", stringify!($filename), ".png")).to_vec()))
+                embed_image!(concat!("xopar-images-overlay-dimmed/", stringify!($filename), ".png"))
             }};
         }
+
         let content = match self {
             TrackerCell::LightMedallionLocation => match state.knowledge.light_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
@@ -664,11 +679,15 @@ struct ModelState {
 
 #[derive(Debug, Clone)]
 enum Message {
+    #[cfg(not(target_arch = "wasm32"))]
     ClientConnected,
+    #[cfg(not(target_arch = "wasm32"))]
     ClientDisconnected,
     DismissNotification,
     LeftClick(TrackerCell),
+    #[cfg(not(target_arch = "wasm32"))]
     NetworkError(proto::ReadError),
+    #[cfg(not(target_arch = "wasm32"))]
     Packet(Packet),
 }
 
@@ -685,6 +704,7 @@ impl State {
     /// Adds a visible notification/alert/log message.
     ///
     /// Implemented as a separate method in case the way this is displayed is changed later, e.g. to allow multiple notifications.
+    #[cfg(not(target_arch = "wasm32"))]
     fn notify(&mut self, message: Message) {
         self.notification = Some(message);
     }
@@ -700,17 +720,21 @@ impl Application for State {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
+            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => {
                 self.client_connected = true;
                 self.notify(message); //TODO automatically hide message after some amount of time
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientDisconnected => {
                 self.client_connected = false;
                 self.notify(message); //TODO automatically hide message after some amount of time
             }
             Message::DismissNotification => self.notification = None,
             Message::LeftClick(cell) => cell.left_click(&mut self.model),
+            #[cfg(not(target_arch = "wasm32"))]
             Message::NetworkError(_) => self.notify(message),
+            #[cfg(not(target_arch = "wasm32"))]
             Message::Packet(packet) => match packet {
                 Packet::Goodbye => unreachable!(), // Goodbye is not yielded from proto::read
                 Packet::SaveDelta(delta) => self.model.save = &self.model.save + &delta,
@@ -824,18 +848,32 @@ impl Application for State {
                     .spacing(1)
                 )
         };
-        Container::new(view.spacing(1).padding(1)).style(ContainerStyle).into()
+        Container::new(Container::new(view.spacing(1).padding(1))
+                .width(Length::Units(WIDTH as u16))
+                .height(Length::Units(HEIGHT as u16))
+            )
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x()
+            .center_y()
+            .style(ContainerStyle)
+            .into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        Subscription::from_recipe(tcp_server::Subscription)
+        #[cfg(not(target_arch = "wasm32"))] {
+            Subscription::from_recipe(tcp_server::Subscription)
+        }
+        #[cfg(target_arch = "wasm32")] {
+            Subscription::none()
+        }
     }
 }
 
 fn main() {
     State::run(Settings {
         window: window::Settings {
-            size: (50 * 6 + 7, 18 + 50 * 7 + 9),
+            size: (WIDTH, HEIGHT),
             resizable: false,
             ..window::Settings::default()
         },

@@ -4,10 +4,7 @@ use {
             TryFrom,
             TryInto as _,
         },
-        io::{
-            self,
-            prelude::*,
-        },
+        io,
         num::TryFromIntError,
         ops::{
             Add,
@@ -15,7 +12,6 @@ use {
         },
         sync::Arc,
     },
-    async_trait::async_trait,
     bitflags::bitflags,
     byteorder::{
         BigEndian,
@@ -23,15 +19,19 @@ use {
     },
     derive_more::From,
     smart_default::SmartDefault,
+    crate::{
+        event_chk_inf::EventChkInf,
+        item_ids,
+    },
+};
+#[cfg(not(target_arch = "wasm32"))] use {
+    std::io::prelude::*,
+    async_trait::async_trait,
     tokio::{
         net::TcpStream,
         prelude::*,
     },
-    crate::{
-        event_chk_inf::EventChkInf,
-        item_ids,
-        proto::Protocol,
-    },
+    crate::proto::Protocol,
 };
 
 pub const SIZE: usize = 0x1450;
@@ -619,6 +619,7 @@ impl From<io::Error> for SaveDataReadError {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Protocol for Save {
     type ReadError = SaveDataReadError;
@@ -678,6 +679,7 @@ impl<'a, 'b> Sub<&'b Save> for &'a Save {
 #[derive(Debug, Clone)]
 pub struct Delta(Vec<(u16, u8)>);
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Protocol for Delta {
     type ReadError = io::Error;

@@ -1,5 +1,9 @@
 This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include auto-tracking for [BizHawk](http://tasvideos.org/BizHawk.html).
 
+# Web app
+
+<https://oottracker.fenhl.net/>
+
 # Download
 
 * main app: [Windows (64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-win64.exe) • [macOS (Intel)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-mac-intel.dmg)
