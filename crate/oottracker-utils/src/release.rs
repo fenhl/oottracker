@@ -143,12 +143,14 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release)
     Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building oottracker-bizhawk");
     Command::new("cargo").arg("build").arg("--package=oottracker-bizhawk").check("cargo").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
+    eprintln!("building OotAutoTracker");
+    Command::new("dotnet").arg("build").arg("--configuration=release").current_dir("crate/oottracker-bizhawk/OotAutoTracker/src").check("dotnet").await?;
     eprintln!("creating oottracker-bizhawk-win64.zip");
     let mut buf = Cursor::<Vec<_>>::default();
     {
         let mut zip = ZipWriter::new(&mut buf); //TODO replace with an async zip writer
         zip.start_file("README.txt", FileOptions::default())?;
-        io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/assets/README.txt")?, &mut zip)?;
+        io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/assets/README.txt")?, &mut zip)?; //TODO auto-update BizHawk version
         zip.start_file("OotAutoTracker.dll", FileOptions::default())?;
         io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/OotAutoTracker.dll")?, &mut zip)?;
         zip.start_file("oottracker.dll", FileOptions::default())?;
