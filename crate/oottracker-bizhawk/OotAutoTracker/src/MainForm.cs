@@ -454,6 +454,7 @@ namespace Net.Fenhl.OotAutoTracker
         private Label label_Game;
         private Label label_Connection;
         private Label label_Save;
+        private Label label_Help;
 
         [RequiredApi]
 		private IMemoryApi? _maybeMemAPI { get; set; }
@@ -464,6 +465,10 @@ namespace Net.Fenhl.OotAutoTracker
         private TcpStream? stream;
         private List<byte> prevSaveData = new List<byte>();
         private Save? prevSave;
+
+        private bool gameOk = false;
+        private bool connectionOk = false;
+        private bool saveOk = false;
 
 		public MainForm()
 		{
@@ -480,12 +485,18 @@ namespace Net.Fenhl.OotAutoTracker
             if (this.stream != null) this.stream.Disconnect().Dispose();
             this.stream = null;
             label_Connection.Text = "Connection: waiting for game";
+            this.connectionOk = false;
+            UpdateHelpLabel();
             if (this.prevSave != null) this.prevSave.Dispose();
             this.prevSave = null;
             label_Save.Text = "Save: waiting for game";
+            this.saveOk = false;
+            UpdateHelpLabel();
             if (GlobalWin.Game.Name == "Null")
             {
                 label_Game.Text = "Not playing anything";
+                this.gameOk = false;
+                UpdateHelpLabel();
             }
             else
             {
@@ -493,6 +504,8 @@ namespace Net.Fenhl.OotAutoTracker
                 if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0"))))
                 {
                     label_Game.Text = $"Game: Expected OoT or OoTR, found {GlobalWin.Game.Name} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})";
+                    this.gameOk = false;
+                    UpdateHelpLabel();
                 }
                 else
                 {
@@ -501,10 +514,14 @@ namespace Net.Fenhl.OotAutoTracker
                     if (this.isVanilla)
                     {
                         label_Game.Text = "Playing OoT (vanilla)";
+                        this.gameOk = true;
+                        UpdateHelpLabel();
                     }
                     else
                     {
                         label_Game.Text = $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}";
+                        this.gameOk = true;
+                        UpdateHelpLabel();
                     }
                     using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback))
                     {
@@ -513,6 +530,8 @@ namespace Net.Fenhl.OotAutoTracker
                             if (this.stream != null) this.stream.Disconnect().Dispose();
                             this.stream = new TcpStream(stream_res);
                             label_Connection.Text = "Connected";
+                            this.connectionOk = true;
+                            UpdateHelpLabel();
                             if (this.isVanilla)
                             {
                                 using (var knowledge = new Knowledge(true))
@@ -526,6 +545,8 @@ namespace Net.Fenhl.OotAutoTracker
                             using (StringHandle err = stream_res.DebugErr())
                             {
                                 label_Connection.Text = $"Failed to connect: {err.AsString()}";
+                                this.connectionOk = false;
+                                UpdateHelpLabel();
                             }
                         }
                     }
@@ -548,7 +569,12 @@ namespace Net.Fenhl.OotAutoTracker
                     {
                         Save save = new Save(state_res);
                         {
-                            using (StringHandle debug = save.Debug()) label_Save.Text = $"Save data ok, last checked {DateTime.Now}";
+                            using (StringHandle debug = save.Debug())
+                            {
+                                label_Save.Text = $"Save data ok, last checked {DateTime.Now}";
+                                this.saveOk = true;
+                                UpdateHelpLabel();
+                            }
                             if (prevSave == null)
                             {
                                 if (this.stream != null)
@@ -562,11 +588,15 @@ namespace Net.Fenhl.OotAutoTracker
                                             using (StringHandle err = io_res.DebugErr())
                                             {
                                                 label_Connection.Text = $"Failed to send save data: {err.AsString()}";
+                                                this.connectionOk = false;
+                                                UpdateHelpLabel();
                                             }
                                         }
                                         else
                                         {
                                             label_Connection.Text = $"Connected, initial save data sent {DateTime.Now}";
+                                            this.connectionOk = true;
+                                            UpdateHelpLabel();
                                         }
                                     }
                                 }
@@ -587,11 +617,15 @@ namespace Net.Fenhl.OotAutoTracker
                                                 using (StringHandle err = io_res.DebugErr())
                                                 {
                                                     label_Connection.Text = $"Failed to send save data: {err.AsString()}";
+                                                    this.connectionOk = false;
+                                                    UpdateHelpLabel();
                                                 }
                                             }
                                             else
                                             {
                                                 label_Connection.Text = $"Connected, save data last sent {DateTime.Now}";
+                                                this.connectionOk = false;
+                                                UpdateHelpLabel();
                                             }
                                         }
                                     }
@@ -610,64 +644,89 @@ namespace Net.Fenhl.OotAutoTracker
                         using (StringHandle err = state_res.DebugErr())
                         {
                             label_Save.Text = $"Error reading save data: {err.AsString()}";
+                            this.saveOk = false;
+                            UpdateHelpLabel();
                         }
                     }
                 }
             }
         }
 
+        private void UpdateHelpLabel()
+        {
+            if (this.gameOk && this.connectionOk && this.saveOk)
+            {
+                label_Help.Text = "You can now minimize this window. To stop auto-tracking, close this window.";
+            }
+            else
+            {
+                label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
+            }
+        }
+
         private void InitializeComponent()
         {
-            this.label_Version = new System.Windows.Forms.Label();
-            this.label_Game = new System.Windows.Forms.Label();
-            this.label_Connection = new System.Windows.Forms.Label();
-            this.label_Save = new System.Windows.Forms.Label();
+            this.label_Version = new Label();
+            this.label_Game = new Label();
+            this.label_Connection = new Label();
+            this.label_Save = new Label();
+            this.label_Help = new Label();
             this.SuspendLayout();
             this.Icon = Properties.Resources.icon;
             //
             // label_Version
             //
             this.label_Version.AutoSize = true;
-            this.label_Version.Location = new System.Drawing.Point(12, 9);
+            this.label_Version.Location = new Point(12, 9);
             this.label_Version.Name = "label_Version";
-            this.label_Version.Size = new System.Drawing.Size(96, 25);
+            this.label_Version.Size = new Size(96, 25);
             this.label_Version.TabIndex = 0;
             this.label_Version.Text = $"OoT autotracker version {Native.version().AsString()}";
             // 
             // label_Game
             // 
             this.label_Game.AutoSize = true;
-            this.label_Game.Location = new System.Drawing.Point(12, 34);
+            this.label_Game.Location = new Point(12, 34);
             this.label_Game.Name = "label_Game";
-            this.label_Game.Size = new System.Drawing.Size(96, 25);
+            this.label_Game.Size = new Size(96, 25);
             this.label_Game.TabIndex = 1;
             this.label_Game.Text = "Game: loading";
             // 
             // label_Connection
             // 
             this.label_Connection.AutoSize = true;
-            this.label_Connection.Location = new System.Drawing.Point(12, 59);
+            this.label_Connection.Location = new Point(12, 59);
             this.label_Connection.Name = "label_Connection";
-            this.label_Connection.Size = new System.Drawing.Size(96, 25);
+            this.label_Connection.Size = new Size(96, 25);
             this.label_Connection.TabIndex = 2;
             this.label_Connection.Text = "Connection: waiting for game";
             // 
             // label_Save
             // 
             this.label_Save.AutoSize = true;
-            this.label_Save.Location = new System.Drawing.Point(12, 84);
+            this.label_Save.Location = new Point(12, 84);
             this.label_Save.Name = "label_Save";
-            this.label_Save.Size = new System.Drawing.Size(96, 25);
+            this.label_Save.Size = new Size(96, 25);
             this.label_Save.TabIndex = 3;
             this.label_Save.Text = "Save: waiting for game";
+            //
+            // label_Help
+            //
+            this.label_Help.AutoSize = true;
+            this.label_Help.Location = new Point(12, 109);
+            this.label_Help.Name = "label_Help";
+            this.label_Help.Size = new Size(96, 25);
+            this.label_Help.TabIndex = 4;
+            this.label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
             // 
             // MainForm
             // 
-            this.ClientSize = new System.Drawing.Size(274, 229);
+            this.ClientSize = new Size(274, 229);
             this.Controls.Add(this.label_Version);
             this.Controls.Add(this.label_Game);
             this.Controls.Add(this.label_Connection);
             this.Controls.Add(this.label_Save);
+            this.Controls.Add(this.label_Help);
             this.Name = "MainForm";
             this.ResumeLayout(false);
             this.PerformLayout();
