@@ -28,6 +28,7 @@ use {
         },
         window,
     },
+    structopt::StructOpt,
     oottracker::{
         checks::checked,
         event_chk_inf::*,
@@ -801,7 +802,7 @@ impl Application for State {
                 .height(Length::Units(101))
             )
         } else {
-            view.push(Row::new() //TODO overlay with song checks
+            view.push(Row::new()
                     .push(cell!(ZeldasLullaby))
                     .push(cell!(EponasSong))
                     .push(cell!(SariasSong))
@@ -810,7 +811,7 @@ impl Application for State {
                     .push(cell!(SongOfStorms))
                     .spacing(1)
                 )
-                .push(Row::new() //TODO overlay with song checks
+                .push(Row::new()
                     .push(cell!(Minuet))
                     .push(cell!(Bolero))
                     .push(cell!(Serenade))
@@ -842,7 +843,11 @@ impl Application for State {
     }
 }
 
-fn main() {
+#[derive(StructOpt)]
+struct Args {}
+
+#[wheel::main]
+fn main(_: Args) {
     State::run(Settings {
         window: window::Settings {
             size: (WIDTH, HEIGHT),

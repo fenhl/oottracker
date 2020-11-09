@@ -15,5 +15,7 @@ pub mod save;
 mod scene_flags;
 
 pub fn version() -> Version {
-    Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version")
+    let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
+    assert_eq!(version, oottracker_derive::version!());
+    version
 }

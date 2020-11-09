@@ -27,6 +27,14 @@ use {
     },
 };
 
+#[proc_macro]
+pub fn version(_: TokenStream) -> TokenStream {
+    let version = env!("CARGO_PKG_VERSION");
+    TokenStream::from(quote! {
+        ::semver::Version::parse(#version).expect("failed to parse current version")
+    })
+}
+
 enum FlagName {
     Ident(Ident),
     Lit(LitStr),

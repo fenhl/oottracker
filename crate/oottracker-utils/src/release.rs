@@ -16,9 +16,11 @@ use {
         env,
         io::Cursor,
         path::Path,
+        process::Stdio,
         time::Duration,
     },
     dir_lock::DirLock,
+    itertools::Itertools as _,
     semver::{
         SemVerError,
         Version,
@@ -106,10 +108,15 @@ async fn release_client() -> Result<reqwest::Client, Error> {
 }
 
 #[cfg(windows)]
-fn version() -> Version {
+async fn version() -> Version {
     let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
-    assert_eq!(version, oottracker::version());
-    //TODO also compare other crates' versions
+    assert_eq!(version, oottracker::version()); // also checks oottracker-derive
+    assert_eq!(version, oottracker_bizhawk::version());
+    //assert_eq!(version, oottracker_csharp::version()); //TODO
+    let gui_output = String::from_utf8(Command::new("cargo").arg("run").arg("--package=oottracker-gui").arg("--").arg("--version").stdout(Stdio::piped()).output().await.expect("failed to run GUI with --version").stdout).expect("gui version output is invalid UTF-8");
+    let (gui_name, gui_version) = gui_output.split(' ').collect_tuple().expect("no space in gui version output");
+    assert_eq!(gui_name, "oottracker-gui");
+    assert_eq!(version, gui_version.parse().expect("failed to parse GUI version"));
     version
 }
 
@@ -122,7 +129,7 @@ async fn setup() -> Result<(reqwest::Client, Repo), Error> {
     eprintln!("checking version");
     if let Some(latest_release) = repo.latest_release(&client).await? {
         let remote_version = latest_release.version()?;
-        match version().cmp(&remote_version) {
+        match version().await.cmp(&remote_version) {
             Less => return Err(Error::VersionRegression),
             Equal => return Err(Error::SameVersion),
             Greater => {}
@@ -239,7 +246,7 @@ async fn main() -> Result<(), Error> {
     let (client, repo) = setup_res?;
     let release_notes = release_notes?;
     eprintln!("creating release");
-    let release = repo.create_release(&client, format!("OoT Tracker {}", version()), format!("v{}", version()), release_notes).await?;
+    let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
     let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
         build_bizhawk(&client, &repo, &release),
         build_gui(&client, &repo, &release),

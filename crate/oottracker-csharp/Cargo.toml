@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
+semver = "0.11"
 
 [dependencies.oottracker]
 path = "../oottracker"

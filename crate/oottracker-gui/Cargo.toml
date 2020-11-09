@@ -15,6 +15,14 @@ features = ["image", "tokio"]
 [dependencies.oottracker]
 path = "../oottracker"
 
+[dependencies.structopt]
+version = "0.3"
+features = ["paw"]
+
+[dependencies.wheel]
+git = "https://github.com/fenhl/wheel"
+branch = "main"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "0.2"
 features = ["net", "stream"]

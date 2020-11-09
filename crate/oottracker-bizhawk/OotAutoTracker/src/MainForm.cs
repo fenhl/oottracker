@@ -16,7 +16,7 @@ namespace Net.Fenhl.OotAutoTracker
     internal class Native
     {
         [DllImport("oottracker")]
-        internal static extern StringHandle version();
+        internal static extern StringHandle version_string();
         [DllImport("oottracker")]
         internal static extern TcpStreamResultHandle connect_ipv4(byte[] addr);
         [DllImport("oottracker")]
@@ -681,7 +681,7 @@ namespace Net.Fenhl.OotAutoTracker
             this.label_Version.Name = "label_Version";
             this.label_Version.Size = new Size(96, 25);
             this.label_Version.TabIndex = 0;
-            this.label_Version.Text = $"OoT autotracker version {Native.version().AsString()}";
+            this.label_Version.Text = $"OoT autotracker version {Native.version_string().AsString()}";
             // 
             // label_Game
             // 

@@ -14,6 +14,7 @@ use {
         time::Duration,
     },
     libc::c_char,
+    semver::Version,
     oottracker::{
         knowledge::*,
         proto::{
@@ -49,8 +50,12 @@ impl<T: Default> Default for HandleOwned<T> {
     }
 }
 
-#[no_mangle] pub extern "C" fn version() -> HandleOwned<c_char> {
-    HandleOwned(CString::new(oottracker::version().to_string()).unwrap().into_raw())
+pub fn version() -> Version {
+    Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version")
+}
+
+#[no_mangle] pub extern "C" fn version_string() -> HandleOwned<c_char> {
+    HandleOwned(CString::new(version().to_string()).unwrap().into_raw())
 }
 
 /// # Safety
