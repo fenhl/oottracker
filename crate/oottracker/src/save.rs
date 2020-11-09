@@ -22,6 +22,7 @@ use {
     crate::{
         event_chk_inf::EventChkInf,
         item_ids,
+        scene_flags::SceneFlags,
     },
 };
 #[cfg(not(target_arch = "wasm32"))] use {
@@ -513,7 +514,7 @@ pub struct Save {
     pub upgrades: Upgrades,
     pub quest_items: QuestItems,
     pub skull_tokens: u8,
-    pub triforce_pieces: u8,
+    pub scene_flags: SceneFlags,
     pub event_chk_inf: EventChkInf,
 }
 
@@ -577,14 +578,14 @@ impl Save {
             upgrades: try_get_offset!("upgrades", 0x00a0, 0x4),
             quest_items: try_get_offset!("quest_items", 0x00a4, 0x4),
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
-            triforce_pieces: BigEndian::read_i32(get_offset!("triforce_pieces", 0x00d4 + 0x48 * 0x1c + 0x10, 0x4)).try_into()?, // unused scene flag in scene 0x48
+            scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
         })
     }
 
     fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { magic, inv, equipment, upgrades, quest_items, skull_tokens, triforce_pieces, event_chk_inf } = self;
+        let Save { magic, inv, equipment, upgrades, quest_items, skull_tokens, scene_flags, event_chk_inf } = self;
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
         buf[0x0032] = magic.into();
         buf[0x003a] = match magic {
@@ -600,9 +601,17 @@ impl Save {
         buf.splice(0x00a0..0x00a4, Vec::from(upgrades));
         buf.splice(0x00a4..0x00a8, Vec::from(quest_items));
         buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
-        buf.splice(0x00d4 + 0x48 * 0x1c + 0x10..0x00d4 + 0x48 * 0x1c + 0x10 + 0x4, i32::from(*triforce_pieces).to_be_bytes().iter().copied()); // unused scene flag in scene 0x48
+        buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
         buf
+    }
+    
+    pub fn triforce_pieces(&self) -> u8 {
+        self.scene_flags.windmill_and_dampes_grave.unused.bits().try_into().expect("too many triforce pieces")
+    }
+
+    pub fn set_triforce_pieces(&mut self, triforce_pieces: u8) {
+        self.scene_flags.windmill_and_dampes_grave.unused = crate::scene_flags::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
     }
 }
 

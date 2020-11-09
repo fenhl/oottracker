@@ -19,6 +19,9 @@ version = "0.99"
 default-features = false
 features = ["from"]
 
+[dependencies.oottracker-derive]
+path = "../oottracker-derive"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "0.2"
 features = ["io-util", "net"]

@@ -29,6 +29,7 @@ use {
         window,
     },
     oottracker::{
+        checks::checked,
         event_chk_inf::*,
         knowledge::*,
         save::*,
@@ -364,7 +365,7 @@ impl TrackerCell {
             } else {
                 state.save.equipment.insert(Equipment::GORON_TUNIC);
             },
-            TrackerCell::Triforce => if state.save.triforce_pieces == 100 { state.save.triforce_pieces = 0 } else { state.save.triforce_pieces += 1 },
+            TrackerCell::Triforce => state.save.set_triforce_pieces(if state.save.triforce_pieces() == 100 { 0 } else { state.save.triforce_pieces() + 1 }),
             TrackerCell::ZeldasLullaby => state.save.quest_items.toggle(QuestItems::ZELDAS_LULLABY),
             TrackerCell::EponasSong => state.save.quest_items.toggle(QuestItems::EPONAS_SONG),
             TrackerCell::SariasSong => state.save.quest_items.toggle(QuestItems::SARIAS_SONG),
@@ -418,11 +419,27 @@ impl TrackerCell {
                     xopar_image!(dimmed $filename)
                 }
             }};
+            (undim = $undim:expr, $filename:ident, overlay = $overlay:expr, $overlay_filename:ident) => {{
+                match ($undim, $overlay) {
+                    (false, false) => xopar_image!(dimmed $filename),
+                    (false, true) => xopar_image!(overlay_dimmed $overlay_filename),
+                    (true, false) => xopar_image!($filename),
+                    (true, true) => xopar_image!(overlay $overlay_filename),
+                }
+            }};
             (overlay $filename:ident) => {{
                 embed_image!(concat!("xopar-images-overlay/", stringify!($filename), ".png"))
             }};
             (overlay_dimmed $filename:ident) => {{
                 embed_image!(concat!("xopar-images-overlay-dimmed/", stringify!($filename), ".png"))
+            }};
+            (composite = $left:expr, $left_filename:ident, $right:expr, $right_filename:ident, $composite_filename:ident) => {{
+                match ($left, $right) {
+                    (false, false) => xopar_image!(dimmed $composite_filename),
+                    (false, true) => xopar_image!($right_filename),
+                    (true, false) => xopar_image!($left_filename),
+                    (true, true) => xopar_image!($composite_filename),
+                }
             }};
         }
 
@@ -565,12 +582,7 @@ impl TrackerCell {
                 _ => xopar_image!(dimmed silver_scale),
             },
             TrackerCell::Slingshot => xopar_image!(undim = state.save.inv.slingshot, slingshot),
-            TrackerCell::Bombs => match (state.save.upgrades.bomb_bag(), state.save.inv.bombchus) {
-                (Upgrades::NONE, false) => xopar_image!(dimmed bomb_bag),
-                (Upgrades::NONE, true) => xopar_image!(overlay_dimmed bomb_bag_bombchu),
-                (_, false) => xopar_image!(bomb_bag),
-                (_, true) => xopar_image!(overlay bomb_bag_bombchu),
-            },
+            TrackerCell::Bombs => xopar_image!(undim = state.save.upgrades.bomb_bag() != Upgrades::NONE, bomb_bag, overlay = state.save.inv.bombchus, bomb_bag_bombchu),
             TrackerCell::Boomerang => xopar_image!(undim = state.save.inv.boomerang, boomerang),
             TrackerCell::Strength => match state.save.upgrades.strength() {
                 Upgrades::GORON_BRACELET => xopar_image!(goron_bracelet),
@@ -578,42 +590,17 @@ impl TrackerCell {
                 Upgrades::GOLD_GAUNTLETS => xopar_image!(gold_gauntlets),
                 _ => xopar_image!(dimmed goron_bracelet),
             },
-            TrackerCell::Magic => match (state.save.magic, state.save.inv.lens) {
-                (MagicCapacity::None, false) => xopar_image!(dimmed magic),
-                (MagicCapacity::None, true) => xopar_image!(overlay_dimmed magic_lens),
-                (_, false) => xopar_image!(magic),
-                (_, true) => xopar_image!(overlay magic_lens),
-            },
-            TrackerCell::Spells => match (state.save.inv.dins_fire, state.save.inv.farores_wind) {
-                (false, false) => xopar_image!(dimmed composite_magic),
-                (false, true) => xopar_image!(faores_wind),
-                (true, false) => xopar_image!(dins_fire),
-                (true, true) => xopar_image!(composite_magic),
-            },
+            TrackerCell::Magic => xopar_image!(undim = state.save.magic != MagicCapacity::None, magic, overlay = state.save.inv.lens, magic_lens),
+            TrackerCell::Spells => xopar_image!(composite = state.save.inv.dins_fire, dins_fire, state.save.inv.farores_wind, faores_wind, composite_magic),
             TrackerCell::Hookshot => match state.save.inv.hookshot {
                 Hookshot::None => xopar_image!(dimmed hookshot),
                 Hookshot::Hookshot => xopar_image!(hookshot_accessible),
                 Hookshot::Longshot => xopar_image!(longshot_accessible),
             },
-            TrackerCell::Bow => match (state.save.inv.bow, state.save.inv.ice_arrows) {
-                (false, false) => xopar_image!(dimmed bow),
-                (false, true) => xopar_image!(overlay_dimmed bow_ice_arrows),
-                (true, false) => xopar_image!(bow),
-                (true, true) => xopar_image!(overlay bow_ice_arrows),
-            },
-            TrackerCell::Arrows => match (state.save.inv.fire_arrows, state.save.inv.light_arrows) {
-                (false, false) => xopar_image!(dimmed composite_arrows),
-                (false, true) => xopar_image!(light_arrows),
-                (true, false) => xopar_image!(fire_arrows),
-                (true, true) => xopar_image!(composite_arrows),
-            },
+            TrackerCell::Bow => xopar_image!(undim = state.save.inv.bow, bow, overlay = state.save.inv.ice_arrows, bow_ice_arrows),
+            TrackerCell::Arrows => xopar_image!(composite = state.save.inv.fire_arrows, fire_arrows, state.save.inv.light_arrows, light_arrows, composite_arrows),
             TrackerCell::Hammer => xopar_image!(undim = state.save.inv.hammer, hammer),
-            TrackerCell::Boots => match (state.save.equipment.contains(Equipment::IRON_BOOTS), state.save.equipment.contains(Equipment::HOVER_BOOTS)) {
-                (false, false) => xopar_image!(dimmed composite_boots),
-                (false, true) => xopar_image!(hover_boots),
-                (true, false) => xopar_image!(iron_boots),
-                (true, true) => xopar_image!(composite_boots),
-            },
+            TrackerCell::Boots => xopar_image!(composite = state.save.equipment.contains(Equipment::IRON_BOOTS), iron_boots, state.save.equipment.contains(Equipment::HOVER_BOOTS), hover_boots, composite_boots),
             TrackerCell::MirrorShield => xopar_image!(undim = state.save.equipment.contains(Equipment::MIRROR_SHIELD), mirror_shield),
             TrackerCell::ChildTrade => match state.save.inv.child_trade_item {
                 ChildTradeItem::None => xopar_image!(dimmed white_egg),
@@ -626,38 +613,23 @@ impl TrackerCell {
                 ChildTradeItem::BunnyHood => xopar_image!(bunny_hood),
                 ChildTradeItem::MaskOfTruth => xopar_image!(mask_of_truth),
             },
-            TrackerCell::Ocarina => match (state.save.inv.ocarina, state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG)) { //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
-                (false, false) => xopar_image!(dimmed ocarina),
-                (false, true) => xopar_image!(overlay_dimmed ocarina_scarecrow),
-                (true, false) => xopar_image!(ocarina),
-                (true, true) => xopar_image!(overlay ocarina_scarecrow),
-            },
+            TrackerCell::Ocarina => xopar_image!(undim = state.save.inv.ocarina, ocarina, overlay = state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG), ocarina_scarecrow), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
             TrackerCell::Beans => xopar_image!(undim = state.save.inv.beans, beans), //TODO overlay with number bought if autotracker is on?
-            TrackerCell::SwordCard => match (state.save.equipment.contains(Equipment::KOKIRI_SWORD), state.save.quest_items.contains(QuestItems::GERUDO_CARD)) {
-                (false, false) => xopar_image!(dimmed composite_ksword_gcard),
-                (false, true) => xopar_image!(gerudo_card),
-                (true, false) => xopar_image!(kokiri_sword),
-                (true, true) => xopar_image!(composite_ksword_gcard),
-            },
-            TrackerCell::Tunics => match (state.save.equipment.contains(Equipment::GORON_TUNIC), state.save.equipment.contains(Equipment::ZORA_TUNIC)) {
-                (false, false) => xopar_image!(dimmed composite_tunics),
-                (false, true) => xopar_image!(zora_tunic),
-                (true, false) => xopar_image!(goron_tunic),
-                (true, true) => xopar_image!(composite_tunics),
-            },
-            TrackerCell::Triforce => if state.save.triforce_pieces == 0 { xopar_image!(dimmed triforce) } else { xopar_image!(count = state.save.triforce_pieces, force) },
-            TrackerCell::ZeldasLullaby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZELDAS_LULLABY), lullaby),
-            TrackerCell::EponasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::EPONAS_SONG), epona),
-            TrackerCell::SariasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SARIAS_SONG), saria),
-            TrackerCell::SunsSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SUNS_SONG), sun),
-            TrackerCell::SongOfTime => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_TIME), time),
-            TrackerCell::SongOfStorms => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_STORMS), storms),
-            TrackerCell::Minuet => xopar_image!(undim = state.save.quest_items.contains(QuestItems::MINUET_OF_FOREST), minuet),
-            TrackerCell::Bolero => xopar_image!(undim = state.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE), bolero),
-            TrackerCell::Serenade => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SERENADE_OF_WATER), serenade),
-            TrackerCell::Requiem => xopar_image!(undim = state.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT), requiem),
-            TrackerCell::Nocturne => xopar_image!(undim = state.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW), nocturne),
-            TrackerCell::Prelude => xopar_image!(undim = state.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT), prelude),
+            TrackerCell::SwordCard => xopar_image!(composite = state.save.equipment.contains(Equipment::KOKIRI_SWORD), kokiri_sword, state.save.quest_items.contains(QuestItems::GERUDO_CARD), gerudo_card, composite_ksword_gcard),
+            TrackerCell::Tunics => xopar_image!(composite = state.save.equipment.contains(Equipment::GORON_TUNIC), goron_tunic, state.save.equipment.contains(Equipment::ZORA_TUNIC), zora_tunic, composite_tunics),
+            TrackerCell::Triforce => if state.save.triforce_pieces() == 0 { xopar_image!(dimmed triforce) } else { xopar_image!(count = state.save.triforce_pieces(), force) },
+            TrackerCell::ZeldasLullaby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZELDAS_LULLABY), lullaby, overlay = checked(&state.save, "Song from Impa").unwrap_or(false), lullaby_check),
+            TrackerCell::EponasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::EPONAS_SONG), epona, overlay = checked(&state.save, "Song from Malon").unwrap_or(false), epona_check),
+            TrackerCell::SariasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SARIAS_SONG), saria, overlay = checked(&state.save, "Song from Saria").unwrap_or(false), saria_check),
+            TrackerCell::SunsSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SUNS_SONG), sun, overlay = checked(&state.save, "Song from Composers Grave").unwrap_or(false), sun_check),
+            TrackerCell::SongOfTime => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_TIME), time, overlay = checked(&state.save, "Song from Ocarina of Time").unwrap_or(false), time_check),
+            TrackerCell::SongOfStorms => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_STORMS), storms, overlay = checked(&state.save, "Song from Windmill").unwrap_or(false), storms_check),
+            TrackerCell::Minuet => xopar_image!(undim = state.save.quest_items.contains(QuestItems::MINUET_OF_FOREST), minuet, overlay = checked(&state.save, "Sheik in Forest").unwrap_or(false), minuet_check),
+            TrackerCell::Bolero => xopar_image!(undim = state.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE), bolero, overlay = checked(&state.save, "Sheik in Crater").unwrap_or(false), bolero_check),
+            TrackerCell::Serenade => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SERENADE_OF_WATER), serenade, overlay = checked(&state.save, "Sheik in Ice Cavern").unwrap_or(false), serenade_check),
+            TrackerCell::Requiem => xopar_image!(undim = state.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT), requiem, overlay = checked(&state.save, "Sheik at Colossus").unwrap_or(false), requiem_check),
+            TrackerCell::Nocturne => xopar_image!(undim = state.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW), nocturne, overlay = checked(&state.save, "Sheik in Kakariko").unwrap_or(false), nocturne_check),
+            TrackerCell::Prelude => xopar_image!(undim = state.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT), prelude, overlay = checked(&state.save, "Sheik at Temple").unwrap_or(false), prelude_check),
         };
         if let Some(cell_button) = cell_button {
             Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(*self).into()
