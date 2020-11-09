@@ -4028,7 +4028,6 @@ version = "0.1.3"
 source = "git+https://github.com/fenhl/wheel?branch=main#557ecbb22f86fb869a8df04f51119369a2314616"
 dependencies = [
  "paw",
- "tokio",
  "wheel-derive",
 ]
 

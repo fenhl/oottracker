@@ -22,6 +22,7 @@ features = ["paw"]
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
+default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "0.2"
