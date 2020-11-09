@@ -151,7 +151,7 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release)
     eprintln!("building oottracker-bizhawk");
     Command::new("cargo").arg("build").arg("--package=oottracker-bizhawk").check("cargo").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building OotAutoTracker");
-    Command::new("dotnet").arg("build").arg("--configuration=release").current_dir("crate/oottracker-bizhawk/OotAutoTracker/src").check("dotnet").await?;
+    Command::new("dotnet").arg("build").arg("--configuration=Release").current_dir("crate/oottracker-bizhawk/OotAutoTracker/src").check("dotnet").await?;
     eprintln!("creating oottracker-bizhawk-win64.zip");
     let mut buf = Cursor::<Vec<_>>::default();
     {
