@@ -10,6 +10,17 @@ path = "src/release.rs"
 
 [dependencies]
 async-trait = "0.1"
+
+[dependencies.derive_more]
+version = "0.99"
+default-features = false
+features = ["from"]
+
+[dependencies.tokio]
+version = "0.2" #TODO upgrade to 0.3 once supported by reqwest
+features = ["fs", "io-util", "macros", "process", "rt-threaded"]
+
+[target.'cfg(windows)'.dependencies]
 dir-lock = "0.2"
 itertools = "0.9"
 semver = "0.11"
@@ -17,29 +28,20 @@ serde_json = "1"
 tempfile = "3"
 zip = "0.5"
 
-[dependencies.derive_more]
-version = "0.99"
-default-features = false
-features = ["from"]
-
-[dependencies.oottracker]
+[target.'cfg(windows)'.dependencies.oottracker]
 path = "../oottracker"
 
-[dependencies.oottracker-bizhawk]
+[target.'cfg(windows)'.dependencies.oottracker-bizhawk]
 path = "../oottracker-bizhawk"
 
-#[dependencies.oottracker-csharp] #TODO
+#[target.'cfg(windows)'.dependencies.oottracker-csharp] #TODO
 #path = "../oottracker-csharp"
 
-[dependencies.reqwest]
+[target.'cfg(windows)'.dependencies.reqwest]
 version = "0.10"
 default-features = false
 features = ["json", "rustls-tls"]
 
-[dependencies.serde]
+[target.'cfg(windows)'.dependencies.serde]
 version = "1"
 features = ["derive"]
-
-[dependencies.tokio]
-version = "0.2" #TODO upgrade to 0.3 once supported by reqwest
-features = ["fs", "io-util", "macros", "process", "rt-threaded"]
