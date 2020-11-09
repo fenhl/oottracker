@@ -147,9 +147,9 @@ async fn setup() -> Result<(reqwest::Client, Repo), Error> {
 #[cfg(windows)]
 async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
     eprintln!("building oottracker-csharp");
-    Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
+    Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo build --package=oottracker-csharp").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building oottracker-bizhawk");
-    Command::new("cargo").arg("build").arg("--package=oottracker-bizhawk").check("cargo").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
+    Command::new("cargo").arg("build").arg("--package=oottracker-bizhawk").check("cargo build --package=oottracker-bizhawk").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building OotAutoTracker");
     Command::new("dotnet").arg("build").arg("--configuration=Release").current_dir("crate/oottracker-bizhawk/OotAutoTracker/src").check("dotnet").await?;
     eprintln!("creating oottracker-bizhawk-win64.zip");
@@ -171,7 +171,7 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release)
 #[cfg(windows)]
 async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
     eprintln!("building oottracker-win64.exe");
-    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo build --package=oottracker-gui").await?;
     eprintln!("uploading oottracker-win64.exe");
     repo.release_attach(client, release, "oottracker-win64.exe", "application/vnd.microsoft.portable-executable", {
         let mut f = File::open("target/release/oottracker-gui.exe").await?;
@@ -203,7 +203,7 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release) -
 #[cfg(windows)]
 async fn build_web() -> Result<(), Error> {
     eprintln!("building for wasm");
-    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").arg("--target=wasm32-unknown-unknown").check("cargo").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").arg("--target=wasm32-unknown-unknown").check("cargo build --target=wasm32-unknown-unknown").await?;
     Command::new("wasm-bindgen").arg("target/wasm32-unknown-unknown/release/oottracker-gui.wasm").arg("--out-dir=assets/wasm").arg("--target=web").check("wasm-bindgen").await?;
     eprintln!("uploading web app");
     Command::new("scp").arg("assets/wasm/*").arg("mercredi:/var/www/oottracker.fenhl.net").check("scp").await?;
