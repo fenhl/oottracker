@@ -3,13 +3,10 @@
 		<LangVersion>8.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<TargetFramework>net48</TargetFramework>
-		<ApplicationIcon>icon.ico</ApplicationIcon>
 		<RootNamespace>Net.Fenhl.OotAutoTracker</RootNamespace>
-		<GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0" PrivateAssets="all" />
-		<PackageReference Include="System.Resources.Extensions" Version="4.7.1" />
 		<Reference Include="System.Windows.Forms" />
 		<Reference Include="BizHawk.Client.Common" HintPath="$(ProjectDir)../BizHawk/dll/BizHawk.Client.Common.dll" />
 		<Reference Include="BizHawk.Client.EmuHawk" HintPath="$(ProjectDir)../BizHawk/EmuHawk.exe" />
@@ -21,22 +18,6 @@
 	    <None Update="oottracker.dll">
 	        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	    </None>
-	</ItemGroup>
-	<ItemGroup>
-	    <EmbeddedResource Include="icon.ico" />
-	</ItemGroup>
-	<ItemGroup>
-	  <Compile Update="Properties\Resources.Designer.cs">
-	    <DesignTime>True</DesignTime>
-	    <AutoGen>True</AutoGen>
-	    <DependentUpon>Resources.resx</DependentUpon>
-	  </Compile>
-	</ItemGroup>
-	<ItemGroup>
-	    <EmbeddedResource Update="Properties\Resources.resx">
-	        <Generator>PublicResXFileCodeGenerator</Generator>
-	        <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-	    </EmbeddedResource>
 	</ItemGroup>
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<Copy SourceFiles="$(OutputPath)$(MSBuildProjectName).dll" DestinationFolder="$(ProjectDir)../BizHawk/ExternalTools" />

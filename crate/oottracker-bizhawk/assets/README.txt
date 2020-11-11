@@ -2,7 +2,7 @@ HOW TO INSTALL/UPDATE
 
 1. The main oottracker app is required. You can download it from https://github.com/fenhl/oottracker/releases/latest/download/oottracker-win64.exe
 2. You will need BizHawk version 2.5.x.
-3. Move the files OotAutoTracker.dll and oottracker.dll into the ExternalTools subfolder within your BizHawk folder (the BizHawk folder is the one with EmuHawk.exe in it).
+3. Move the files OotAutoTracker.dll and oottracker.dll into the ExternalTools subfolder within your BizHawk folder. (The BizHawk folder is the one with EmuHawk.exe in it. You may have to create the ExternalTools folder if it doesn't exist.)
 
 HOW TO USE
 

@@ -447,7 +447,6 @@ namespace Net.Fenhl.OotAutoTracker
     }
 
     [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
-    [ExternalToolEmbeddedIcon("Net.Fenhl.OotAutoTracker.icon.ico")]
 	public sealed class MainForm : Form, IExternalToolForm
     {
         private Label label_Version;
@@ -672,7 +671,6 @@ namespace Net.Fenhl.OotAutoTracker
             this.label_Save = new Label();
             this.label_Help = new Label();
             this.SuspendLayout();
-            this.Icon = Properties.Resources.icon;
             //
             // label_Version
             //
