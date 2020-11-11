@@ -31,7 +31,7 @@ use {
     structopt::StructOpt,
     oottracker::{
         checks::checked,
-        event_chk_inf::*,
+        info_tables::*,
         knowledge::*,
         save::*,
     },

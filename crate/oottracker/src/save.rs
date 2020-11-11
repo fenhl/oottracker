@@ -20,7 +20,11 @@ use {
     derive_more::From,
     smart_default::SmartDefault,
     crate::{
-        event_chk_inf::EventChkInf,
+        info_tables::{
+            EventChkInf,
+            InfTable,
+            ItemGetInf,
+        },
         item_ids,
         scene_flags::SceneFlags,
     },
@@ -516,6 +520,8 @@ pub struct Save {
     pub skull_tokens: u8,
     pub scene_flags: SceneFlags,
     pub event_chk_inf: EventChkInf,
+    pub item_get_inf: ItemGetInf,
+    pub inf_table: InfTable,
 }
 
 impl Save {
@@ -580,12 +586,14 @@ impl Save {
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
+            item_get_inf: try_get_offset!("item_get_inf", 0x0ef0, 0x8),
+            inf_table: try_get_offset!("inf_table", 0x0ef8, 0x3c),
         })
     }
 
     fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { magic, inv, equipment, upgrades, quest_items, skull_tokens, scene_flags, event_chk_inf } = self;
+        let Save { magic, inv, equipment, upgrades, quest_items, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table } = self;
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
         buf[0x0032] = magic.into();
         buf[0x003a] = match magic {
@@ -603,6 +611,8 @@ impl Save {
         buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
+        buf.splice(0x0ef0..0x0ef8, Vec::from(item_get_inf));
+        buf.splice(0x0ef8..0x0f34, Vec::from(inf_table));
         buf
     }
     

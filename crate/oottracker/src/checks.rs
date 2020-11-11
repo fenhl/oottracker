@@ -1,89 +1,31 @@
 use crate::Save;
 
 pub fn checked(save: &Save, loc: &str) -> Option<bool> { //TODO change return type to bool once all used checks are implemented
-    if let Some(checked) = save.event_chk_inf.checked(loc) { return Some(checked) }
+    // location list taken from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
     if let Some(checked) = save.scene_flags.checked(loc) { return Some(checked) }
-    // location list taken from Dev-R as of commit 478587c7c33cac7305a15a1cb9673861ae712213
+    if let Some(checked) = save.event_chk_inf.checked(loc) { return Some(checked) }
+    if let Some(checked) = save.item_get_inf.checked(loc) { return Some(checked) }
+    if let Some(checked) = save.inf_table.checked(loc) { return Some(checked) }
     match loc {
-        "KF Midos Top Left Chest" => None, //TODO
-        "KF Midos Top Right Chest" => None, //TODO
-        "KF Midos Bottom Left Chest" => None, //TODO
-        "KF Midos Bottom Right Chest" => None, //TODO
-        "Graveyard Shield Grave Chest" => None, //TODO
-        "Graveyard Heart Piece Grave Chest" => None, //TODO
-        "Graveyard Composers Grave Chest" => None, //TODO
-        "DMT Chest" => None, //TODO
-        "GC Maze Left Chest" => None, //TODO
-        "GC Maze Right Chest" => None, //TODO
-        "GC Maze Center Chest" => None, //TODO
-        "ZD Chest" => None, //TODO
-        "Graveyard Hookshot Chest" => None, //TODO
-        "GV Chest" => None, //TODO
-        "GF Chest" => None, //TODO
-        "Wasteland Chest" => None, //TODO
-        "Kak Redead Grotto Chest" => None, //TODO
-        "SFM Wolfos Grotto Chest" => None, //TODO
-        "HF Near Market Grotto Chest" => None, //TODO
-        "HF Southeast Grotto Chest" => None, //TODO
-        "HF Open Grotto Chest" => None, //TODO
-        "Kak Open Grotto Chest" => None, //TODO
-        "ZR Open Grotto Chest" => None, //TODO
-        "KF Storms Grotto Chest" => None, //TODO
-        "LW Near Shortcuts Grotto Chest" => None, //TODO
-        "DMT Storms Grotto Chest" => None, //TODO
-        "DMC Upper Grotto Chest" => None, //TODO
-        "Market Treasure Chest Game Reward" => None, //TODO
-
         "ToT Light Arrows Cutscene" => None, //TODO
-        "LW Gift from Saria" => None, //TODO
-        "ZF Great Fairy Reward" => None, //TODO
-        "HC Great Fairy Reward" => None, //TODO
-        "Colossus Great Fairy Reward" => None, //TODO
         "DMT Great Fairy Reward" => None, //TODO
         "DMC Great Fairy Reward" => None, //TODO
         "OGC Great Fairy Reward" => None, //TODO
 
-        "HC Malon Egg" => None, //TODO
-        "HC Zeldas Letter" => None, //TODO
         "GC Darunias Joy" => None, //TODO
-        "ZD Diving Minigame" => None, //TODO
         "LH Child Fishing" => None, //TODO
         "LH Adult Fishing" => None, //TODO
-        "LH Lab Dive" => None, //TODO
-        "GC Rolling Goron as Adult" => None, //TODO
         "ZD King Zora Thawed" => None, //TODO
         "Market Bombchu Bowling First Prize" => None, //TODO
         "Market Bombchu Bowling Second Prize" => None, //TODO
         "Market Bombchu Bowling Bombchus" => None, //TODO
-        "Market Lost Dog" => None, //TODO
-        "LW Skull Kid" => None, //TODO
-        "LW Ocarina Memory Game" => None, //TODO
-        "Kak 10 Gold Skulltula Reward" => None, //TODO
-        "Kak 20 Gold Skulltula Reward" => None, //TODO
-        "Kak 30 Gold Skulltula Reward" => None, //TODO
-        "Kak 40 Gold Skulltula Reward" => None, //TODO
-        "Kak 50 Gold Skulltula Reward" => None, //TODO
-        "Kak Man on Roof" => None, //TODO
         "ZR Magic Bean Salesman" => None, //TODO
-        "ZR Frogs Ocarina Game" => None, //TODO
-        "ZR Frogs in the Rain" => None, //TODO
-        "GF HBA 1000 Points" => None, //TODO
-        "GF HBA 1500 Points" => None, //TODO
         "Market Shooting Gallery Reward" => None, //TODO
-        "Kak Shooting Gallery Reward" => None, //TODO
-        "LW Target in Woods" => None, //TODO
-        "Deku Theater Skull Mask" => None, //TODO
-        "Deku Theater Mask of Truth" => None, //TODO
-        "Kak Anju as Adult" => None, //TODO
         "DMT Biggoron" => None, //TODO
-        "Kak Anju as Child" => None, //TODO
-        "LLR Talons Chickens" => None, //TODO
         "Market 10 Big Poes" => None, //TODO
         "GC Rolling Goron as Child" => None, //TODO
-        "LH Underwater Item" => None, //TODO
         "LH Sun" => None, //TODO
         "GF Gerudo Membership Card" => None, //TODO
-        "HF Ocarina of Time Item" => None, //TODO
         "Wasteland Bombchu Salesman" => None, //TODO
         "GC Medigoron" => None, //TODO
 
@@ -454,11 +396,6 @@ pub fn checked(save: &Save, loc: &str) -> Option<bool> { //TODO change return ty
 
         "Links Pocket" => None, //TODO check if vanilla or rando, if vanilla check for appropriate flag
         "Queen Gohma" => None, //TODO
-        "King Dodongo" => None, //TODO
-        "Barinade" => None, //TODO
-        "Phantom Ganon" => None, //TODO
-        "Volvagia" => None, //TODO
-        "Morpha" => None, //TODO
         "Twinrova" => None, //TODO
         "Bongo Bongo" => None, //TODO
         "Ganon" => None, //TODO
@@ -740,7 +677,6 @@ pub fn checked(save: &Save, loc: &str) -> Option<bool> { //TODO change return ty
 
         "LW Deku Scrub Near Deku Theater Right" => None, //TODO
         "LW Deku Scrub Near Deku Theater Left" => None, //TODO
-        "LW Deku Scrub Near Bridge" => None, //TODO
         "LW Deku Scrub Grotto Rear" => None, //TODO
         "LW Deku Scrub Grotto Front" => None, //TODO
 

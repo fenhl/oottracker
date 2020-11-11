@@ -7,7 +7,7 @@ pub use crate::{
 };
 
 pub mod checks;
-pub mod event_chk_inf;
+pub mod info_tables;
 mod item_ids;
 pub mod knowledge;
 #[cfg(not(target_arch = "wasm32"))] pub mod proto;

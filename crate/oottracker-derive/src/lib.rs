@@ -169,7 +169,12 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
                 let name_ident = name.to_ident();
                 quote!(const #name_ident = #value;)
             });
-            let read_field_ty = Ident::new(&format!("read_{}", field_ty), Span::call_site());
+            let read_field = if matches!(&field_ty.to_string()[..], "u8" | "i8") {
+                quote!(raw_data[0] as #field_ty)
+            } else {
+                let read_field_ty = Ident::new(&format!("read_{}", field_ty), Span::call_site());
+                quote!(<::byteorder::BigEndian as ::byteorder::ByteOrder>::#read_field_ty(&raw_data))
+            };
             quote! {
                 ::bitflags::bitflags! {
                     #[derive(Default)]
@@ -183,7 +188,7 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
                 
                     fn try_from(raw_data: &[u8]) -> Result<#fields_ty, ()> {
                         if raw_data.len() != #field_ty_size { return Err(()) }
-                        Ok(#fields_ty::from_bits_truncate(<::byteorder::BigEndian as ::byteorder::ByteOrder>::#read_field_ty(&raw_data)))
+                        Ok(#fields_ty::from_bits_truncate(#read_field))
                     }
                 }
 
@@ -251,6 +256,40 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
     })
 }
 
+enum SceneName {
+    Ident(Ident),
+    Lit(LitStr),
+}
+
+impl SceneName {
+    fn to_field(&self) -> Ident {
+        match self {
+            SceneName::Ident(ident) => Ident::new(&ident.to_string().to_case(Case::Snake), ident.span()),
+            SceneName::Lit(lit) => Ident::new(&lit.value().to_case(Case::Snake), lit.span()),
+        }
+    }
+
+    fn to_type(&self) -> Ident {
+        match self {
+            SceneName::Ident(ident) => ident.clone(),
+            SceneName::Lit(lit) => Ident::new(&lit.value().to_case(Case::Pascal), lit.span()),
+        }
+    }
+}
+
+impl Parse for SceneName {
+    fn parse(input: ParseStream<'_>) -> Result<SceneName> {
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Ident) {
+            input.parse().map(SceneName::Ident)
+        } else if lookahead.peek(LitStr) {
+            input.parse().map(SceneName::Lit)
+        } else {
+            Err(lookahead.error())
+        }
+    }
+}
+
 enum SceneFieldsKind {
     Chests,
     Switches,
@@ -276,8 +315,8 @@ impl SceneFieldsKind {
 
     fn end_idx(&self) -> usize { self.start_idx() + 4 }
 
-    fn ty(&self, scene_name: String) -> Ident {
-        Ident::new(&format!("{}{}", scene_name.to_case(Case::Pascal), match self {
+    fn ty(&self, scene_name: &SceneName) -> Ident {
+        Ident::new(&format!("{}{}", scene_name.to_type(), match self {
             SceneFieldsKind::Chests => "Chests",
             SceneFieldsKind::Switches => "Switches",
             SceneFieldsKind::RoomClear => "RoomClear",
@@ -337,7 +376,7 @@ impl Parse for SceneFields {
 
 struct Scene {
     idx: LitInt,
-    name: LitStr,
+    name: SceneName,
     fields: Punctuated<SceneFields, Token![,]>,
 }
 
@@ -378,20 +417,20 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
     let scene_size = 0x1c;
     let num_scenes = 0x65usize;
     let contents = scenes.iter().map(|Scene { name, .. }| {
-        let scene_field = Ident::new(&name.value().to_case(Case::Snake), name.span());
-        let scene_ty = Ident::new(&name.value().to_case(Case::Pascal), name.span());
+        let scene_field = name.to_field();
+        let scene_ty = name.to_type();
         quote!(#vis #scene_field: #scene_ty)
     }).collect::<Vec<_>>();
     let checks = scenes.iter()
         .flat_map(|Scene { name: scene_name, fields, .. }| {
-            let scene_field = Ident::new(&scene_name.value().to_case(Case::Snake), name.span());
+            let scene_field = scene_name.to_field();
             fields.iter()
                 .flat_map(move |SceneFields { kind, fields }| {
                     let kind = kind.clone();
                     let scene_field = scene_field.clone();
                     fields.iter()
                         .filter_map(move |Flag { name, .. }| if let FlagName::Lit(name_lit) = name.clone() {
-                            let fields_ty = kind.ty(scene_name.value());
+                            let fields_ty = kind.ty(scene_name);
                             let name_ident = name.to_ident();
                             Some(quote!(#name_lit => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident))))
                         } else {
@@ -401,28 +440,28 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         });
     let try_from_items = scenes.iter()
         .map(|Scene { idx, name, .. }| {
-            let scene_field = Ident::new(&name.value().to_case(Case::Snake), name.span());
-            let scene_ty = Ident::new(&name.value().to_case(Case::Pascal), name.span());
+            let scene_field = name.to_field();
+            let scene_ty = name.to_type();
             let start_idx = idx.base10_parse::<usize>().expect("failed to parse scene index") * scene_size;
             let end_idx = start_idx + scene_size;
             quote!(#scene_field: #scene_ty::try_from(&raw_data[#start_idx..#end_idx]).map_err(|()| raw_data.clone())?)
         });
     let into_items = scenes.iter()
         .map(|Scene { idx, name, .. }| {
-            let scene_field = Ident::new(&name.value().to_case(Case::Snake), name.span());
+            let scene_field = name.to_field();
             let start_idx = idx.base10_parse::<usize>().expect("failed to parse scene index") * scene_size;
             let end_idx = start_idx + scene_size;
             quote!(buf.splice(#start_idx..#end_idx, Vec::from(value.#scene_field));)
         });
     let decls = scenes.iter().map(|Scene { name, fields, .. }| {
-        let scene_ty = Ident::new(&name.value().to_case(Case::Pascal), name.span());
+        let scene_ty = name.to_type();
         let struct_fields = fields.iter().map(|SceneFields { kind, .. }| {
-            let fields_ty = kind.ty(name.value());
+            let fields_ty = kind.ty(name);
             quote!(#vis #kind: #fields_ty)
         }).collect::<Vec<_>>();
         let try_from_items = fields.iter()
             .map(|SceneFields { kind, .. }| {
-                let fields_ty = kind.ty(name.value());
+                let fields_ty = kind.ty(name);
                 let start_idx = kind.start_idx();
                 let end_idx = kind.end_idx();
                 quote!(#kind: #fields_ty::try_from(&raw_data[#start_idx..#end_idx])?)
@@ -434,7 +473,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                 quote!(buf.splice(#start_idx..#end_idx, Vec::from(value.#kind));)
             });
         let subdecls = fields.iter().map(|SceneFields { kind, fields }| {
-            let fields_ty = kind.ty(name.value());
+            let fields_ty = kind.ty(name);
             let fields = fields.iter().map(|Flag { name, value }| {
                 let name_ident = name.to_ident();
                 quote!(const #name_ident = #value;)
