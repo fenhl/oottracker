@@ -1,5 +1,6 @@
 use {
     std::{
+        fmt,
         io,
         sync::Arc,
     },
@@ -35,6 +36,15 @@ pub enum DungeonRewardLocationReadError {
 impl From<io::Error> for DungeonRewardLocationReadError {
     fn from(e: io::Error) -> DungeonRewardLocationReadError {
         DungeonRewardLocationReadError::Io(Arc::new(e))
+    }
+}
+
+impl fmt::Display for DungeonRewardLocationReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DungeonRewardLocationReadError::Io(e) => write!(f, "I/O error: {}", e),
+            DungeonRewardLocationReadError::UnknownLocationId(id) => write!(f, "unknown location ID: {}", id),
+        }
     }
 }
 

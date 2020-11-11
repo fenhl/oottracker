@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use {
+    std::fmt,
     iced::{
         Application,
         Background,
@@ -37,7 +38,9 @@ use {
     },
 };
 #[cfg(not(target_arch = "wasm32"))] use {
+    std::time::Duration,
     iced::image,
+    tokio::time::delay_for,
     oottracker::proto::{
         self,
         Packet,
@@ -653,6 +656,8 @@ struct ModelState {
 #[derive(Debug, Clone)]
 enum Message {
     #[cfg(not(target_arch = "wasm32"))]
+    AutoDismissNotification,
+    #[cfg(not(target_arch = "wasm32"))]
     ClientConnected,
     #[cfg(not(target_arch = "wasm32"))]
     ClientDisconnected,
@@ -664,12 +669,23 @@ enum Message {
     Packet(Packet),
 }
 
+impl fmt::Display for Message {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Message::ClientConnected => write!(f, "auto-tracker connected"),
+            Message::ClientDisconnected => write!(f, "auto-tracker disconnected"),
+            Message::NetworkError(e) => write!(f, "network error: {}", e),
+            Message::AutoDismissNotification | Message::DismissNotification | Message::LeftClick(_) | Message::Packet(_) => write!(f, "{:?}", self), // these messages are not notifications so just fall back to Debug
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct State {
     cell_buttons: CellButtons,
     client_connected: bool,
     model: ModelState,
-    notification: Option<Message>,
+    notification: Option<(bool, Message)>,
     dismiss_notification_button: button::State,
 }
 
@@ -679,7 +695,13 @@ impl State {
     /// Implemented as a separate method in case the way this is displayed is changed later, e.g. to allow multiple notifications.
     #[cfg(not(target_arch = "wasm32"))]
     fn notify(&mut self, message: Message) {
-        self.notification = Some(message);
+        self.notification = Some((false, message));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn notify_temp(&mut self, message: Message) -> Command<Message> {
+        self.notification = Some((true, message));
+        async { delay_for(Duration::from_secs(10)).await; Message::AutoDismissNotification }.into()
     }
 }
 
@@ -689,19 +711,30 @@ impl Application for State {
     type Flags = ();
 
     fn new((): ()) -> (State, Command<Message>) { (State::default(), Command::none()) }
-    fn title(&self) -> String { format!("OoT Tracker") }
+
+    fn title(&self) -> String {
+        if self.client_connected {
+            format!("OoT Tracker (auto-tracker connected)")
+        } else {
+            format!("OoT Tracker")
+        }
+    }
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             #[cfg(not(target_arch = "wasm32"))]
+            Message::AutoDismissNotification => if let Some((true, _)) = self.notification {
+                self.notification = None;
+            },
+            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => {
                 self.client_connected = true;
-                self.notify(message); //TODO automatically hide message after some amount of time
+                return self.notify_temp(message)
             }
             #[cfg(not(target_arch = "wasm32"))]
             Message::ClientDisconnected => {
                 self.client_connected = false;
-                self.notify(message); //TODO automatically hide message after some amount of time
+                self.notify(message);
             }
             Message::DismissNotification => self.notification = None,
             Message::LeftClick(cell) => cell.left_click(&mut self.model),
@@ -795,12 +828,13 @@ impl Application for State {
                 .push(cell!(Triforce)) //TODO if triforce hunt is off and autotracker is on, replace with something else (big poes?)
                 .spacing(1)
             );
-        let view = if let Some(ref notification) = self.notification {
-            view.push(Row::new()
-                .push(Text::new(format!("{:?}", notification)).color([1.0, 1.0, 1.0])) //TODO Display instead of Debug
-                .push(Button::new(&mut self.dismiss_notification_button, Text::new("X").color([1.0, 0.0, 0.0])).on_press(Message::DismissNotification))
-                .height(Length::Units(101))
-            )
+        let view = if let Some((is_temp, ref notification)) = self.notification {
+            let mut row = Row::new()
+                .push(Text::new(format!("{}", notification)).color([1.0, 1.0, 1.0])); //TODO Display instead of Debug
+            if !is_temp {
+                row = row.push(Button::new(&mut self.dismiss_notification_button, Text::new("X").color([1.0, 0.0, 0.0])).on_press(Message::DismissNotification));
+            }
+            view.push(row.height(Length::Units(101)))
         } else {
             view.push(Row::new()
                     .push(cell!(ZeldasLullaby))

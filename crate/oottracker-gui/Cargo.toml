@@ -25,5 +25,5 @@ branch = "main"
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
-version = "0.2"
-features = ["net", "stream"]
+version = "0.2"  #TODO upgrade to 0.3 once supported by iced
+features = ["net", "stream", "time"]

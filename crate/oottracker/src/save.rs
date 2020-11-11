@@ -4,6 +4,7 @@ use {
             TryFrom,
             TryInto as _,
         },
+        fmt,
         io,
         num::TryFromIntError,
         ops::{
@@ -635,6 +636,15 @@ pub enum SaveDataReadError {
 impl From<io::Error> for SaveDataReadError {
     fn from(e: io::Error) -> SaveDataReadError {
         SaveDataReadError::Io(Arc::new(e))
+    }
+}
+
+impl fmt::Display for SaveDataReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SaveDataReadError::Decode(e) => write!(f, "{:?}", e),
+            SaveDataReadError::Io(e) => write!(f, "I/O error: {}", e),
+        }
     }
 }
 

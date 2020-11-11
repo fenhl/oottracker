@@ -1,5 +1,7 @@
 use {
     std::{
+        cmp::Ordering::*,
+        fmt,
         io,
         sync::Arc,
     },
@@ -82,6 +84,17 @@ impl From<io::Error> for PacketReadError {
     }
 }
 
+impl fmt::Display for PacketReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PacketReadError::DungeonRewardLocation(e) => write!(f, "failed to decode dungeon reward location: {}", e),
+            PacketReadError::Io(e) => write!(f, "I/O error: {}", e),
+            PacketReadError::SaveData(e) => write!(f, "failed to decode save data: {}", e),
+            PacketReadError::UnknownPacketId(id) => write!(f, "unknown packet ID: {}", id),
+        }
+    }
+}
+
 #[async_trait]
 impl Protocol for Packet {
     type ReadError = PacketReadError;
@@ -149,6 +162,20 @@ pub enum ReadError {
 impl From<io::Error> for ReadError {
     fn from(e: io::Error) -> ReadError {
         ReadError::Io(Arc::new(e))
+    }
+}
+
+impl fmt::Display for ReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadError::Io(e) => write!(f, "I/O error: {}", e),
+            ReadError::Packet(e) => e.fmt(f),
+            ReadError::VersionMismatch { server, client } => match client.cmp(server) {
+                Less => write!(f, "An outdated auto-tracker attempted to connect. Please update the auto-tracker and try again."),
+                Greater => write!(f, "An auto-tracker failed to connect because this app is outdated. Please update this app and try again."),
+                Equal => unreachable!(),
+            },
+        }
     }
 }
 
