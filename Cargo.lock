@@ -2406,6 +2406,7 @@ dependencies = [
  "futures 0.3.8",
  "iced",
  "iced_futures",
+ "iced_native",
  "oottracker",
  "structopt",
  "tokio",

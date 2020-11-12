@@ -74,162 +74,217 @@ impl container::StyleSheet for ContainerStyle {
     }
 }
 
+trait DungeonRewardLocationExt {
+    fn increment(&mut self);
+    fn decrement(&mut self);
+}
+
+impl DungeonRewardLocationExt for DungeonRewardLocation {
+    fn increment(&mut self) {
+        *self = match self {
+            DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
+            DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
+            DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
+            DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
+            DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
+            DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
+            DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
+            DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
+            DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
+            DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
+        }
+    }
+
+    fn decrement(&mut self) {
+        *self = match self {
+            DungeonRewardLocation::Unknown => DungeonRewardLocation::LinksPocket,
+            DungeonRewardLocation::DekuTree => DungeonRewardLocation::Unknown,
+            DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::DekuTree,
+            DungeonRewardLocation::JabuJabu => DungeonRewardLocation::DodongosCavern,
+            DungeonRewardLocation::ForestTemple => DungeonRewardLocation::JabuJabu,
+            DungeonRewardLocation::FireTemple => DungeonRewardLocation::ForestTemple,
+            DungeonRewardLocation::WaterTemple => DungeonRewardLocation::FireTemple,
+            DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::WaterTemple,
+            DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::ShadowTemple,
+            DungeonRewardLocation::LinksPocket => DungeonRewardLocation::SpiritTemple,
+        }
+    }
+}
+
+enum TrackerCellKind {
+    Composite {
+        #[cfg_attr(not(target_arch = "wasm32"), allow(unused))] //TODO (should be used in view)
+        state: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        toggle_left: Box<dyn Fn(&mut ModelState)>,
+        toggle_right: Box<dyn Fn(&mut ModelState)>,
+    },
+    Count {
+        get: Box<dyn Fn(&ModelState) -> u8>,
+        set: Box<dyn Fn(&mut ModelState, u8)>,
+        max: u8,
+    },
+    MedallionLocation(Box<dyn Fn(&mut Knowledge) -> &mut DungeonRewardLocation>),
+    OptionalOverlay {
+        toggle_main: Box<dyn Fn(&mut ModelState)>,
+        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
+    },
+    Overlay {
+        #[cfg_attr(not(target_arch = "wasm32"), allow(unused))] //TODO (should be used in view)
+        state: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut ModelState)>,
+        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
+    },
+    Sequence {
+        increment: Box<dyn Fn(&mut ModelState)>,
+        decrement: Box<dyn Fn(&mut ModelState)>,
+    },
+    Simple(Box<dyn Fn(&mut ModelState)>),
+    Song {
+        song: QuestItems,
+        toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
+    },
+    SpecialSequence {
+        increment: Box<dyn Fn(&mut ModelState)>,
+        decrement: Box<dyn Fn(&mut ModelState)>,
+    },
+    Stone(QuestItems),
+    StoneLocation(Box<dyn Fn(&mut Knowledge) -> &mut DungeonRewardLocation>),
+}
+
+use TrackerCellKind::*;
+
+impl TrackerCellKind {
+    fn width(&self) -> u16 {
+        match self {
+            StoneLocation(_) | Stone(_) => 33,
+            _ => 50,
+        }
+    }
+
+    fn height(&self) -> u16 {
+        match self {
+            MedallionLocation(_) => 18,
+            StoneLocation(_) => 12,
+            _ => 50,
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn left_click(&self, state: &mut ModelState) {
+        match self {
+            Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple(toggle) => toggle(state),
+            Count { get, set, max } => {
+                let current = get(state);
+                if current == *max { set(state, 0) } else { set(state, current + 1) }
+            }
+            MedallionLocation(loc_mut) | StoneLocation(loc_mut) => loc_mut(&mut state.knowledge).increment(),
+            Sequence { increment, .. } | SpecialSequence { increment, .. } => increment(state),
+            Song { song: quest_item, .. } | Stone(quest_item) => state.save.quest_items.toggle(*quest_item),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn right_click(&self, state: &mut ModelState) {
+        match self {
+            Composite { toggle_right: toggle, .. } | OptionalOverlay { toggle_overlay: toggle, .. } | Overlay { toggle_overlay: toggle, .. } => toggle(state),
+            Count { get, set, max } => {
+                let current = get(state);
+                if current == 0 { set(state, *max) } else { set(state, current - 1) }
+            }
+            MedallionLocation(loc_mut) | StoneLocation(loc_mut) => loc_mut(&mut state.knowledge).decrement(),
+            Sequence { decrement, .. } | SpecialSequence { decrement, .. } => decrement(state),
+            Simple(_) | Stone(_) => {}
+            Song { toggle_overlay, .. } => toggle_overlay(&mut state.save.event_chk_inf),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn click(&self, state: &mut ModelState) {
+        match self {
+            Composite { state: state_fn, toggle_left, toggle_right } | Overlay { state: state_fn, toggle_main: toggle_left, toggle_overlay: toggle_right } => {
+                let (left, right) = state_fn(state);
+                if right { toggle_left(state) }
+                toggle_right(state);
+            }
+            _ => self.left_click(state),
+        }
+    }
+}
+
 macro_rules! cells {
-    ($($cell:ident,)*) => {
+    ($([$($cell:ident: $kind:expr,)*],)*) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        enum TrackerCell {
+        enum TrackerCellId {
             $(
-                $cell,
+                $(
+                    $cell,
+                )*
             )*
+        }
+
+        impl TrackerCellId {
+            #[allow(unused_assignments)]
+            fn at([x, y]: [f32; 2], include_songs: bool) -> Option<TrackerCellId> {
+                if x < 0.0 || y < 0.0 { return None }
+                let x = x as u16;
+                let y = y as u16;
+                let mut max_x;
+                let mut max_y = 1;
+                $({
+                    max_x = 0;
+                    let mut row_max_y = 0;
+                    $({
+                        let kind = $kind;
+                        if max_x == 0 { row_max_y = kind.height() }
+                        if !matches!(kind, Stone(_)) { max_x += kind.width() + 1 }
+                        if (include_songs || !matches!(kind, Song { .. })) && (x < max_x && y < max_y + kind.height()) {
+                            return Some(TrackerCellId::$cell)
+                        }
+                    })*
+                    max_y += row_max_y + 1;
+                })*
+                None
+            }
+
+            fn kind(&self) -> TrackerCellKind {
+                match self {
+                    $($(TrackerCellId::$cell => $kind,)*)*
+                }
+            }
         }
 
         #[allow(non_snake_case)]
         #[derive(Debug, Default)]
         struct CellButtons {
             $(
-                $cell: button::State,
+                $(
+                    $cell: button::State,
+                )*
             )*
         }
     }
 }
 
 cells! {
-    LightMedallionLocation,
-    ForestMedallionLocation,
-    FireMedallionLocation,
-    WaterMedallionLocation,
-    ShadowMedallionLocation,
-    SpiritMedallionLocation,
-    LightMedallion,
-    ForestMedallion,
-    FireMedallion,
-    WaterMedallion,
-    ShadowMedallion,
-    SpiritMedallion,
-    AdultTrade,
-    Skulltula,
-    KokiriEmeraldLocation,
-    KokiriEmerald,
-    GoronRubyLocation,
-    GoronRuby,
-    ZoraSapphireLocation,
-    ZoraSapphire,
-    Bottle,
-    Scale,
-    Slingshot,
-    Bombs,
-    Boomerang,
-    Strength,
-    Magic,
-    Spells,
-    Hookshot,
-    Bow,
-    Arrows,
-    Hammer,
-    Boots,
-    MirrorShield,
-    ChildTrade,
-    Ocarina,
-    Beans,
-    SwordCard,
-    Tunics,
-    Triforce,
-    ZeldasLullaby,
-    EponasSong,
-    SariasSong,
-    SunsSong,
-    SongOfTime,
-    SongOfStorms,
-    Minuet,
-    Bolero,
-    Serenade,
-    Requiem,
-    Nocturne,
-    Prelude,
-}
-
-impl TrackerCell {
-    fn left_click(&self, state: &mut ModelState) {
-        match self {
-            TrackerCell::LightMedallionLocation => state.knowledge.light_medallion_location = match state.knowledge.light_medallion_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::ForestMedallionLocation => state.knowledge.forest_medallion_location = match state.knowledge.forest_medallion_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::FireMedallionLocation => state.knowledge.fire_medallion_location = match state.knowledge.fire_medallion_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::WaterMedallionLocation => state.knowledge.water_medallion_location = match state.knowledge.water_medallion_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::ShadowMedallionLocation => state.knowledge.shadow_medallion_location = match state.knowledge.shadow_medallion_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::SpiritMedallionLocation => state.knowledge.spirit_medallion_location = match state.knowledge.spirit_medallion_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::LightMedallion => state.save.quest_items.toggle(QuestItems::LIGHT_MEDALLION),
-            TrackerCell::ForestMedallion => state.save.quest_items.toggle(QuestItems::FOREST_MEDALLION),
-            TrackerCell::FireMedallion => state.save.quest_items.toggle(QuestItems::FIRE_MEDALLION),
-            TrackerCell::WaterMedallion => state.save.quest_items.toggle(QuestItems::WATER_MEDALLION),
-            TrackerCell::ShadowMedallion => state.save.quest_items.toggle(QuestItems::SHADOW_MEDALLION),
-            TrackerCell::SpiritMedallion => state.save.quest_items.toggle(QuestItems::SPIRIT_MEDALLION),
-            TrackerCell::AdultTrade => state.save.inv.adult_trade_item = match state.save.inv.adult_trade_item {
+    [
+        LightMedallionLocation: MedallionLocation(Box::new(|knowledge| &mut knowledge.light_medallion_location)),
+        ForestMedallionLocation: MedallionLocation(Box::new(|knowledge| &mut knowledge.forest_medallion_location)),
+        FireMedallionLocation: MedallionLocation(Box::new(|knowledge| &mut knowledge.fire_medallion_location)),
+        WaterMedallionLocation: MedallionLocation(Box::new(|knowledge| &mut knowledge.water_medallion_location)),
+        ShadowMedallionLocation: MedallionLocation(Box::new(|knowledge| &mut knowledge.shadow_medallion_location)),
+        SpiritMedallionLocation: MedallionLocation(Box::new(|knowledge| &mut knowledge.spirit_medallion_location)),
+    ],
+    [
+        LightMedallion: Simple(Box::new(|state| state.save.quest_items.toggle(QuestItems::LIGHT_MEDALLION))),
+        ForestMedallion: Simple(Box::new(|state| state.save.quest_items.toggle(QuestItems::FOREST_MEDALLION))),
+        FireMedallion: Simple(Box::new(|state| state.save.quest_items.toggle(QuestItems::FIRE_MEDALLION))),
+        WaterMedallion: Simple(Box::new(|state| state.save.quest_items.toggle(QuestItems::WATER_MEDALLION))),
+        ShadowMedallion: Simple(Box::new(|state| state.save.quest_items.toggle(QuestItems::SHADOW_MEDALLION))),
+        SpiritMedallion: Simple(Box::new(|state| state.save.quest_items.toggle(QuestItems::SPIRIT_MEDALLION))),
+    ],
+    [
+        AdultTrade: Sequence {
+            increment: Box::new(|state| state.save.inv.adult_trade_item = match state.save.inv.adult_trade_item {
                 AdultTradeItem::None => AdultTradeItem::PocketEgg,
                 AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::Cojiro,
                 AdultTradeItem::Cojiro => AdultTradeItem::OddMushroom,
@@ -241,105 +296,123 @@ impl TrackerCell {
                 AdultTradeItem::EyeballFrog => AdultTradeItem::Eyedrops,
                 AdultTradeItem::Eyedrops => AdultTradeItem::ClaimCheck,
                 AdultTradeItem::ClaimCheck => AdultTradeItem::None,
-            },
-            TrackerCell::Skulltula => if state.save.skull_tokens == 100 { state.save.skull_tokens = 0 } else { state.save.skull_tokens += 1 },
-            TrackerCell::KokiriEmeraldLocation => state.knowledge.kokiri_emerald_location = match state.knowledge.kokiri_emerald_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::KokiriEmerald => state.save.quest_items.toggle(QuestItems::KOKIRI_EMERALD),
-            TrackerCell::GoronRubyLocation => state.knowledge.goron_ruby_location = match state.knowledge.goron_ruby_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::GoronRuby => state.save.quest_items.toggle(QuestItems::GORON_RUBY),
-            TrackerCell::ZoraSapphireLocation => state.knowledge.zora_sapphire_location = match state.knowledge.zora_sapphire_location {
-                DungeonRewardLocation::Unknown => DungeonRewardLocation::DekuTree,
-                DungeonRewardLocation::DekuTree => DungeonRewardLocation::DodongosCavern,
-                DungeonRewardLocation::DodongosCavern => DungeonRewardLocation::JabuJabu,
-                DungeonRewardLocation::JabuJabu => DungeonRewardLocation::ForestTemple,
-                DungeonRewardLocation::ForestTemple => DungeonRewardLocation::FireTemple,
-                DungeonRewardLocation::FireTemple => DungeonRewardLocation::WaterTemple,
-                DungeonRewardLocation::WaterTemple => DungeonRewardLocation::ShadowTemple,
-                DungeonRewardLocation::ShadowTemple => DungeonRewardLocation::SpiritTemple,
-                DungeonRewardLocation::SpiritTemple => DungeonRewardLocation::LinksPocket,
-                DungeonRewardLocation::LinksPocket => DungeonRewardLocation::Unknown,
-            },
-            TrackerCell::ZoraSapphire => state.save.quest_items.toggle(QuestItems::ZORA_SAPPHIRE),
-            TrackerCell::Bottle => state.save.inv.bottles = if state.save.inv.bottles == 0 { 1 } else { 0 }, //TODO Ruto's Letter support
-            TrackerCell::Scale => state.save.upgrades.set_scale(match state.save.upgrades.scale() {
+            }),
+            decrement: Box::new(|state| state.save.inv.adult_trade_item = match state.save.inv.adult_trade_item {
+                AdultTradeItem::None => AdultTradeItem::ClaimCheck,
+                AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::None,
+                AdultTradeItem::Cojiro => AdultTradeItem::PocketEgg,
+                AdultTradeItem::OddMushroom => AdultTradeItem::Cojiro,
+                AdultTradeItem::OddPotion => AdultTradeItem::OddMushroom,
+                AdultTradeItem::PoachersSaw => AdultTradeItem::OddPotion,
+                AdultTradeItem::BrokenSword => AdultTradeItem::PoachersSaw,
+                AdultTradeItem::Prescription => AdultTradeItem::BrokenSword,
+                AdultTradeItem::EyeballFrog => AdultTradeItem::Prescription,
+                AdultTradeItem::Eyedrops => AdultTradeItem::EyeballFrog,
+                AdultTradeItem::ClaimCheck => AdultTradeItem::Eyedrops,
+            }),
+        },
+        Skulltula: Count {
+            get: Box::new(|state| state.save.skull_tokens),
+            set: Box::new(|state, value| state.save.skull_tokens = value),
+            max: 100,
+        },
+        KokiriEmeraldLocation: StoneLocation(Box::new(|knowledge| &mut knowledge.kokiri_emerald_location)),
+        KokiriEmerald: Stone(QuestItems::KOKIRI_EMERALD),
+        GoronRubyLocation: StoneLocation(Box::new(|knowledge| &mut knowledge.goron_ruby_location)),
+        GoronRuby: Stone(QuestItems::GORON_RUBY),
+        ZoraSapphireLocation: StoneLocation(Box::new(|knowledge| &mut knowledge.zora_sapphire_location)),
+        ZoraSapphire: Stone(QuestItems::ZORA_SAPPHIRE),
+        Bottle: OptionalOverlay {
+            toggle_main: Box::new(|state| state.save.inv.bottles = if state.save.inv.bottles == 0 { 1 } else { 0 }),
+            toggle_overlay: Box::new(|_| ()), //TODO toggle Ruto's letter
+        },
+        Scale: Sequence {
+            increment: Box::new(|state| state.save.upgrades.set_scale(match state.save.upgrades.scale() {
                 Upgrades::SILVER_SCALE => Upgrades::GOLD_SCALE,
                 Upgrades::GOLD_SCALE => Upgrades::NONE,
                 _ => Upgrades::SILVER_SCALE,
-            }),
-            TrackerCell::Slingshot => state.save.inv.slingshot = !state.save.inv.slingshot,
-            TrackerCell::Bombs => if state.save.upgrades.bomb_bag() != Upgrades::NONE {
-                state.save.upgrades.set_bomb_bag(Upgrades::NONE);
-                state.save.inv.bombchus = !state.save.inv.bombchus;
-            } else {
+            })),
+            decrement: Box::new(|state| state.save.upgrades.set_scale(match state.save.upgrades.scale() {
+                Upgrades::SILVER_SCALE => Upgrades::NONE,
+                Upgrades::GOLD_SCALE => Upgrades::SILVER_SCALE,
+                _ => Upgrades::GOLD_SCALE,
+            })),
+        },
+    ],
+    [
+        Slingshot: Simple(Box::new(|state| state.save.inv.slingshot = !state.save.inv.slingshot)),
+        Bombs: Overlay {
+            state: Box::new(|state| (state.save.upgrades.bomb_bag() != Upgrades::NONE, state.save.inv.bombchus)),
+            toggle_main: Box::new(|state| if state.save.upgrades.bomb_bag() == Upgrades::NONE {
                 state.save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG);
-            },
-            TrackerCell::Boomerang => state.save.inv.boomerang = !state.save.inv.boomerang,
-            TrackerCell::Strength => state.save.upgrades.set_strength(match state.save.upgrades.strength() {
+            } else {
+                state.save.upgrades.set_bomb_bag(Upgrades::NONE)
+            }),
+            toggle_overlay: Box::new(|state| state.save.inv.bombchus = !state.save.inv.bombchus),
+        },
+        Boomerang: Simple(Box::new(|state| state.save.inv.boomerang = !state.save.inv.boomerang)),
+        Strength: Sequence {
+            increment: Box::new(|state| state.save.upgrades.set_strength(match state.save.upgrades.strength() {
                 Upgrades::GORON_BRACELET => Upgrades::SILVER_GAUNTLETS,
                 Upgrades::SILVER_GAUNTLETS => Upgrades::GOLD_GAUNTLETS,
                 Upgrades::GOLD_GAUNTLETS => Upgrades::NONE,
                 _ => Upgrades::GORON_BRACELET,
-            }),
-            TrackerCell::Magic => if state.save.magic != MagicCapacity::None {
-                state.save.magic = MagicCapacity::None;
-                state.save.inv.lens = !state.save.inv.lens;
-            } else {
+            })),
+            decrement: Box::new(|state| state.save.upgrades.set_strength(match state.save.upgrades.strength() {
+                Upgrades::GORON_BRACELET => Upgrades::NONE,
+                Upgrades::SILVER_GAUNTLETS => Upgrades::GORON_BRACELET,
+                Upgrades::GOLD_GAUNTLETS => Upgrades::SILVER_GAUNTLETS,
+                _ => Upgrades::GOLD_GAUNTLETS,
+            })),
+        },
+        Magic: Overlay {
+            state: Box::new(|state| (state.save.magic != MagicCapacity::None, state.save.inv.lens)),
+            toggle_main: Box::new(|state| if state.save.magic == MagicCapacity::None {
                 state.save.magic = MagicCapacity::Small;
-            },
-            TrackerCell::Spells => if state.save.inv.dins_fire {
-                state.save.inv.dins_fire = false;
-                state.save.inv.farores_wind = !state.save.inv.farores_wind;
             } else {
-                state.save.inv.dins_fire = true;
-            },
-            TrackerCell::Hookshot => state.save.inv.hookshot = match state.save.inv.hookshot {
+                state.save.magic = MagicCapacity::None;
+            }),
+            toggle_overlay: Box::new(|state| state.save.inv.lens = !state.save.inv.lens),
+        },
+        Spells: Composite {
+            state: Box::new(|state| (state.save.inv.dins_fire, state.save.inv.farores_wind)),
+            toggle_left: Box::new(|state| state.save.inv.dins_fire = !state.save.inv.dins_fire),
+            toggle_right: Box::new(|state| state.save.inv.farores_wind = !state.save.inv.farores_wind),
+        },
+    ],
+    [
+        Hookshot: SpecialSequence {
+            increment: Box::new(|state| state.save.inv.hookshot = match state.save.inv.hookshot {
                 Hookshot::None => Hookshot::Hookshot,
                 Hookshot::Hookshot => Hookshot::Longshot,
                 Hookshot::Longshot => Hookshot::None,
-            },
-            TrackerCell::Bow => if state.save.inv.bow {
-                state.save.inv.bow = false;
-                state.save.inv.ice_arrows = !state.save.inv.ice_arrows;
-            } else {
-                state.save.inv.bow = true;
-            },
-            TrackerCell::Arrows => if state.save.inv.fire_arrows {
-                state.save.inv.fire_arrows = false;
-                state.save.inv.light_arrows = !state.save.inv.light_arrows;
-            } else {
-                state.save.inv.fire_arrows = true;
-            },
-            TrackerCell::Hammer => state.save.inv.hammer = !state.save.inv.hammer,
-            TrackerCell::Boots => if state.save.equipment.contains(Equipment::IRON_BOOTS) {
-                state.save.equipment.remove(Equipment::IRON_BOOTS);
-                state.save.equipment.toggle(Equipment::HOVER_BOOTS);
-            } else {
-                state.save.equipment.insert(Equipment::IRON_BOOTS);
-            },
-            TrackerCell::MirrorShield => state.save.equipment.toggle(Equipment::MIRROR_SHIELD),
-            TrackerCell::ChildTrade => state.save.inv.child_trade_item = match state.save.inv.child_trade_item {
+            }),
+            decrement: Box::new(|state| state.save.inv.hookshot = match state.save.inv.hookshot {
+                Hookshot::None => Hookshot::Longshot,
+                Hookshot::Hookshot => Hookshot::None,
+                Hookshot::Longshot => Hookshot::Hookshot,
+            }),
+        },
+        Bow: OptionalOverlay {
+            toggle_main: Box::new(|state| state.save.inv.bow = !state.save.inv.bow),
+            toggle_overlay: Box::new(|state| state.save.inv.ice_arrows = !state.save.inv.ice_arrows),
+        },
+        Arrows: Composite {
+            state: Box::new(|state| (state.save.inv.fire_arrows, state.save.inv.light_arrows)),
+            toggle_left: Box::new(|state| state.save.inv.fire_arrows = !state.save.inv.fire_arrows),
+            toggle_right: Box::new(|state| state.save.inv.light_arrows = !state.save.inv.light_arrows),
+        },
+        Hammer: Simple(Box::new(|state| state.save.inv.hammer = !state.save.inv.hammer)),
+        Boots: Composite {
+            state: Box::new(|state| (state.save.equipment.contains(Equipment::IRON_BOOTS), state.save.equipment.contains(Equipment::HOVER_BOOTS))),
+            toggle_left: Box::new(|state| state.save.equipment.toggle(Equipment::IRON_BOOTS)),
+            toggle_right: Box::new(|state| state.save.equipment.toggle(Equipment::HOVER_BOOTS)),
+        },
+        MirrorShield: Simple(Box::new(|state| state.save.equipment.toggle(Equipment::MIRROR_SHIELD))),
+    ],
+    [
+        ChildTrade: Sequence {
+            increment: Box::new(|state| state.save.inv.child_trade_item = match state.save.inv.child_trade_item {
                 ChildTradeItem::None => ChildTradeItem::WeirdEgg,
                 ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
                 ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
@@ -349,43 +422,97 @@ impl TrackerCell {
                 ChildTradeItem::SpookyMask => ChildTradeItem::BunnyHood,
                 ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
                 ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
-            },
-            TrackerCell::Ocarina => if state.save.inv.ocarina {
-                state.save.inv.ocarina = false;
-                state.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG);
-            } else {
-                state.save.inv.ocarina = true;
-            },
-            TrackerCell::Beans => state.save.inv.beans = !state.save.inv.beans,
-            TrackerCell::SwordCard => if state.save.equipment.contains(Equipment::KOKIRI_SWORD) {
-                state.save.equipment.remove(Equipment::KOKIRI_SWORD);
-                state.save.quest_items.toggle(QuestItems::GERUDO_CARD);
-            } else {
-                state.save.equipment.insert(Equipment::KOKIRI_SWORD);
-            },
-            TrackerCell::Tunics => if state.save.equipment.contains(Equipment::GORON_TUNIC) {
-                state.save.equipment.remove(Equipment::GORON_TUNIC);
-                state.save.equipment.toggle(Equipment::ZORA_TUNIC);
-            } else {
-                state.save.equipment.insert(Equipment::GORON_TUNIC);
-            },
-            TrackerCell::Triforce => state.save.set_triforce_pieces(if state.save.triforce_pieces() == 100 { 0 } else { state.save.triforce_pieces() + 1 }),
-            TrackerCell::ZeldasLullaby => state.save.quest_items.toggle(QuestItems::ZELDAS_LULLABY),
-            TrackerCell::EponasSong => state.save.quest_items.toggle(QuestItems::EPONAS_SONG),
-            TrackerCell::SariasSong => state.save.quest_items.toggle(QuestItems::SARIAS_SONG),
-            TrackerCell::SunsSong => state.save.quest_items.toggle(QuestItems::SUNS_SONG),
-            TrackerCell::SongOfTime => state.save.quest_items.toggle(QuestItems::SONG_OF_TIME),
-            TrackerCell::SongOfStorms => state.save.quest_items.toggle(QuestItems::SONG_OF_STORMS),
-            TrackerCell::Minuet => state.save.quest_items.toggle(QuestItems::MINUET_OF_FOREST),
-            TrackerCell::Bolero => state.save.quest_items.toggle(QuestItems::BOLERO_OF_FIRE),
-            TrackerCell::Serenade => state.save.quest_items.toggle(QuestItems::SERENADE_OF_WATER),
-            TrackerCell::Requiem => state.save.quest_items.toggle(QuestItems::REQUIEM_OF_SPIRIT),
-            TrackerCell::Nocturne => state.save.quest_items.toggle(QuestItems::NOCTURNE_OF_SHADOW),
-            TrackerCell::Prelude => state.save.quest_items.toggle(QuestItems::PRELUDE_OF_LIGHT),
-        }
-    }
+            }),
+            decrement: Box::new(|state| state.save.inv.child_trade_item = match state.save.inv.child_trade_item {
+                ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
+                ChildTradeItem::WeirdEgg => ChildTradeItem::None,
+                ChildTradeItem::Chicken => ChildTradeItem::WeirdEgg,
+                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::Chicken, //TODO for SOLD OUT, check trade quest progress
+                ChildTradeItem::KeatonMask => ChildTradeItem::ZeldasLetter,
+                ChildTradeItem::SkullMask => ChildTradeItem::KeatonMask,
+                ChildTradeItem::SpookyMask => ChildTradeItem::SkullMask,
+                ChildTradeItem::BunnyHood => ChildTradeItem::SpookyMask,
+                ChildTradeItem::MaskOfTruth => ChildTradeItem::BunnyHood,
+            }),
+        },
+        Ocarina: Overlay {
+            state: Box::new(|state| (state.save.inv.ocarina, state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
+            toggle_main: Box::new(|state| state.save.inv.ocarina = !state.save.inv.ocarina),
+            toggle_overlay: Box::new(|state| state.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)),
+        },
+        Beans: Simple(Box::new(|state| state.save.inv.beans = !state.save.inv.beans)),
+        SwordCard: Composite {
+            state: Box::new(|state| (state.save.equipment.contains(Equipment::KOKIRI_SWORD), state.save.quest_items.contains(QuestItems::GERUDO_CARD))),
+            toggle_left: Box::new(|state| state.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
+            toggle_right: Box::new(|state| state.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
+        },
+        Tunics: Composite {
+            state: Box::new(|state| (state.save.equipment.contains(Equipment::GORON_TUNIC), state.save.equipment.contains(Equipment::ZORA_TUNIC))),
+            toggle_left: Box::new(|state| state.save.equipment.toggle(Equipment::GORON_TUNIC)),
+            toggle_right: Box::new(|state| state.save.equipment.toggle(Equipment::ZORA_TUNIC)),
+        },
+        Triforce: Count {
+            get: Box::new(|state| state.save.triforce_pieces()),
+            set: Box::new(|state, value| state.save.set_triforce_pieces(value)),
+            max: 100,
+        },
+    ],
+    [
+        ZeldasLullaby: Song {
+            song: QuestItems::ZELDAS_LULLABY,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_IMPA)),
+        },
+        EponasSong: Song {
+            song: QuestItems::EPONAS_SONG,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_MALON)),
+        },
+        SariasSong: Song {
+            song: QuestItems::SARIAS_SONG,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
+        },
+        SunsSong: Song {
+            song: QuestItems::SUNS_SONG,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
+        },
+        SongOfTime: Song {
+            song: QuestItems::SONG_OF_TIME,
+            toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SONG_FROM_OCARINA_OF_TIME)),
+        },
+        SongOfStorms: Song {
+            song: QuestItems::SONG_OF_STORMS,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_WINDMILL)),
+        },
+    ],
+    [
+        Minuet: Song {
+            song: QuestItems::MINUET_OF_FOREST,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_FOREST)),
+        },
+        Bolero: Song {
+            song: QuestItems::BOLERO_OF_FIRE,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_CRATER)),
+        },
+        Serenade: Song {
+            song: QuestItems::SERENADE_OF_WATER,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_ICE_CAVERN)),
+        },
+        Requiem: Song {
+            song: QuestItems::REQUIEM_OF_SPIRIT,
+            toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SHEIK_AT_COLOSSUS)),
+        },
+        Nocturne: Song {
+            song: QuestItems::NOCTURNE_OF_SHADOW,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_KAKARIKO)),
+        },
+        Prelude: Song {
+            song: QuestItems::PRELUDE_OF_LIGHT,
+            toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
+        },
+    ],
+}
 
-    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> {
+impl TrackerCellId {
+    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> { //TODO generate code to allow getting embedded images using non-static paths, then move this method to TrackerCellKind
         macro_rules! xopar_image {
             (@count_inner $filename:ident $count:expr, $($n:literal),*) => {{
                 match $count {
@@ -448,7 +575,7 @@ impl TrackerCell {
         }
 
         let content = match self {
-            TrackerCell::LightMedallionLocation => match state.knowledge.light_medallion_location {
+            TrackerCellId::LightMedallionLocation => match state.knowledge.light_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -460,7 +587,7 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(50)),
-            TrackerCell::ForestMedallionLocation => match state.knowledge.forest_medallion_location {
+            TrackerCellId::ForestMedallionLocation => match state.knowledge.forest_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -472,7 +599,7 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(50)),
-            TrackerCell::FireMedallionLocation => match state.knowledge.fire_medallion_location {
+            TrackerCellId::FireMedallionLocation => match state.knowledge.fire_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -484,7 +611,7 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(50)),
-            TrackerCell::WaterMedallionLocation => match state.knowledge.water_medallion_location {
+            TrackerCellId::WaterMedallionLocation => match state.knowledge.water_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -496,7 +623,7 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(50)),
-            TrackerCell::ShadowMedallionLocation => match state.knowledge.shadow_medallion_location {
+            TrackerCellId::ShadowMedallionLocation => match state.knowledge.shadow_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -508,7 +635,7 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(50)),
-            TrackerCell::SpiritMedallionLocation => match state.knowledge.spirit_medallion_location {
+            TrackerCellId::SpiritMedallionLocation => match state.knowledge.spirit_medallion_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -520,13 +647,13 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(50)),
-            TrackerCell::LightMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::LIGHT_MEDALLION), light_medallion),
-            TrackerCell::ForestMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::FOREST_MEDALLION), forest_medallion),
-            TrackerCell::FireMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::FIRE_MEDALLION), fire_medallion),
-            TrackerCell::WaterMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::WATER_MEDALLION), water_medallion),
-            TrackerCell::ShadowMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SHADOW_MEDALLION), shadow_medallion),
-            TrackerCell::SpiritMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SPIRIT_MEDALLION), spirit_medallion),
-            TrackerCell::AdultTrade => match state.save.inv.adult_trade_item {
+            TrackerCellId::LightMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::LIGHT_MEDALLION), light_medallion),
+            TrackerCellId::ForestMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::FOREST_MEDALLION), forest_medallion),
+            TrackerCellId::FireMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::FIRE_MEDALLION), fire_medallion),
+            TrackerCellId::WaterMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::WATER_MEDALLION), water_medallion),
+            TrackerCellId::ShadowMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SHADOW_MEDALLION), shadow_medallion),
+            TrackerCellId::SpiritMedallion => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SPIRIT_MEDALLION), spirit_medallion),
+            TrackerCellId::AdultTrade => match state.save.inv.adult_trade_item {
                 AdultTradeItem::None => xopar_image!(dimmed blue_egg),
                 AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => xopar_image!(blue_egg),
                 AdultTradeItem::Cojiro => xopar_image!(cojiro),
@@ -539,8 +666,8 @@ impl TrackerCell {
                 AdultTradeItem::Eyedrops => xopar_image!(eye_drops),
                 AdultTradeItem::ClaimCheck => xopar_image!(claim_check),
             },
-            TrackerCell::Skulltula => if state.save.skull_tokens == 0 { xopar_image!(dimmed golden_skulltula) } else { xopar_image!(count = state.save.skull_tokens, skulls) },
-            TrackerCell::KokiriEmeraldLocation => match state.knowledge.kokiri_emerald_location {
+            TrackerCellId::Skulltula => if state.save.skull_tokens == 0 { xopar_image!(dimmed golden_skulltula) } else { xopar_image!(count = state.save.skull_tokens, skulls) },
+            TrackerCellId::KokiriEmeraldLocation => match state.knowledge.kokiri_emerald_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -552,8 +679,8 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(33)),
-            TrackerCell::KokiriEmerald => xopar_image!(undim = state.save.quest_items.contains(QuestItems::KOKIRI_EMERALD), kokiri_emerald).width(Length::Units(33)),
-            TrackerCell::GoronRubyLocation => match state.knowledge.goron_ruby_location {
+            TrackerCellId::KokiriEmerald => xopar_image!(undim = state.save.quest_items.contains(QuestItems::KOKIRI_EMERALD), kokiri_emerald).width(Length::Units(33)),
+            TrackerCellId::GoronRubyLocation => match state.knowledge.goron_ruby_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -565,8 +692,8 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(33)),
-            TrackerCell::GoronRuby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(33)),
-            TrackerCell::ZoraSapphireLocation => match state.knowledge.zora_sapphire_location {
+            TrackerCellId::GoronRuby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(33)),
+            TrackerCellId::ZoraSapphireLocation => match state.knowledge.zora_sapphire_location {
                 DungeonRewardLocation::Unknown => xopar_image!(unknown_text),
                 DungeonRewardLocation::DekuTree => xopar_image!(deku_text),
                 DungeonRewardLocation::DodongosCavern => xopar_image!(dc_text),
@@ -578,35 +705,35 @@ impl TrackerCell {
                 DungeonRewardLocation::SpiritTemple => xopar_image!(spirit_text),
                 DungeonRewardLocation::LinksPocket => xopar_image!(free_text),
             }.width(Length::Units(33)),
-            TrackerCell::ZoraSapphire => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZORA_SAPPHIRE), zora_sapphire).width(Length::Units(33)),
-            TrackerCell::Bottle => xopar_image!(undim = state.save.inv.bottles > 0, bottle), //TODO only undim if the bottle can be trivially emptied; Ruto's Letter support
-            TrackerCell::Scale => match state.save.upgrades.scale() {
+            TrackerCellId::ZoraSapphire => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZORA_SAPPHIRE), zora_sapphire).width(Length::Units(33)),
+            TrackerCellId::Bottle => xopar_image!(undim = state.save.inv.bottles > 0, bottle), //TODO only undim if the bottle can be trivially emptied; Ruto's Letter support
+            TrackerCellId::Scale => match state.save.upgrades.scale() {
                 Upgrades::SILVER_SCALE => xopar_image!(silver_scale),
                 Upgrades::GOLD_SCALE => xopar_image!(gold_scale),
                 _ => xopar_image!(dimmed silver_scale),
             },
-            TrackerCell::Slingshot => xopar_image!(undim = state.save.inv.slingshot, slingshot),
-            TrackerCell::Bombs => xopar_image!(undim = state.save.upgrades.bomb_bag() != Upgrades::NONE, bomb_bag, overlay = state.save.inv.bombchus, bomb_bag_bombchu),
-            TrackerCell::Boomerang => xopar_image!(undim = state.save.inv.boomerang, boomerang),
-            TrackerCell::Strength => match state.save.upgrades.strength() {
+            TrackerCellId::Slingshot => xopar_image!(undim = state.save.inv.slingshot, slingshot),
+            TrackerCellId::Bombs => xopar_image!(undim = state.save.upgrades.bomb_bag() != Upgrades::NONE, bomb_bag, overlay = state.save.inv.bombchus, bomb_bag_bombchu),
+            TrackerCellId::Boomerang => xopar_image!(undim = state.save.inv.boomerang, boomerang),
+            TrackerCellId::Strength => match state.save.upgrades.strength() {
                 Upgrades::GORON_BRACELET => xopar_image!(goron_bracelet),
                 Upgrades::SILVER_GAUNTLETS => xopar_image!(silver_gauntlets),
                 Upgrades::GOLD_GAUNTLETS => xopar_image!(gold_gauntlets),
                 _ => xopar_image!(dimmed goron_bracelet),
             },
-            TrackerCell::Magic => xopar_image!(undim = state.save.magic != MagicCapacity::None, magic, overlay = state.save.inv.lens, magic_lens),
-            TrackerCell::Spells => xopar_image!(composite = state.save.inv.dins_fire, dins_fire, state.save.inv.farores_wind, faores_wind, composite_magic),
-            TrackerCell::Hookshot => match state.save.inv.hookshot {
+            TrackerCellId::Magic => xopar_image!(undim = state.save.magic != MagicCapacity::None, magic, overlay = state.save.inv.lens, magic_lens),
+            TrackerCellId::Spells => xopar_image!(composite = state.save.inv.dins_fire, dins_fire, state.save.inv.farores_wind, faores_wind, composite_magic),
+            TrackerCellId::Hookshot => match state.save.inv.hookshot {
                 Hookshot::None => xopar_image!(dimmed hookshot),
                 Hookshot::Hookshot => xopar_image!(hookshot_accessible),
                 Hookshot::Longshot => xopar_image!(longshot_accessible),
             },
-            TrackerCell::Bow => xopar_image!(undim = state.save.inv.bow, bow, overlay = state.save.inv.ice_arrows, bow_ice_arrows),
-            TrackerCell::Arrows => xopar_image!(composite = state.save.inv.fire_arrows, fire_arrows, state.save.inv.light_arrows, light_arrows, composite_arrows),
-            TrackerCell::Hammer => xopar_image!(undim = state.save.inv.hammer, hammer),
-            TrackerCell::Boots => xopar_image!(composite = state.save.equipment.contains(Equipment::IRON_BOOTS), iron_boots, state.save.equipment.contains(Equipment::HOVER_BOOTS), hover_boots, composite_boots),
-            TrackerCell::MirrorShield => xopar_image!(undim = state.save.equipment.contains(Equipment::MIRROR_SHIELD), mirror_shield),
-            TrackerCell::ChildTrade => match state.save.inv.child_trade_item {
+            TrackerCellId::Bow => xopar_image!(undim = state.save.inv.bow, bow, overlay = state.save.inv.ice_arrows, bow_ice_arrows),
+            TrackerCellId::Arrows => xopar_image!(composite = state.save.inv.fire_arrows, fire_arrows, state.save.inv.light_arrows, light_arrows, composite_arrows),
+            TrackerCellId::Hammer => xopar_image!(undim = state.save.inv.hammer, hammer),
+            TrackerCellId::Boots => xopar_image!(composite = state.save.equipment.contains(Equipment::IRON_BOOTS), iron_boots, state.save.equipment.contains(Equipment::HOVER_BOOTS), hover_boots, composite_boots),
+            TrackerCellId::MirrorShield => xopar_image!(undim = state.save.equipment.contains(Equipment::MIRROR_SHIELD), mirror_shield),
+            TrackerCellId::ChildTrade => match state.save.inv.child_trade_item {
                 ChildTradeItem::None => xopar_image!(dimmed white_egg),
                 ChildTradeItem::WeirdEgg => xopar_image!(white_egg),
                 ChildTradeItem::Chicken => xopar_image!(white_chicken),
@@ -617,23 +744,23 @@ impl TrackerCell {
                 ChildTradeItem::BunnyHood => xopar_image!(bunny_hood),
                 ChildTradeItem::MaskOfTruth => xopar_image!(mask_of_truth),
             },
-            TrackerCell::Ocarina => xopar_image!(undim = state.save.inv.ocarina, ocarina, overlay = state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG), ocarina_scarecrow), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
-            TrackerCell::Beans => xopar_image!(undim = state.save.inv.beans, beans), //TODO overlay with number bought if autotracker is on?
-            TrackerCell::SwordCard => xopar_image!(composite = state.save.equipment.contains(Equipment::KOKIRI_SWORD), kokiri_sword, state.save.quest_items.contains(QuestItems::GERUDO_CARD), gerudo_card, composite_ksword_gcard),
-            TrackerCell::Tunics => xopar_image!(composite = state.save.equipment.contains(Equipment::GORON_TUNIC), goron_tunic, state.save.equipment.contains(Equipment::ZORA_TUNIC), zora_tunic, composite_tunics),
-            TrackerCell::Triforce => if state.save.triforce_pieces() == 0 { xopar_image!(dimmed triforce) } else { xopar_image!(count = state.save.triforce_pieces(), force) },
-            TrackerCell::ZeldasLullaby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZELDAS_LULLABY), lullaby, overlay = checked(&state.save, "Song from Impa").unwrap_or(false), lullaby_check),
-            TrackerCell::EponasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::EPONAS_SONG), epona, overlay = checked(&state.save, "Song from Malon").unwrap_or(false), epona_check),
-            TrackerCell::SariasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SARIAS_SONG), saria, overlay = checked(&state.save, "Song from Saria").unwrap_or(false), saria_check),
-            TrackerCell::SunsSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SUNS_SONG), sun, overlay = checked(&state.save, "Song from Composers Grave").unwrap_or(false), sun_check),
-            TrackerCell::SongOfTime => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_TIME), time, overlay = checked(&state.save, "Song from Ocarina of Time").unwrap_or(false), time_check),
-            TrackerCell::SongOfStorms => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_STORMS), storms, overlay = checked(&state.save, "Song from Windmill").unwrap_or(false), storms_check),
-            TrackerCell::Minuet => xopar_image!(undim = state.save.quest_items.contains(QuestItems::MINUET_OF_FOREST), minuet, overlay = checked(&state.save, "Sheik in Forest").unwrap_or(false), minuet_check),
-            TrackerCell::Bolero => xopar_image!(undim = state.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE), bolero, overlay = checked(&state.save, "Sheik in Crater").unwrap_or(false), bolero_check),
-            TrackerCell::Serenade => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SERENADE_OF_WATER), serenade, overlay = checked(&state.save, "Sheik in Ice Cavern").unwrap_or(false), serenade_check),
-            TrackerCell::Requiem => xopar_image!(undim = state.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT), requiem, overlay = checked(&state.save, "Sheik at Colossus").unwrap_or(false), requiem_check),
-            TrackerCell::Nocturne => xopar_image!(undim = state.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW), nocturne, overlay = checked(&state.save, "Sheik in Kakariko").unwrap_or(false), nocturne_check),
-            TrackerCell::Prelude => xopar_image!(undim = state.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT), prelude, overlay = checked(&state.save, "Sheik at Temple").unwrap_or(false), prelude_check),
+            TrackerCellId::Ocarina => xopar_image!(undim = state.save.inv.ocarina, ocarina, overlay = state.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG), ocarina_scarecrow), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
+            TrackerCellId::Beans => xopar_image!(undim = state.save.inv.beans, beans), //TODO overlay with number bought if autotracker is on?
+            TrackerCellId::SwordCard => xopar_image!(composite = state.save.equipment.contains(Equipment::KOKIRI_SWORD), kokiri_sword, state.save.quest_items.contains(QuestItems::GERUDO_CARD), gerudo_card, composite_ksword_gcard),
+            TrackerCellId::Tunics => xopar_image!(composite = state.save.equipment.contains(Equipment::GORON_TUNIC), goron_tunic, state.save.equipment.contains(Equipment::ZORA_TUNIC), zora_tunic, composite_tunics),
+            TrackerCellId::Triforce => if state.save.triforce_pieces() == 0 { xopar_image!(dimmed triforce) } else { xopar_image!(count = state.save.triforce_pieces(), force) },
+            TrackerCellId::ZeldasLullaby => xopar_image!(undim = state.save.quest_items.contains(QuestItems::ZELDAS_LULLABY), lullaby, overlay = checked(&state.save, "Song from Impa").unwrap_or(false), lullaby_check),
+            TrackerCellId::EponasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::EPONAS_SONG), epona, overlay = checked(&state.save, "Song from Malon").unwrap_or(false), epona_check),
+            TrackerCellId::SariasSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SARIAS_SONG), saria, overlay = checked(&state.save, "Song from Saria").unwrap_or(false), saria_check),
+            TrackerCellId::SunsSong => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SUNS_SONG), sun, overlay = checked(&state.save, "Song from Composers Grave").unwrap_or(false), sun_check),
+            TrackerCellId::SongOfTime => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_TIME), time, overlay = checked(&state.save, "Song from Ocarina of Time").unwrap_or(false), time_check),
+            TrackerCellId::SongOfStorms => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SONG_OF_STORMS), storms, overlay = checked(&state.save, "Song from Windmill").unwrap_or(false), storms_check),
+            TrackerCellId::Minuet => xopar_image!(undim = state.save.quest_items.contains(QuestItems::MINUET_OF_FOREST), minuet, overlay = checked(&state.save, "Sheik in Forest").unwrap_or(false), minuet_check),
+            TrackerCellId::Bolero => xopar_image!(undim = state.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE), bolero, overlay = checked(&state.save, "Sheik in Crater").unwrap_or(false), bolero_check),
+            TrackerCellId::Serenade => xopar_image!(undim = state.save.quest_items.contains(QuestItems::SERENADE_OF_WATER), serenade, overlay = checked(&state.save, "Sheik in Ice Cavern").unwrap_or(false), serenade_check),
+            TrackerCellId::Requiem => xopar_image!(undim = state.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT), requiem, overlay = checked(&state.save, "Sheik at Colossus").unwrap_or(false), requiem_check),
+            TrackerCellId::Nocturne => xopar_image!(undim = state.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW), nocturne, overlay = checked(&state.save, "Sheik in Kakariko").unwrap_or(false), nocturne_check),
+            TrackerCellId::Prelude => xopar_image!(undim = state.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT), prelude, overlay = checked(&state.save, "Sheik at Temple").unwrap_or(false), prelude_check),
         };
         if let Some(cell_button) = cell_button {
             Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(*self).into()
@@ -643,7 +770,7 @@ impl TrackerCell {
     }
 }
 
-impl button::StyleSheet for TrackerCell {
+impl button::StyleSheet for TrackerCellId {
     fn active(&self) -> button::Style { button::Style::default() }
 }
 
@@ -662,7 +789,9 @@ enum Message {
     #[cfg(not(target_arch = "wasm32"))]
     ClientDisconnected,
     DismissNotification,
-    LeftClick(TrackerCell),
+    #[cfg(not(target_arch = "wasm32"))]
+    Event(iced_native::Event),
+    LeftClick(TrackerCellId),
     #[cfg(not(target_arch = "wasm32"))]
     NetworkError(proto::ReadError),
     #[cfg(not(target_arch = "wasm32"))]
@@ -675,15 +804,16 @@ impl fmt::Display for Message {
             Message::ClientConnected => write!(f, "auto-tracker connected"),
             Message::ClientDisconnected => write!(f, "auto-tracker disconnected"),
             Message::NetworkError(e) => write!(f, "network error: {}", e),
-            Message::AutoDismissNotification | Message::DismissNotification | Message::LeftClick(_) | Message::Packet(_) => write!(f, "{:?}", self), // these messages are not notifications so just fall back to Debug
+            _ => write!(f, "{:?}", self), // these messages are not notifications so just fall back to Debug
         }
     }
 }
 
 #[derive(Debug, Default)]
 struct State {
-    cell_buttons: CellButtons,
     client_connected: bool,
+    last_cursor_pos: [f32; 2],
+    cell_buttons: CellButtons,
     model: ModelState,
     notification: Option<(bool, Message)>,
     dismiss_notification_button: button::State,
@@ -737,7 +867,21 @@ impl Application for State {
                 self.notify(message);
             }
             Message::DismissNotification => self.notification = None,
-            Message::LeftClick(cell) => cell.left_click(&mut self.model),
+            #[cfg(not(target_arch = "wasm32"))]
+            Message::Event(iced_native::Event::Mouse(event)) => match event {
+                iced_native::input::mouse::Event::CursorMoved { x, y } => self.last_cursor_pos = [x, y],
+                iced_native::input::mouse::Event::Input { state: iced_native::input::ButtonState::Released, button: iced_native::input::mouse::Button::Right } => {
+                    if let Some(cell) = TrackerCellId::at(self.last_cursor_pos, self.notification.is_none()) {
+                        cell.kind().right_click(&mut self.model);
+                    }
+                }
+                _ => {}
+            },
+            Message::Event(_) => {}
+            Message::LeftClick(cell) => {
+                #[cfg(not(target_arch = "wasm32"))] cell.kind().left_click(&mut self.model);
+                #[cfg(target_arch = "wasm32")] cell.kind().click(&mut self.model);
+            }
             #[cfg(not(target_arch = "wasm32"))]
             Message::NetworkError(_) => self.notify(message),
             #[cfg(not(target_arch = "wasm32"))]
@@ -756,7 +900,7 @@ impl Application for State {
 
         macro_rules! cell {
             ($cell:ident) => {{
-                TrackerCell::$cell.view(&self.model, if self.client_connected { None } else { Some(&mut cell_buttons.$cell) })
+                TrackerCellId::$cell.view(&self.model, if self.client_connected { None } else { Some(&mut cell_buttons.$cell) })
             }}
         }
 
@@ -869,7 +1013,10 @@ impl Application for State {
 
     fn subscription(&self) -> Subscription<Message> {
         #[cfg(not(target_arch = "wasm32"))] {
-            Subscription::from_recipe(tcp_server::Subscription)
+            Subscription::batch(vec![
+                iced_native::subscription::events().map(Message::Event),
+                Subscription::from_recipe(tcp_server::Subscription),
+            ])
         }
         #[cfg(target_arch = "wasm32")] {
             Subscription::none()
