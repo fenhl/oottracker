@@ -2,6 +2,11 @@ use oottracker_derive::flags_list;
 
 flags_list! {
     pub struct EventChkInf: [u16; 14] {
+        0: {
+            //USED_BLUE_WARP_IN_GOHMAS_LAIR = 0x0200, //TODO check for parity with Deku Tree Clear event
+            event "Deku Tree Clear" = 0x0080,
+            event "Showed Mido Sword & Shield" = 0x0010,
+        },
         1: {
             "HC Malon Egg" = 0x0004, // unsure, documented at CloudModding as “Obtained Pocket Egg”, not Weird Egg
         },
@@ -11,6 +16,7 @@ flags_list! {
         3: {
             "ZD Diving Minigame" = 0x0100,
             "Barinade" = 0x0080,
+            DELIVER_RUTOS_LETTER = 0x0008,
             "LH Underwater Item" = 0x0002,
         },
         4: {
@@ -32,12 +38,23 @@ flags_list! {
             "Sheik in Crater" = 0x0002,
             "Sheik in Forest" = 0x0001,
         },
+        6: {
+            event "Drain Well" = 0x0080,
+        },
         9: {
             SCARECROW_SONG = 0x1000,
         },
         10: {
+            event "Spirit Trial Clear" = 0x2000, //TODO only consider when known by settings knowledge or visual confirmation
             "Sheik at Colossus" = 0x1000,
             "Song from Ocarina of Time" = 0x0200,
+        },
+        11: {
+            event "Light Trial Clear" = 0x8000, //TODO only consider when known by settings knowledge or visual confirmation
+            event "Fire Trial Clear" = 0x4000, //TODO only consider when known by settings knowledge or visual confirmation
+            event "Shadow Trial Clear" = 0x2000, //TODO only consider when known by settings knowledge or visual confirmation
+            event "Water Trial Clear" = 0x1000, //TODO only consider when known by settings knowledge or visual confirmation
+            event "Forest Trial Clear" = 0x0800, //TODO only consider when known by settings knowledge or visual confirmation
         },
         12: {
             "LW Gift from Saria" = 0x0002,
@@ -86,6 +103,9 @@ flags_list! {
 
 flags_list! {
     pub struct InfTable: [u8; 60] {
+        15: {
+            event "Kakariko Village Gate Open" = 0x40, //TODO only consider when known by settings knowledge or visual confirmation
+        },
         32: {
             "GC Rolling Goron as Adult" = 0x02,
         },

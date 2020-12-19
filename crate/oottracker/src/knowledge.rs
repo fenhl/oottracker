@@ -1,177 +1,237 @@
 use {
     std::{
+        collections::HashMap,
         fmt,
         io,
         sync::Arc,
     },
+    collect_mac::collect,
+    derive_more::From,
     smart_default::SmartDefault,
 };
 #[cfg(not(target_arch = "wasm32"))] use {
     async_trait::async_trait,
     tokio::net::TcpStream,
-    crate::proto::Protocol,
+    crate::{
+        model::*,
+        proto::Protocol,
+    },
 };
 
-#[derive(Debug, SmartDefault, Clone, Copy)]
-pub enum DungeonRewardLocation {
-    #[default]
-    Unknown,
-    DekuTree,
-    DodongosCavern,
-    JabuJabu,
-    ForestTemple,
-    FireTemple,
-    WaterTemple,
-    ShadowTemple,
-    SpiritTemple,
-    LinksPocket,
-}
-
-#[derive(Debug, Clone)]
-pub enum DungeonRewardLocationReadError {
+#[derive(Debug, From, Clone)]
+pub enum KnowledgeReadError {
+    ActiveTrials(Arc<<HashMap<Medallion, bool> as Protocol>::ReadError>),
+    BoolSettings(Arc<<HashMap<String, bool> as Protocol>::ReadError>),
+    DungeonRewardLocations(Arc<<HashMap<DungeonReward, DungeonRewardLocation> as Protocol>::ReadError>),
+    Exits(Arc<<HashMap<String, HashMap<String, String>> as Protocol>::ReadError>),
     Io(Arc<io::Error>),
-    UnknownLocationId(u8),
+    Mq(Arc<<HashMap<Dungeon, bool> as Protocol>::ReadError>),
+    UnknownPreset(u8),
 }
 
-impl From<io::Error> for DungeonRewardLocationReadError {
-    fn from(e: io::Error) -> DungeonRewardLocationReadError {
-        DungeonRewardLocationReadError::Io(Arc::new(e))
+impl From<<HashMap<Medallion, bool> as Protocol>::ReadError> for KnowledgeReadError {
+    fn from(e: <HashMap<Medallion, bool> as Protocol>::ReadError) -> KnowledgeReadError {
+        KnowledgeReadError::ActiveTrials(Arc::new(e))
     }
 }
 
-impl fmt::Display for DungeonRewardLocationReadError {
+impl From<<HashMap<String, bool> as Protocol>::ReadError> for KnowledgeReadError {
+    fn from(e: <HashMap<String, bool> as Protocol>::ReadError) -> KnowledgeReadError {
+        KnowledgeReadError::BoolSettings(Arc::new(e))
+    }
+}
+
+impl From<<HashMap<DungeonReward, DungeonRewardLocation> as Protocol>::ReadError> for KnowledgeReadError {
+    fn from(e: <HashMap<DungeonReward, DungeonRewardLocation> as Protocol>::ReadError) -> KnowledgeReadError {
+        KnowledgeReadError::DungeonRewardLocations(Arc::new(e))
+    }
+}
+
+impl From<<HashMap<String, HashMap<String, String>> as Protocol>::ReadError> for KnowledgeReadError {
+    fn from(e: <HashMap<String, HashMap<String, String>> as Protocol>::ReadError) -> KnowledgeReadError {
+        KnowledgeReadError::Exits(Arc::new(e))
+    }
+}
+
+impl From<io::Error> for KnowledgeReadError {
+    fn from(e: io::Error) -> KnowledgeReadError {
+        KnowledgeReadError::Io(Arc::new(e))
+    }
+}
+
+impl From<<HashMap<Dungeon, bool> as Protocol>::ReadError> for KnowledgeReadError {
+    fn from(e: <HashMap<Dungeon, bool> as Protocol>::ReadError) -> KnowledgeReadError {
+        KnowledgeReadError::Mq(Arc::new(e))
+    }
+}
+
+impl fmt::Display for KnowledgeReadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DungeonRewardLocationReadError::Io(e) => write!(f, "I/O error: {}", e),
-            DungeonRewardLocationReadError::UnknownLocationId(id) => write!(f, "unknown location ID: {}", id),
+            KnowledgeReadError::ActiveTrials(e) => write!(f, "failed to decode trials knowledge: {}", e),
+            KnowledgeReadError::BoolSettings(e) => write!(f, "failed to decode settings knowledge: {}", e),
+            KnowledgeReadError::DungeonRewardLocations(e) => write!(f, "failed to decode dungeon reward locations: {}", e),
+            KnowledgeReadError::Exits(e) => write!(f, "failed to decode entrance knowledge: {}", e),
+            KnowledgeReadError::Io(e) => write!(f, "I/O error: {}", e),
+            KnowledgeReadError::Mq(e) => write!(f, "failed to decode MQ knowledge: {}", e),
+            KnowledgeReadError::UnknownPreset(id) => write!(f, "unknown knowledge preset: {}", id),
         }
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[async_trait]
-impl Protocol for DungeonRewardLocation {
-    type ReadError = DungeonRewardLocationReadError;
-
-    async fn read(tcp_stream: &mut TcpStream) -> Result<DungeonRewardLocation, DungeonRewardLocationReadError> {
-        match u8::read(tcp_stream).await? {
-            0 => Ok(DungeonRewardLocation::Unknown),
-            1 => Ok(DungeonRewardLocation::DekuTree),
-            2 => Ok(DungeonRewardLocation::DodongosCavern),
-            3 => Ok(DungeonRewardLocation::JabuJabu),
-            4 => Ok(DungeonRewardLocation::ForestTemple),
-            5 => Ok(DungeonRewardLocation::FireTemple),
-            6 => Ok(DungeonRewardLocation::WaterTemple),
-            7 => Ok(DungeonRewardLocation::ShadowTemple),
-            8 => Ok(DungeonRewardLocation::SpiritTemple),
-            9 => Ok(DungeonRewardLocation::LinksPocket),
-            n => Err(DungeonRewardLocationReadError::UnknownLocationId(n)),
-        }
-    }
-
-    async fn write(&self, tcp_stream: &mut TcpStream) -> io::Result<()> {
-        match self {
-            DungeonRewardLocation::Unknown => 0u8.write(tcp_stream).await,
-            DungeonRewardLocation::DekuTree => 1u8.write(tcp_stream).await,
-            DungeonRewardLocation::DodongosCavern => 2u8.write(tcp_stream).await,
-            DungeonRewardLocation::JabuJabu => 3u8.write(tcp_stream).await,
-            DungeonRewardLocation::ForestTemple => 4u8.write(tcp_stream).await,
-            DungeonRewardLocation::FireTemple => 5u8.write(tcp_stream).await,
-            DungeonRewardLocation::WaterTemple => 6u8.write(tcp_stream).await,
-            DungeonRewardLocation::ShadowTemple => 7u8.write(tcp_stream).await,
-            DungeonRewardLocation::SpiritTemple => 8u8.write(tcp_stream).await,
-            DungeonRewardLocation::LinksPocket => 9u8.write(tcp_stream).await,
-        }
-    }
-
-    fn write_sync(&self, tcp_stream: &mut std::net::TcpStream) -> io::Result<()> {
-        match self {
-            DungeonRewardLocation::Unknown => 0u8.write_sync(tcp_stream),
-            DungeonRewardLocation::DekuTree => 1u8.write_sync(tcp_stream),
-            DungeonRewardLocation::DodongosCavern => 2u8.write_sync(tcp_stream),
-            DungeonRewardLocation::JabuJabu => 3u8.write_sync(tcp_stream),
-            DungeonRewardLocation::ForestTemple => 4u8.write_sync(tcp_stream),
-            DungeonRewardLocation::FireTemple => 5u8.write_sync(tcp_stream),
-            DungeonRewardLocation::WaterTemple => 6u8.write_sync(tcp_stream),
-            DungeonRewardLocation::ShadowTemple => 7u8.write_sync(tcp_stream),
-            DungeonRewardLocation::SpiritTemple => 8u8.write_sync(tcp_stream),
-            DungeonRewardLocation::LinksPocket => 9u8.write_sync(tcp_stream),
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, SmartDefault, Clone, PartialEq, Eq)]
 pub struct Knowledge {
-    pub kokiri_emerald_location: DungeonRewardLocation,
-    pub goron_ruby_location: DungeonRewardLocation,
-    pub zora_sapphire_location: DungeonRewardLocation,
-    pub forest_medallion_location: DungeonRewardLocation,
-    pub fire_medallion_location: DungeonRewardLocation,
-    pub water_medallion_location: DungeonRewardLocation,
-    pub shadow_medallion_location: DungeonRewardLocation,
-    pub spirit_medallion_location: DungeonRewardLocation,
-    pub light_medallion_location: DungeonRewardLocation,
+    pub bool_settings: HashMap<String, bool>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
+    #[default(Some(Default::default()))]
+    pub tricks: Option<HashMap<String, bool>>, //TODO remove option wrapping
+    pub dungeon_reward_locations: HashMap<DungeonReward, DungeonRewardLocation>,
+    pub mq: HashMap<Dungeon, bool>,
+    #[default(Some(Default::default()))] //TODO include exits that are never shuffled
+    pub exits: Option<HashMap<String, HashMap<String, String>>>, //TODO remove option wrapping
+    pub active_trials: HashMap<Medallion, bool>,
 }
 
 impl Knowledge {
     /// We know that everything is vanilla. Used by auto-trackers when the base game, rather than rando, is detected.
     pub fn vanilla() -> Knowledge {
         Knowledge {
-            kokiri_emerald_location: DungeonRewardLocation::DekuTree,
-            goron_ruby_location: DungeonRewardLocation::DodongosCavern,
-            zora_sapphire_location: DungeonRewardLocation::JabuJabu,
-            forest_medallion_location: DungeonRewardLocation::ForestTemple,
-            fire_medallion_location: DungeonRewardLocation::FireTemple,
-            water_medallion_location: DungeonRewardLocation::WaterTemple,
-            shadow_medallion_location: DungeonRewardLocation::ShadowTemple,
-            spirit_medallion_location: DungeonRewardLocation::SpiritTemple,
-            light_medallion_location: DungeonRewardLocation::LinksPocket,
+            bool_settings: collect![
+                format!("open_door_of_time") => false,
+                format!("triforce_hunt") => false,
+                format!("all_reachable") => true,
+                format!("bombchus_in_logic") => false,
+                format!("one_item_per_dungeon") => false,
+                format!("trials_random") => false,
+                format!("skip_child_zelda") => false,
+                format!("no_escape_sequence") => false,
+                format!("no_guard_stealth") => false,
+                format!("no_epona_race") => false,
+                format!("skip_some_minigame_phases") => false,
+                format!("useful_cutscenes") => true,
+                format!("complete_mask_quest") => false,
+                format!("fast_chests") => false,
+                format!("logic_no_night_tokens_without_suns_song") => false,
+                format!("free_scarecrow") => false,
+                format!("fast_bunny_hood") => false,
+                format!("start_with_rupees") => false,
+                format!("start_with_consumables") => false,
+                format!("chicken_count_random") => false,
+                format!("big_poe_count_random") => false,
+                format!("shuffle_kokiri_sword") => false,
+                format!("shuffle_ocarinas") => false,
+                format!("shuffle_weird_egg") => false,
+                format!("shuffle_gerudo_card") => false,
+                format!("shuffle_cows") => false,
+                format!("shuffle_beans") => false,
+                format!("shuffle_medigoron_carpet_salesman") => false,
+                format!("shuffle_grotto_entrances") => false,
+                format!("shuffle_dungeon_entrances") => false,
+                format!("shuffle_overworld_entrances") => false,
+                format!("decouple_entrances") => false,
+                format!("owl_drops") => false,
+                format!("warp_songs") => false,
+                format!("spawn_positions") => false,
+                format!("enhance_map_compass") => false,
+                format!("mq_dungeons_random") => false,
+                format!("ocarina_songs") => false,
+                format!("correct_chest_sizes") => false,
+                format!("no_collectible_hearts") => false,
+            ],
+            tricks: None, //TODO properly initialize with all tricks set to false
+            dungeon_reward_locations: collect![
+                DungeonReward::Stone(Stone::KokiriEmerald) => DungeonRewardLocation::Dungeon(MainDungeon::DekuTree),
+                DungeonReward::Stone(Stone::GoronRuby) => DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern),
+                DungeonReward::Stone(Stone::ZoraSapphire) => DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu),
+                DungeonReward::Medallion(Medallion::Forest) => DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple),
+                DungeonReward::Medallion(Medallion::Fire) => DungeonRewardLocation::Dungeon(MainDungeon::FireTemple),
+                DungeonReward::Medallion(Medallion::Water) => DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple),
+                DungeonReward::Medallion(Medallion::Shadow) => DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple),
+                DungeonReward::Medallion(Medallion::Spirit) => DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple),
+                DungeonReward::Medallion(Medallion::Light) => DungeonRewardLocation::LinksPocket,
+            ],
+            mq: collect![
+                Dungeon::Main(MainDungeon::DekuTree) => false,
+                Dungeon::Main(MainDungeon::DodongosCavern) => false,
+                Dungeon::Main(MainDungeon::JabuJabu) => false,
+                Dungeon::Main(MainDungeon::ForestTemple) => false,
+                Dungeon::Main(MainDungeon::FireTemple) => false,
+                Dungeon::Main(MainDungeon::WaterTemple) => false,
+                Dungeon::Main(MainDungeon::ShadowTemple) => false,
+                Dungeon::Main(MainDungeon::SpiritTemple) => false,
+                Dungeon::IceCavern => false,
+                Dungeon::BottomOfTheWell => false,
+                Dungeon::GerudoTrainingGrounds => false,
+                Dungeon::GanonsCastle => false,
+            ],
+            exits: None, //TODO properly initialize with all exits
+            active_trials: collect![
+                Medallion::Light => true,
+                Medallion::Forest => true,
+                Medallion::Fire => true,
+                Medallion::Water => true,
+                Medallion::Shadow => true,
+                Medallion::Spirit => true,
+            ],
         }
+    }
+
+    pub fn get_exit<'a>(&'a self, from: &str, to: &'a str) -> Option<&'a str> {
+        self.exits.as_ref().map_or(Some(to), |exits| exits.get(from).and_then(|region_exits| region_exits.get(to)).map(String::as_ref))
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Protocol for Knowledge {
-    type ReadError = DungeonRewardLocationReadError;
+    type ReadError = KnowledgeReadError;
 
-    async fn read(tcp_stream: &mut TcpStream) -> Result<Knowledge, DungeonRewardLocationReadError> {
-        Ok(Knowledge {
-            kokiri_emerald_location: DungeonRewardLocation::read(tcp_stream).await?,
-            goron_ruby_location: DungeonRewardLocation::read(tcp_stream).await?,
-            zora_sapphire_location: DungeonRewardLocation::read(tcp_stream).await?,
-            forest_medallion_location: DungeonRewardLocation::read(tcp_stream).await?,
-            fire_medallion_location: DungeonRewardLocation::read(tcp_stream).await?,
-            water_medallion_location: DungeonRewardLocation::read(tcp_stream).await?,
-            shadow_medallion_location: DungeonRewardLocation::read(tcp_stream).await?,
-            spirit_medallion_location: DungeonRewardLocation::read(tcp_stream).await?,
-            light_medallion_location: DungeonRewardLocation::read(tcp_stream).await?,
+    async fn read(tcp_stream: &mut TcpStream) -> Result<Knowledge, KnowledgeReadError> {
+        Ok(match u8::read(tcp_stream).await? {
+            0 => Knowledge {
+                bool_settings: HashMap::read(tcp_stream).await?,
+                tricks: Some(HashMap::read(tcp_stream).await?),
+                dungeon_reward_locations: HashMap::read(tcp_stream).await?,
+                mq: HashMap::read(tcp_stream).await?,
+                exits: Some(HashMap::read(tcp_stream).await?),
+                active_trials: HashMap::read(tcp_stream).await?,
+            },
+            1 => Knowledge::default(),
+            2 => Knowledge::vanilla(),
+            n => return Err(KnowledgeReadError::UnknownPreset(n)),
         })
     }
 
     async fn write(&self, tcp_stream: &mut TcpStream) -> io::Result<()> {
-        self.kokiri_emerald_location.write(tcp_stream).await?;
-        self.goron_ruby_location.write(tcp_stream).await?;
-        self.zora_sapphire_location.write(tcp_stream).await?;
-        self.forest_medallion_location.write(tcp_stream).await?;
-        self.fire_medallion_location.write(tcp_stream).await?;
-        self.water_medallion_location.write(tcp_stream).await?;
-        self.shadow_medallion_location.write(tcp_stream).await?;
-        self.spirit_medallion_location.write(tcp_stream).await?;
-        self.light_medallion_location.write(tcp_stream).await?;
+        if *self == Knowledge::default() {
+            1u8.write(tcp_stream).await?;
+        } else if *self == Knowledge::vanilla() {
+            2u8.write(tcp_stream).await?;
+        } else {
+            0u8.write(tcp_stream).await?;
+            self.bool_settings.write(tcp_stream).await?;
+            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write(tcp_stream).await?;
+            self.dungeon_reward_locations.write(tcp_stream).await?;
+            self.mq.write(tcp_stream).await?;
+            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(tcp_stream).await?;
+            self.active_trials.write(tcp_stream).await?;
+        }
         Ok(())
     }
 
     fn write_sync(&self, tcp_stream: &mut std::net::TcpStream) -> io::Result<()> {
-        self.kokiri_emerald_location.write_sync(tcp_stream)?;
-        self.goron_ruby_location.write_sync(tcp_stream)?;
-        self.zora_sapphire_location.write_sync(tcp_stream)?;
-        self.forest_medallion_location.write_sync(tcp_stream)?;
-        self.fire_medallion_location.write_sync(tcp_stream)?;
-        self.water_medallion_location.write_sync(tcp_stream)?;
-        self.shadow_medallion_location.write_sync(tcp_stream)?;
-        self.spirit_medallion_location.write_sync(tcp_stream)?;
-        self.light_medallion_location.write_sync(tcp_stream)?;
+        if *self == Knowledge::default() {
+            1u8.write_sync(tcp_stream)?;
+        } else if *self == Knowledge::vanilla() {
+            2u8.write_sync(tcp_stream)?;
+        } else {
+            0u8.write_sync(tcp_stream)?;
+            self.bool_settings.write_sync(tcp_stream)?;
+            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write_sync(tcp_stream)?;
+            self.dungeon_reward_locations.write_sync(tcp_stream)?;
+            self.mq.write_sync(tcp_stream)?;
+            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write_sync(tcp_stream)?;
+            self.active_trials.write_sync(tcp_stream)?;
+        }
         Ok(())
     }
 }

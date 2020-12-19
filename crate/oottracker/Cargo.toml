@@ -9,9 +9,15 @@ async-stream = "0.3"
 async-trait = "0.1"
 bitflags = "1"
 byteorder = "1"
+collect-mac = "0.1"
 futures = "0.3"
+itertools = "0.9"
+lazy_static = "1"
 pin-utils = "0.1"
+pyo3 = "0.12"
+regex = "1"
 semver = "0.11"
+serde_json = "1"
 smart-default = "0.6"
 
 [dependencies.derive_more]
@@ -22,6 +28,17 @@ features = ["from"]
 [dependencies.oottracker-derive]
 path = "../oottracker-derive"
 
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "0.2" #TODO upgrade to 0.3 once supported by iced
-features = ["io-util", "net"]
+features = [
+    "fs",
+    "io-util",
+    "macros", # for tests
+    "net",
+    "rt-threaded", # for tests
+    "stream"
+]

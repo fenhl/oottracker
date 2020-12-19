@@ -162,7 +162,7 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `start` must point at the start of a valid slice of length `0x1450` and must not be mutated for the duration of the function call.
-#[no_mangle] pub unsafe extern "C" fn save_from_save_data(start: *const u8) -> HandleOwned<Result<Save, SaveDataDecodeError>> {
+#[no_mangle] pub unsafe extern "C" fn save_from_save_data(start: *const u8) -> HandleOwned<Result<Save, DecodeError>> {
     assert!(!start.is_null());
     let save_data = slice::from_raw_parts(start, SIZE);
     HandleOwned::new(Save::from_save_data(save_data))
@@ -170,22 +170,22 @@ pub fn version() -> Version {
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, SaveDataDecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn save_result_free(save_res: HandleOwned<Result<Save, SaveDataDecodeError>>) {
+/// `save_res` must point at a valid `Result<Save, save::DecodeError>`. This function takes ownership of the `Result`.
+#[no_mangle] pub unsafe extern "C" fn save_result_free(save_res: HandleOwned<Result<Save, DecodeError>>) {
     let _ = save_res.into_box();
 }
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, SaveDataDecodeError>`.
-#[no_mangle] pub unsafe extern "C" fn save_result_is_ok(save_res: *const Result<Save, SaveDataDecodeError>) -> bool {
+/// `save_res` must point at a valid `Result<Save, save::DecodeError>`.
+#[no_mangle] pub unsafe extern "C" fn save_result_is_ok(save_res: *const Result<Save, DecodeError>) -> bool {
     (&*save_res).is_ok()
 }
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, SaveDataDecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn save_result_unwrap(save_res: HandleOwned<Result<Save, SaveDataDecodeError>>) -> HandleOwned<Save> {
+/// `save_res` must point at a valid `Result<Save, save::DecodeError>`. This function takes ownership of the `Result`.
+#[no_mangle] pub unsafe extern "C" fn save_result_unwrap(save_res: HandleOwned<Result<Save, DecodeError>>) -> HandleOwned<Save> {
     HandleOwned::new(save_res.into_box().unwrap())
 }
 
@@ -205,8 +205,8 @@ pub fn version() -> Version {
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, SaveDataDecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn save_result_debug_err(save_res: HandleOwned<Result<Save, SaveDataDecodeError>>) -> HandleOwned<c_char> {
+/// `save_res` must point at a valid `Result<Save, save::DecodeError>`. This function takes ownership of the `Result`.
+#[no_mangle] pub unsafe extern "C" fn save_result_debug_err(save_res: HandleOwned<Result<Save, DecodeError>>) -> HandleOwned<c_char> {
     HandleOwned(CString::new(format!("{:?}", save_res.into_box().unwrap_err())).unwrap().into_raw())
 }
 

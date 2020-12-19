@@ -21,13 +21,15 @@ use {
     derive_more::From,
     smart_default::SmartDefault,
     crate::{
+        Item,
         info_tables::{
             EventChkInf,
+            EventChkInf3,
             InfTable,
             ItemGetInf,
         },
         item_ids,
-        scene_flags::SceneFlags,
+        scene::SceneFlags,
     },
 };
 #[cfg(not(target_arch = "wasm32"))] use {
@@ -41,6 +43,40 @@ use {
 };
 
 pub const SIZE: usize = 0x1450;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct TimeOfDay(u16);
+
+impl TimeOfDay {
+    pub fn matches(&self, range: crate::access::TimeRange) -> bool {
+        match range {
+            crate::access::TimeRange::Day => (0x4555..0xc001).contains(&self.0),
+            crate::access::TimeRange::Night => (0x0000..0x4555).contains(&self.0) || (0xc001..=0xffff).contains(&self.0),
+            crate::access::TimeRange::Dampe => (0xc001..0xe000).contains(&self.0),
+        }
+    }
+}
+
+impl TryFrom<Vec<u8>> for TimeOfDay {
+    type Error = Vec<u8>;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<TimeOfDay, Vec<u8>> {
+        if raw_data.len() != 2 { return Err(raw_data) }
+        Ok(TimeOfDay(BigEndian::read_u16(&raw_data)))
+    }
+}
+
+impl<'a> From<&'a TimeOfDay> for [u8; 2] {
+    fn from(TimeOfDay(repr): &TimeOfDay) -> [u8; 2] {
+        repr.to_be_bytes()
+    }
+}
+
+impl<'a> From<&'a TimeOfDay> for Vec<u8> {
+    fn from(time: &TimeOfDay) -> Vec<u8> {
+        <[u8; 2]>::from(time).into()
+    }
+}
 
 #[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -101,6 +137,76 @@ impl From<Hookshot> for u8 {
             Hookshot::None => item_ids::NONE,
             Hookshot::Hookshot => item_ids::HOOKSHOT,
             Hookshot::Longshot => item_ids::LONGSHOT,
+        }
+    }
+}
+
+#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+pub enum Bottle {
+    #[default]
+    None,
+    Empty,
+    RedPotion,
+    GreenPotion,
+    BluePotion,
+    Fairy,
+    Fish,
+    MilkFull,
+    RutosLetter,
+    BlueFire,
+    Bug,
+    BigPoe,
+    MilkHalf,
+    Poe,
+}
+
+impl Bottle {
+    fn emptiable(&self) -> bool {
+        !matches!(self, Bottle::RutosLetter | Bottle::BigPoe)
+    }
+}
+
+impl TryFrom<u8> for Bottle {
+    type Error = u8;
+
+    fn try_from(raw_data: u8) -> Result<Bottle, u8> {
+        match raw_data {
+            item_ids::NONE => Ok(Bottle::None),
+            item_ids::EMPTY_BOTTLE => Ok(Bottle::Empty),
+            item_ids::RED_POTION => Ok(Bottle::RedPotion),
+            item_ids::GREEN_POTION => Ok(Bottle::GreenPotion),
+            item_ids::BLUE_POTION => Ok(Bottle::BluePotion),
+            item_ids::BOTTLED_FAIRY => Ok(Bottle::Fairy),
+            item_ids::FISH => Ok(Bottle::Fish),
+            item_ids::LON_LON_MILK_FULL => Ok(Bottle::MilkFull),
+            item_ids::RUTOS_LETTER => Ok(Bottle::RutosLetter),
+            item_ids::BLUE_FIRE => Ok(Bottle::BlueFire),
+            item_ids::BUG => Ok(Bottle::Bug),
+            item_ids::BIG_POE => Ok(Bottle::BigPoe),
+            item_ids::LON_LON_MILK_HALF => Ok(Bottle::MilkHalf),
+            item_ids::POE => Ok(Bottle::Poe),
+            _ => Err(raw_data),
+        }
+    }
+}
+
+impl From<Bottle> for u8 {
+    fn from(bottle: Bottle) -> u8 {
+        match bottle {
+            Bottle::None => item_ids::NONE,
+            Bottle::Empty => item_ids::EMPTY_BOTTLE,
+            Bottle::RedPotion => item_ids::RED_POTION,
+            Bottle::GreenPotion => item_ids::GREEN_POTION,
+            Bottle::BluePotion => item_ids::BLUE_POTION,
+            Bottle::Fairy => item_ids::BOTTLED_FAIRY,
+            Bottle::Fish => item_ids::FISH,
+            Bottle::MilkFull => item_ids::LON_LON_MILK_FULL,
+            Bottle::RutosLetter => item_ids::RUTOS_LETTER,
+            Bottle::BlueFire => item_ids::BLUE_FIRE,
+            Bottle::Bug => item_ids::BUG,
+            Bottle::BigPoe => item_ids::BIG_POE,
+            Bottle::MilkHalf => item_ids::LON_LON_MILK_HALF,
+            Bottle::Poe => item_ids::POE,
         }
     }
 }
@@ -241,9 +347,63 @@ pub struct Inventory {
     pub hammer: bool,
     pub light_arrows: bool,
     pub nayrus_love: bool,
-    pub bottles: u8, //TODO Ruto's letter
+    pub bottles: [Bottle; 4],
     pub adult_trade_item: AdultTradeItem,
     pub child_trade_item: ChildTradeItem,
+}
+
+impl Inventory {
+    pub fn has_emptiable_bottle(&self) -> bool {
+        self.bottles.iter().any(Bottle::emptiable)
+    }
+
+    pub fn has_rutos_letter(&self) -> bool {
+        self.bottles.iter().any(|bottle| *bottle == Bottle::RutosLetter)
+    }
+
+    pub fn toggle_emptiable_bottle(&mut self) {
+        if self.has_emptiable_bottle() {
+            self.bottles.iter_mut().for_each(|bottle| if bottle.emptiable() { *bottle = Bottle::None });
+        } else {
+            // First, simply try to add an empty bottle.
+            for bottle in &mut self.bottles {
+                if *bottle == Bottle::None {
+                    *bottle = Bottle::Empty;
+                    return
+                }
+            }
+            // All 4 bottles have either Ruto's letter or a big poe. Replace one of the 3+ big poes with an empty bottle.
+            for bottle in &mut self.bottles {
+                if *bottle == Bottle::BigPoe {
+                    *bottle = Bottle::Empty;
+                    return
+                }
+            }
+        }
+    }
+
+    pub fn toggle_rutos_letter(&mut self) {
+        if self.has_rutos_letter() {
+            self.bottles.iter_mut().for_each(|bottle| if *bottle == Bottle::RutosLetter { *bottle = Bottle::None });
+        } else {
+            // First, try to put the letter into a new bottle.
+            for bottle in &mut self.bottles {
+                if *bottle == Bottle::None {
+                    *bottle = Bottle::RutosLetter;
+                    return
+                }
+            }
+            // All 4 bottles obtained, empty one and put Ruto's letter in it.
+            for bottle in &mut self.bottles {
+                if bottle.emptiable() {
+                    *bottle = Bottle::RutosLetter;
+                    return
+                }
+            }
+            // All 4 bottles have big poes in them. Replace one of them with Ruto's letter.
+            self.bottles[0] = Bottle::RutosLetter;
+        }
+    }
 }
 
 impl TryFrom<Vec<u8>> for Inventory {
@@ -260,21 +420,7 @@ impl TryFrom<Vec<u8>> for Inventory {
             }};
         }
 
-        macro_rules! bottles {
-            ($($offset:literal),+) => {{
-                0 $(+ {
-                    let raw_item = *raw_data.get($offset).ok_or_else(|| raw_data.clone())?;
-                    if raw_item >= item_ids::EMPTY_BOTTLE && raw_item <= item_ids::POE {
-                        1
-                    } else if raw_item == item_ids::NONE {
-                        0
-                    } else {
-                        return Err(raw_data)
-                    }
-                })+
-            }};
-        }
-
+        if raw_data.len() != 0x18 { return Err(raw_data) }
         Ok(Inventory {
             bow: bool_item!(0x03, item_ids::BOW),
             fire_arrows: bool_item!(0x04, item_ids::FIRE_ARROWS),
@@ -282,7 +428,7 @@ impl TryFrom<Vec<u8>> for Inventory {
             slingshot: bool_item!(0x06, item_ids::SLINGSHOT),
             ocarina: bool_item!(0x07, item_ids::FAIRY_OCARINA | item_ids::OCARINA_OF_TIME),
             bombchus: bool_item!(0x08, item_ids::BOMBCHU_10),
-            hookshot: Hookshot::try_from(*raw_data.get(0x09).ok_or_else(|| raw_data.clone())?).map_err(|_| raw_data.clone())?,
+            hookshot: Hookshot::try_from(raw_data[0x09]).map_err(|_| raw_data.clone())?,
             ice_arrows: bool_item!(0x0a, item_ids::ICE_ARROWS),
             farores_wind: bool_item!(0x0b, item_ids::FARORES_WIND),
             boomerang: bool_item!(0x0c, item_ids::BOOMERANG),
@@ -291,7 +437,12 @@ impl TryFrom<Vec<u8>> for Inventory {
             hammer: bool_item!(0x0f, item_ids::MEGATON_HAMMER),
             light_arrows: bool_item!(0x10, item_ids::LIGHT_ARROWS),
             nayrus_love: bool_item!(0x11, item_ids::NAYRUS_LOVE),
-            bottles: bottles!(0x12, 0x13, 0x14, 0x15),
+            bottles: [
+                Bottle::try_from(raw_data[0x12]).map_err(|_| raw_data.clone())?,
+                Bottle::try_from(raw_data[0x13]).map_err(|_| raw_data.clone())?,
+                Bottle::try_from(raw_data[0x14]).map_err(|_| raw_data.clone())?,
+                Bottle::try_from(raw_data[0x15]).map_err(|_| raw_data.clone())?,
+            ],
             adult_trade_item: AdultTradeItem::try_from(raw_data[0x16]).map_err(|_| raw_data.clone())?,
             child_trade_item: ChildTradeItem::try_from(raw_data[0x17]).map_err(|_| raw_data)?,
         })
@@ -306,24 +457,54 @@ impl<'a> From<&'a Inventory> for [u8; 0x18] {
             }};
         }
 
-        macro_rules! bottle {
-            ($min_count:literal) => {{
-                if inv.bottles >= $min_count { item_ids::EMPTY_BOTTLE } else { item_ids::NONE }
-            }};
-        }
-
         [
             item_ids::NONE, item_ids::NONE, item_ids::NONE, bool_item!(bow, item_ids::BOW), bool_item!(fire_arrows, item_ids::FIRE_ARROWS), bool_item!(dins_fire, item_ids::DINS_FIRE),
             bool_item!(slingshot, item_ids::SLINGSHOT), bool_item!(ocarina, item_ids::FAIRY_OCARINA), bool_item!(bombchus, item_ids::BOMBCHU_10), inv.hookshot.into(), bool_item!(ice_arrows, item_ids::ICE_ARROWS), bool_item!(farores_wind, item_ids::FARORES_WIND),
             bool_item!(boomerang, item_ids::BOOMERANG), bool_item!(lens, item_ids::LENS_OF_TRUTH), bool_item!(beans, item_ids::MAGIC_BEAN), bool_item!(hammer, item_ids::MEGATON_HAMMER), bool_item!(light_arrows, item_ids::LIGHT_ARROWS), bool_item!(nayrus_love, item_ids::NAYRUS_LOVE),
-            bottle!(1), bottle!(2), bottle!(3), bottle!(4), inv.adult_trade_item.into(), inv.child_trade_item.into(),
+            inv.bottles[0].into(), inv.bottles[1].into(), inv.bottles[2].into(), inv.bottles[3].into(), inv.adult_trade_item.into(), inv.child_trade_item.into(),
         ]
-    }    
+    }
 }
 
 impl<'a> From<&'a Inventory> for Vec<u8> {
     fn from(inv: &Inventory) -> Vec<u8> {
         <[u8; 0x18]>::from(inv).into()
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct InvAmounts {
+    pub deku_sticks: u8,
+    pub deku_nuts: u8,
+    pub bombchus: u8,
+}
+
+impl TryFrom<Vec<u8>> for InvAmounts {
+    type Error = Vec<u8>;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<InvAmounts, Vec<u8>> {
+        if raw_data.len() != 0xf { return Err(raw_data) }
+        Ok(InvAmounts {
+            deku_sticks: *raw_data.get(0x00).ok_or_else(|| raw_data.clone())?,
+            deku_nuts: *raw_data.get(0x01).ok_or_else(|| raw_data.clone())?,
+            bombchus: *raw_data.get(0x08).ok_or_else(|| raw_data.clone())?,
+        })
+    }
+}
+
+impl<'a> From<&'a InvAmounts> for [u8; 0xf] {
+    fn from(inv_amounts: &InvAmounts) -> [u8; 0xf] {
+        [
+            inv_amounts.deku_sticks, inv_amounts.deku_nuts, 0, 0, 0, 0,
+            0, 0, inv_amounts.bombchus, 0, 0, 0,
+            0, 0, 0,
+        ]
+    }
+}
+
+impl<'a> From<&'a InvAmounts> for Vec<u8> {
+    fn from(inv_amounts: &InvAmounts) -> Vec<u8> {
+        <[u8; 0xf]>::from(inv_amounts).into()
     }
 }
 
@@ -377,6 +558,8 @@ bitflags! {
         const SILVER_GAUNTLETS = 0x0000_0080;
         const GORON_BRACELET = 0x0000_0040;
         const BOMB_BAG_MASK = 0x0000_0038;
+        const BIGGEST_BOMB_BAG = 0x0000_0018;
+        const BIG_BOMB_BAG = 0x0000_0010;
         const BOMB_BAG = 0x0000_0008;
         //TODO quiver for parity with bow
         const NONE = 0x0000_0000;
@@ -455,6 +638,14 @@ bitflags! {
     }
 }
 
+impl QuestItems {
+    pub fn num_stones(&self) -> u8 {
+        (if self.contains(QuestItems::KOKIRI_EMERALD) { 1 } else { 0 })
+        + if self.contains(QuestItems::GORON_RUBY) { 1 } else { 0 }
+        + if self.contains(QuestItems::ZORA_SAPPHIRE) { 1 } else { 0 }
+    }
+}
+
 impl TryFrom<Vec<u8>> for QuestItems {
     type Error = Vec<u8>;
 
@@ -476,8 +667,64 @@ impl<'a> From<&'a QuestItems> for Vec<u8> {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct SmallKeys {
+    pub forest_temple: u8,
+    pub fire_temple: u8,
+    pub water_temple: u8,
+    pub spirit_temple: u8,
+    pub shadow_temple: u8,
+    pub bottom_of_the_well: u8,
+    pub gerudo_training_grounds: u8,
+    pub thieves_hideout: u8,
+    pub ganons_castle: u8,
+}
+
+impl TryFrom<Vec<u8>> for SmallKeys {
+    type Error = Vec<u8>;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<SmallKeys, Vec<u8>> {
+        macro_rules! get {
+            ($idx:expr) => {{
+                if raw_data[$idx] == 0xff { 0 } else { raw_data[$idx] }
+            }};
+        }
+
+        if raw_data.len() != 0x13 { return Err(raw_data) }
+        Ok(SmallKeys {
+            forest_temple: get!(0x03),
+            fire_temple: get!(0x04),
+            water_temple: get!(0x05),
+            spirit_temple: get!(0x06),
+            shadow_temple: get!(0x07),
+            bottom_of_the_well: get!(0x08),
+            gerudo_training_grounds: get!(0x0b),
+            thieves_hideout: get!(0x0c),
+            ganons_castle: get!(0x0d),
+        })
+    }
+}
+
+impl<'a> From<&'a SmallKeys> for [u8; 0x13] {
+    fn from(small_keys: &SmallKeys) -> [u8; 0x13] {
+        [
+            0, 0, 0, small_keys.forest_temple,
+            small_keys.fire_temple, small_keys.water_temple, small_keys.spirit_temple, small_keys.shadow_temple,
+            small_keys.bottom_of_the_well, 0, 0, small_keys.gerudo_training_grounds,
+            small_keys.thieves_hideout, small_keys.ganons_castle, 0, 0,
+            0, 0, 0,
+        ]
+    }
+}
+
+impl<'a> From<&'a SmallKeys> for Vec<u8> {
+    fn from(small_keys: &SmallKeys) -> Vec<u8> {
+        <[u8; 0x13]>::from(small_keys).into()
+    }
+}
+
 #[derive(Debug, From, Clone)]
-pub enum SaveDataDecodeError {
+pub enum DecodeError {
     AssertEq {
         offset: u16,
         expected: u8,
@@ -513,11 +760,15 @@ pub enum SaveDataDecodeError {
 /// The state of a playthrough.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Save {
+    pub time_of_day: TimeOfDay,
+    pub is_adult: bool,
     pub magic: MagicCapacity,
     pub inv: Inventory,
+    pub inv_amounts: InvAmounts,
     pub equipment: Equipment,
     pub upgrades: Upgrades,
     pub quest_items: QuestItems,
+    pub small_keys: SmallKeys,
     pub skull_tokens: u8,
     pub scene_flags: SceneFlags,
     pub event_chk_inf: EventChkInf,
@@ -531,43 +782,49 @@ impl Save {
     /// # Panics
     ///
     /// This method may panic if `save_data`'s size is less than `0x1450` bytes, or if it doesn't contain valid OoT save data.
-    pub fn from_save_data(save_data: &[u8]) -> Result<Save, SaveDataDecodeError> {
+    pub fn from_save_data(save_data: &[u8]) -> Result<Save, DecodeError> {
         macro_rules! get_offset {
             ($name:expr, $offset:expr) => {{
-                *save_data.get($offset).ok_or(SaveDataDecodeError::Index($offset))?
+                *save_data.get($offset).ok_or(DecodeError::Index($offset))?
             }};
             ($name:expr, $offset:expr, $len:expr) => {{
-                save_data.get($offset..$offset + $len).ok_or(SaveDataDecodeError::IndexRange { start: $offset, end: $offset + $len })?
+                save_data.get($offset..$offset + $len).ok_or(DecodeError::IndexRange { start: $offset, end: $offset + $len })?
             }};
         }
 
         macro_rules! try_get_offset {
             ($name:expr, $offset:expr) => {{
-                let raw = *save_data.get($offset).ok_or(SaveDataDecodeError::Index($offset))?;
-                raw.try_into().map_err(|value| SaveDataDecodeError::UnexpectedValue { value, offset: $offset, field: $name })?
+                let raw = *save_data.get($offset).ok_or(DecodeError::Index($offset))?;
+                raw.try_into().map_err(|value| DecodeError::UnexpectedValue { value, offset: $offset, field: $name })?
             }};
             ($name:expr, $offset:expr, $len:expr) => {{
-                let raw = save_data.get($offset..$offset + $len).ok_or(SaveDataDecodeError::IndexRange { start: $offset, end: $offset + $len })?.to_vec();
-                raw.try_into().map_err(|value| SaveDataDecodeError::UnexpectedValueRange { value, start: $offset, end: $offset + $len, field: $name })?
+                let raw = save_data.get($offset..$offset + $len).ok_or(DecodeError::IndexRange { start: $offset, end: $offset + $len })?.to_vec();
+                raw.try_into().map_err(|value| DecodeError::UnexpectedValueRange { value, start: $offset, end: $offset + $len, field: $name })?
             }};
         }
 
         macro_rules! try_eq {
             ($offset:literal, $val:expr) => {{
                 let expected = $val;
-                let found = *save_data.get($offset).ok_or(SaveDataDecodeError::Index($offset))?;
-                if expected != found { return Err(SaveDataDecodeError::AssertEq { expected, found, offset: $offset }) }
+                let found = *save_data.get($offset).ok_or(DecodeError::Index($offset))?;
+                if expected != found { return Err(DecodeError::AssertEq { expected, found, offset: $offset }) }
             }};
             ($start:literal..$end:literal, $val:expr) => {{
                 let expected = $val;
-                let found = save_data.get($start..$end).ok_or(SaveDataDecodeError::IndexRange { start: $start, end: $end })?;
-                if expected != found { return Err(SaveDataDecodeError::AssertEqRange { start: $start, end: $end, expected: expected.to_vec(), found: found.to_vec() }) }
+                let found = save_data.get($start..$end).ok_or(DecodeError::IndexRange { start: $start, end: $end })?;
+                if expected != found { return Err(DecodeError::AssertEqRange { start: $start, end: $end, expected: expected.to_vec(), found: found.to_vec() }) }
             }};
         }
 
-        if save_data.len() != SIZE { return Err(SaveDataDecodeError::Size(save_data.len())) }
+        if save_data.len() != SIZE { return Err(DecodeError::Size(save_data.len())) }
         try_eq!(0x001c..0x0022, b"ZELDAZ");
         Ok(Save {
+            is_adult: match BigEndian::read_i32(get_offset!("is_adult", 0x0004, 0x4)) {
+                0 => true,
+                1 => false,
+                n => return Err(DecodeError::UnexpectedValueRange { start: 0x0004, end: 0x0008, field: "is_adult", value: n.to_be_bytes().into() }),
+            },
+            time_of_day: try_get_offset!("time_of_day", 0x000c, 0x2),
             magic: {
                 let magic = try_get_offset!("magic", 0x0032);
                 try_eq!(0x003a, match magic {
@@ -581,9 +838,11 @@ impl Save {
                 magic
             },
             inv: try_get_offset!("inv", 0x0074, 0x18),
+            inv_amounts: try_get_offset!("inv_amounts", 0x008c, 0xf),
             equipment: try_get_offset!("equipment", 0x009c, 0x2),
             upgrades: try_get_offset!("upgrades", 0x00a0, 0x4),
             quest_items: try_get_offset!("quest_items", 0x00a4, 0x4),
+            small_keys: try_get_offset!("small_keys", 0x00bc, 0x13),
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
@@ -594,7 +853,9 @@ impl Save {
 
     fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { magic, inv, equipment, upgrades, quest_items, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table } = self;
+        let Save { is_adult, time_of_day, magic, inv, inv_amounts, equipment, upgrades, quest_items, small_keys, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table } = self;
+        buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
+        buf.splice(0x000c..0x000e, Vec::from(time_of_day));
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
         buf[0x0032] = magic.into();
         buf[0x003a] = match magic {
@@ -606,9 +867,11 @@ impl Save {
             MagicCapacity::Large => 1,
         };
         buf.splice(0x0074..0x008c, Vec::from(inv));
+        buf.splice(0x008c..0x009b, Vec::from(inv_amounts));
         buf.splice(0x009c..0x009e, Vec::from(equipment));
         buf.splice(0x00a0..0x00a4, Vec::from(upgrades));
         buf.splice(0x00a4..0x00a8, Vec::from(quest_items));
+        buf.splice(0x00bc..0x00cf, Vec::from(small_keys));
         buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
@@ -616,20 +879,76 @@ impl Save {
         buf.splice(0x0ef8..0x0f34, Vec::from(inf_table));
         buf
     }
-    
-    pub fn triforce_pieces(&self) -> u8 {
+
+    pub fn triforce_pieces(&self) -> u8 { //TODO move to Ram depending on how finding a triforce piece in the scene works
         self.scene_flags.windmill_and_dampes_grave.unused.bits().try_into().expect("too many triforce pieces")
     }
 
     pub fn set_triforce_pieces(&mut self, triforce_pieces: u8) {
-        self.scene_flags.windmill_and_dampes_grave.unused = crate::scene_flags::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
+        self.scene_flags.windmill_and_dampes_grave.unused = crate::scene::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
+    }
+
+    pub(crate) fn amount_of_item(&self, item: &Item) -> u8 {
+        match item.name() {
+            "Blue Fire" | "Buy Blue Fire" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),
+            "Bomb Bag" => match self.upgrades.bomb_bag() {
+                Upgrades::BIGGEST_BOMB_BAG => 3,
+                Upgrades::BIG_BOMB_BAG => 2,
+                Upgrades::BOMB_BAG => 1,
+                _ => 0,
+            },
+            "Bombchus" | "Bombchu Drop" | "Bombchus (5)" | "Bombchus (10)" | "Bombchus (20)" | "Buy Bombchu (5)" | "Buy Bombchu (10)" | "Buy Bombchu (20)" => self.inv_amounts.bombchus,
+            "Boomerang" => if self.inv.boomerang { 1 } else { 0 },
+            "Bow" => if self.inv.bow { 1 } else { 0 },
+            "Deku Nut Drop" | "Buy Deku Nut (5)" | "Buy Deku Nut (10)" => self.inv_amounts.deku_nuts,
+            "Buy Deku Shield" => if self.equipment.contains(Equipment::DEKU_SHIELD) { 1 } else { 0 },
+            "Deku Stick Drop" | "Buy Deku Stick (1)" => self.inv_amounts.deku_sticks,
+            "Deliver Letter" => if self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER) { 1 } else { 0 }, //TODO only consider when known by settings knowledge or visual confirmation
+            "Dins Fire" => if self.inv.dins_fire { 1 } else { 0 },
+            "Fish" | "Buy Fish" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Fish).count().try_into().expect("more than u8::MAX bottles"),
+            "Gerudo Membership Card" => if self.quest_items.contains(QuestItems::GERUDO_CARD) { 1 } else { 0 },
+            "Hover Boots" => if self.equipment.contains(Equipment::HOVER_BOOTS) { 1 } else { 0 },
+            "Buy Hylian Shield" => if self.equipment.contains(Equipment::HYLIAN_SHIELD) { 1 } else { 0 },
+            "Kokiri Sword" => if self.equipment.contains(Equipment::KOKIRI_SWORD) { 1 } else { 0 },
+            "Lens of Truth" => if self.inv.lens { 1 } else { 0 },
+            "Megaton Hammer" => if self.inv.hammer { 1 } else { 0 },
+            "Mirror Shield" => if self.equipment.contains(Equipment::MIRROR_SHIELD) { 1 } else { 0 },
+            "Nayrus Love" => if self.inv.nayrus_love { 1 } else { 0 },
+            "Ocarina" => if self.inv.ocarina { 1 } else { 0 }, //TODO return 2 with Ocarina of Time? (currently unused)
+            "Progressive Hookshot" => match self.inv.hookshot {
+                Hookshot::None => 0,
+                Hookshot::Hookshot => 1,
+                Hookshot::Longshot => 2,
+            },
+            "Progressive Scale" => match self.upgrades.scale() {
+                Upgrades::GOLD_SCALE => 2,
+                Upgrades::SILVER_SCALE => 1,
+                _ => 0,
+            },
+            "Progressive Strength Upgrade" => match self.upgrades.strength() {
+                Upgrades::GOLD_GAUNTLETS => 3,
+                Upgrades::SILVER_GAUNTLETS => 2,
+                Upgrades::GORON_BRACELET => 1,
+                _ => 0,
+            },
+            "Serenade of Water" => if self.quest_items.contains(QuestItems::SERENADE_OF_WATER) { 1 } else { 0 },
+            "Slingshot" => if self.inv.slingshot { 1 } else { 0 },
+            //TODO add already opened doors (if Keysy is known or off)
+            "Small Key (Fire Temple)" => self.small_keys.fire_temple,
+            "Small Key (Forest Temple)" => self.small_keys.forest_temple,
+            "Small Key (Gerudo Training Grounds)" => self.small_keys.gerudo_training_grounds,
+            "Small Key (Spirit Temple)" => self.small_keys.spirit_temple,
+            "Small Key (Water Temple)" => self.small_keys.water_temple,
+            "Weird Egg" => if self.inv.child_trade_item == ChildTradeItem::WeirdEgg { 1 } else { 0 },
+            name => unimplemented!("check for item {}", name), //TODO (make a list of all items)
+        }
     }
 }
 
 #[derive(Debug, From, Clone)]
 pub enum SaveDataReadError {
     #[from]
-    Decode(SaveDataDecodeError),
+    Decode(DecodeError),
     Io(Arc<io::Error>),
 }
 
