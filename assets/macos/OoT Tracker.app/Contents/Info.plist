@@ -20,14 +20,14 @@
         <string>APPL</string>
         <!--TODO make sure this matches the crate version-->
         <key>CFBundleShortVersionString</key>
-        <string>0.1.5</string>
+        <string>0.1.6</string>
         <key>CFBundleSupportedPlatforms</key>
         <array>
             <string>MacOSX</string>
         </array>
         <!--TODO make sure this is incremented each time the crate version is incremented-->
         <key>CFBundleVersion</key>
-        <string>5</string>
+        <string>6</string>
         <key>NSHighResolutionCapable</key>
         <true/>
         <key>NSMainNibFile</key>

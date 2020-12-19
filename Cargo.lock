@@ -2466,7 +2466,7 @@ checksum = "13bd41f508810a131401606d54ac32a467c97172d74ba7662562ebba5ad07fa0"
 
 [[package]]
 name = "oottracker"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2490,14 +2490,14 @@ dependencies = [
 
 [[package]]
 name = "oottracker-bizhawk"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "semver 0.11.0",
 ]
 
 [[package]]
 name = "oottracker-csharp"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "libc",
  "oottracker",
@@ -2506,7 +2506,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-derive"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "convert_case",
  "proc-macro2 1.0.24",
@@ -2516,7 +2516,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-gui"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "futures 0.3.8",
  "iced",
@@ -2532,7 +2532,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-utils"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "async-trait",
  "derive_more",
