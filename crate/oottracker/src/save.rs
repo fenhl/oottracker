@@ -162,7 +162,7 @@ pub enum Bottle {
 
 impl Bottle {
     fn emptiable(&self) -> bool {
-        !matches!(self, Bottle::RutosLetter | Bottle::BigPoe)
+        !matches!(self, Bottle::None | Bottle::RutosLetter | Bottle::BigPoe)
     }
 }
 
