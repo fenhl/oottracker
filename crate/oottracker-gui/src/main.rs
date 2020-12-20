@@ -37,12 +37,9 @@ use {
     oottracker::{
         Check,
         ModelState,
-        Rando,
         checks::{
-            self,
             CheckExt as _,
             CheckStatus,
-            CheckStatusError,
         },
         info_tables::*,
         model::{
@@ -60,9 +57,16 @@ use {
     iced::image,
     iced_native::keyboard::Modifiers as KeyboardModifiers,
     tokio::time::sleep,
-    oottracker::proto::{
-        self,
-        Packet,
+    oottracker::{
+        Rando,
+        checks::{
+            self,
+            CheckStatusError,
+        },
+        proto::{
+            self,
+            Packet,
+        },
     },
 };
 
@@ -84,7 +88,7 @@ const WIDTH: u32 = 50 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
 const HEIGHT: u32 = 18 + 50 * 7 + 9; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 1px spacing
 
 #[cfg(target_arch = "wasm32")]
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct KeyboardModifiers {
     control: bool,
 }
@@ -102,6 +106,7 @@ impl container::StyleSheet for ContainerStyle {
 
 trait DungeonRewardLocationExt {
     fn increment(&mut self, key: DungeonReward);
+    #[cfg(not(target_arch = "wasm32"))]
     fn decrement(&mut self, key: DungeonReward);
 }
 
@@ -121,6 +126,7 @@ impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> 
         };
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn decrement(&mut self, key: DungeonReward) {
         match self.get(&key) {
             None => self.insert(key, DungeonRewardLocation::LinksPocket),
@@ -152,6 +158,7 @@ enum TrackerCellKind {
     MedallionLocation(Medallion),
     OptionalOverlay {
         toggle_main: Box<dyn Fn(&mut ModelState)>,
+        #[cfg(not(target_arch = "wasm32"))]
         toggle_overlay: Box<dyn Fn(&mut ModelState)>,
     },
     Overlay {
@@ -162,15 +169,18 @@ enum TrackerCellKind {
     },
     Sequence {
         increment: Box<dyn Fn(&mut ModelState)>,
+        #[cfg(not(target_arch = "wasm32"))]
         decrement: Box<dyn Fn(&mut ModelState)>,
     },
     Simple(Box<dyn Fn(&mut ModelState)>),
     Song {
         song: QuestItems,
+        #[cfg(not(target_arch = "wasm32"))]
         toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
     },
     SpecialSequence {
         increment: Box<dyn Fn(&mut ModelState)>,
+        #[cfg(not(target_arch = "wasm32"))]
         decrement: Box<dyn Fn(&mut ModelState)>,
     },
     Stone(QuestItems),
@@ -180,6 +190,7 @@ enum TrackerCellKind {
 use TrackerCellKind::*;
 
 impl TrackerCellKind {
+    #[cfg(not(target_arch = "wasm32"))]
     fn width(&self) -> u16 {
         match self {
             StoneLocation(_) | Stone(_) => 33,
@@ -187,6 +198,7 @@ impl TrackerCellKind {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn height(&self) -> u16 {
         match self {
             MedallionLocation(_) => 18,
@@ -195,8 +207,7 @@ impl TrackerCellKind {
         }
     }
 
-    #[cfg_attr(not(target_os = "macos"), allow(unused))]
-    fn left_click(&self, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) {
+    fn left_click(&self, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
             self.right_click(state);
             return
@@ -255,6 +266,7 @@ macro_rules! cells {
         }
 
         impl TrackerCellId {
+            #[cfg(not(target_arch = "wasm32"))]
             #[allow(unused_assignments)]
             fn at([x, y]: [f32; 2], include_songs: bool) -> Option<TrackerCellId> {
                 if x < 0.0 || y < 0.0 { return None }
@@ -329,6 +341,7 @@ cells! {
                 AdultTradeItem::Eyedrops => AdultTradeItem::ClaimCheck,
                 AdultTradeItem::ClaimCheck => AdultTradeItem::None,
             }),
+            #[cfg(not(target_arch = "wasm32"))]
             decrement: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
                 AdultTradeItem::None => AdultTradeItem::ClaimCheck,
                 AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::None,
@@ -356,6 +369,7 @@ cells! {
         ZoraSapphire: Stone(QuestItems::ZORA_SAPPHIRE),
         Bottle: OptionalOverlay {
             toggle_main: Box::new(|state| state.ram.save.inv.toggle_emptiable_bottle()),
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
         },
         Scale: Sequence {
@@ -364,6 +378,7 @@ cells! {
                 Upgrades::GOLD_SCALE => Upgrades::NONE,
                 _ => Upgrades::SILVER_SCALE,
             })),
+            #[cfg(not(target_arch = "wasm32"))]
             decrement: Box::new(|state| state.ram.save.upgrades.set_scale(match state.ram.save.upgrades.scale() {
                 Upgrades::SILVER_SCALE => Upgrades::NONE,
                 Upgrades::GOLD_SCALE => Upgrades::SILVER_SCALE,
@@ -390,6 +405,7 @@ cells! {
                 Upgrades::GOLD_GAUNTLETS => Upgrades::NONE,
                 _ => Upgrades::GORON_BRACELET,
             })),
+            #[cfg(not(target_arch = "wasm32"))]
             decrement: Box::new(|state| state.ram.save.upgrades.set_strength(match state.ram.save.upgrades.strength() {
                 Upgrades::GORON_BRACELET => Upgrades::NONE,
                 Upgrades::SILVER_GAUNTLETS => Upgrades::GORON_BRACELET,
@@ -419,6 +435,7 @@ cells! {
                 Hookshot::Hookshot => Hookshot::Longshot,
                 Hookshot::Longshot => Hookshot::None,
             }),
+            #[cfg(not(target_arch = "wasm32"))]
             decrement: Box::new(|state| state.ram.save.inv.hookshot = match state.ram.save.inv.hookshot {
                 Hookshot::None => Hookshot::Longshot,
                 Hookshot::Hookshot => Hookshot::None,
@@ -427,6 +444,7 @@ cells! {
         },
         Bow: OptionalOverlay {
             toggle_main: Box::new(|state| state.ram.save.inv.bow = !state.ram.save.inv.bow),
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
         },
         Arrows: Composite {
@@ -455,6 +473,7 @@ cells! {
                 ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
                 ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
             }),
+            #[cfg(not(target_arch = "wasm32"))]
             decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
                 ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
                 ChildTradeItem::WeirdEgg => ChildTradeItem::None,
@@ -492,52 +511,64 @@ cells! {
     [
         ZeldasLullaby: Song {
             song: QuestItems::ZELDAS_LULLABY,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_IMPA)),
         },
         EponasSong: Song {
             song: QuestItems::EPONAS_SONG,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_MALON)),
         },
         SariasSong: Song {
             song: QuestItems::SARIAS_SONG,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
         },
         SunsSong: Song {
             song: QuestItems::SUNS_SONG,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
         },
         SongOfTime: Song {
             song: QuestItems::SONG_OF_TIME,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SONG_FROM_OCARINA_OF_TIME)),
         },
         SongOfStorms: Song {
             song: QuestItems::SONG_OF_STORMS,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_WINDMILL)),
         },
     ],
     [
         Minuet: Song {
             song: QuestItems::MINUET_OF_FOREST,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_FOREST)),
         },
         Bolero: Song {
             song: QuestItems::BOLERO_OF_FIRE,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_CRATER)),
         },
         Serenade: Song {
             song: QuestItems::SERENADE_OF_WATER,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_ICE_CAVERN)),
         },
         Requiem: Song {
             song: QuestItems::REQUIEM_OF_SPIRIT,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SHEIK_AT_COLOSSUS)),
         },
         Nocturne: Song {
             song: QuestItems::NOCTURNE_OF_SHADOW,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_KAKARIKO)),
         },
         Prelude: Song {
             song: QuestItems::PRELUDE_OF_LIGHT,
+            #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
         },
     ],
@@ -810,6 +841,7 @@ impl button::StyleSheet for TrackerCellId {
 enum Message {
     #[cfg(not(target_arch = "wasm32"))]
     AutoDismissNotification,
+    #[cfg(not(target_arch = "wasm32"))]
     CheckStatusError(CheckStatusError),
     #[cfg(not(target_arch = "wasm32"))]
     ClientConnected,
@@ -827,12 +859,14 @@ enum Message {
     Packet(Packet),
     #[cfg(not(target_arch = "wasm32"))]
     RightClick,
+    #[cfg(not(target_arch = "wasm32"))]
     UpdateAvailableChecks(HashMap<Check, CheckStatus>),
 }
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Message::CheckStatusError(e) => write!(f, "error calculating checks: {}", e),
             #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => write!(f, "auto-tracker connected"),
@@ -906,6 +940,7 @@ impl Application for State {
             Message::AutoDismissNotification => if let Some((true, _)) = self.notification {
                 self.notification = None;
             },
+            #[cfg(not(target_arch = "wasm32"))]
             Message::CheckStatusError(_) => self.notify(message),
             #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => {
@@ -953,6 +988,7 @@ impl Application for State {
                     cell.kind().right_click(&mut self.model);
                 }
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Message::UpdateAvailableChecks(checks) => self.checks = checks,
         }
         Command::none()

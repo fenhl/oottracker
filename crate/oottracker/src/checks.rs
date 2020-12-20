@@ -1,26 +1,30 @@
 use {
     std::{
-        collections::{
-            HashMap,
-            HashSet,
-        },
         fmt,
         io,
         sync::Arc,
     },
-    collect_mac::collect,
     derive_more::From,
+    crate::{
+        Check,
+        ModelState,
+        region::Mq,
+    },
+};
+#[cfg(not(target_arch = "wasm32"))] use {
+    std::collections::{
+        HashMap,
+        HashSet,
+    },
+    collect_mac::collect,
     itertools::{
         EitherOrBoth,
         Itertools as _,
     },
     pyo3::prelude::*,
     crate::{
-        Check,
-        ModelState,
         Rando,
         region::{
-            Mq,
             Region,
             RegionLookup,
             RegionLookupError,
@@ -898,6 +902,7 @@ impl CheckExt for Check {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Returns `Ok(Err)` if the check has unmet prerequisites.
 fn can_check<'a>(py: Python<'_>, rando: &'a Rando, model: &'a ModelState, check: &Check, cond: &str) -> Result<Result<bool, HashSet<Check>>, crate::access::RuleParseError> {
     Ok(model.can_access(py, rando, &crate::access::Rule::parse(py, rando, check, cond.trim())?))
@@ -912,9 +917,10 @@ pub enum CheckStatus {
 
 #[derive(Debug, From, Clone)]
 pub enum CheckStatusError {
+    #[cfg(not(target_arch = "wasm32"))]
     AccessRuleParse(crate::access::RuleParseError),
     Io(Arc<io::Error>),
-    //Py(Arc<PyErr>),
+    #[cfg(not(target_arch = "wasm32"))]
     RegionLookup(RegionLookupError),
 }
 
@@ -924,25 +930,19 @@ impl From<io::Error> for CheckStatusError {
     }
 }
 
-/*
-impl From<PyErr> for CheckStatusError {
-    fn from(e: PyErr) -> CheckStatusError {
-        CheckStatusError::Py(Arc::new(e))
-    }
-}
-*/
-
 impl fmt::Display for CheckStatusError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             CheckStatusError::AccessRuleParse(e) => e.fmt(f),
             CheckStatusError::Io(e) => write!(f, "I/O error: {}", e),
-            //CheckStatusError::Py(e) => write!(f, "Python error: {}", e),
+            #[cfg(not(target_arch = "wasm32"))]
             CheckStatusError::RegionLookup(e) => e.fmt(f),
         }
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckStatus>, CheckStatusError> {
     let mut map = HashMap::default();
     let mut reachable_regions = collect![as HashSet<_>: (Mq::Overworld, Region::root(rando)?)];
@@ -1022,6 +1022,7 @@ pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckS
     Ok(map)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn default_status() {
     if let Err(e) = status(&Rando::dynamic("C:\\Users\\Fenhl\\git\\github.com\\fenhl\\OoT-Randomizer\\stage"), &ModelState::default()) { //TODO test with static rando instead

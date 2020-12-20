@@ -1,10 +1,16 @@
 #![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
 
-use {
+use semver::Version;
+pub use crate::{
+    check::Check,
+    knowledge::Knowledge,
+    ram::Ram,
+    save::Save,
+};
+#[cfg(not(target_arch = "wasm32"))] use {
     std::collections::HashSet,
     collect_mac::collect,
     pyo3::prelude::*,
-    semver::Version,
     crate::{
         access::{
             Expr,
@@ -13,27 +19,23 @@ use {
         checks::CheckExt as _,
     },
 };
-pub use crate::{
-    check::Check,
+#[cfg(not(target_arch = "wasm32"))] pub use crate::{
     item::Item,
-    knowledge::Knowledge,
-    ram::Ram,
     rando_info::Rando,
     region::Region,
-    save::Save,
 };
 
-mod access;
+#[cfg(not(target_arch = "wasm32"))] mod access;
 mod check;
 pub mod checks;
 pub mod info_tables;
-mod item;
+#[cfg(not(target_arch = "wasm32"))] mod item;
 mod item_ids;
 pub mod knowledge;
 pub mod model;
 #[cfg(not(target_arch = "wasm32"))] pub mod proto;
 pub mod ram;
-mod rando_info;
+#[cfg(not(target_arch = "wasm32"))] mod rando_info;
 pub mod region;
 pub mod save;
 mod scene;
@@ -45,6 +47,7 @@ pub struct ModelState {
 }
 
 impl ModelState {
+    #[cfg(not(target_arch = "wasm32"))]
     /// If access depends on other checks (including an event or the value of an unknown setting), those checks are returned.
     pub(crate) fn can_access<'a>(&self, py: Python<'_>, rando: &Rando, rule: &'a Rule) -> Result<bool, HashSet<Check>> {
         Ok(match rule {
@@ -96,6 +99,7 @@ impl ModelState {
         })
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn access_exprs_eq<'a>(&self, py: Python<'_>, rando: &Rando, left: &'a Expr, right: &'a Expr) -> Result<bool, HashSet<Check>> {
         Ok(match (left, right) {
             (Expr::All(exprs), expr) | (expr, Expr::All(exprs)) => {

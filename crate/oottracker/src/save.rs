@@ -21,10 +21,8 @@ use {
     derive_more::From,
     smart_default::SmartDefault,
     crate::{
-        Item,
         info_tables::{
             EventChkInf,
-            EventChkInf3,
             InfTable,
             ItemGetInf,
         },
@@ -39,7 +37,11 @@ use {
         net::TcpStream,
         prelude::*,
     },
-    crate::proto::Protocol,
+    crate::{
+        info_tables::EventChkInf3,
+        Item,
+        proto::Protocol,
+    },
 };
 
 pub const SIZE: usize = 0x1450;
@@ -47,6 +49,7 @@ pub const SIZE: usize = 0x1450;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct TimeOfDay(u16);
 
+#[cfg(not(target_arch = "wasm32"))]
 impl TimeOfDay {
     pub fn matches(&self, range: crate::access::TimeRange) -> bool {
         match range {
@@ -888,6 +891,7 @@ impl Save {
         self.scene_flags.windmill_and_dampes_grave.unused = crate::scene::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn amount_of_item(&self, item: &Item) -> u8 {
         match item.name() {
             "Blue Fire" | "Buy Blue Fire" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),

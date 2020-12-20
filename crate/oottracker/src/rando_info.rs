@@ -34,7 +34,7 @@ use {
     },
 };
 
-pub enum RandoInfo {
+enum RandoInfo {
     //TODO implement static variant
     Dynamic {
         path: PathBuf,

@@ -3,13 +3,7 @@ use byteorder::BigEndian;
 use {
     byteorder::ByteOrder as _,
     derive_more::From,
-    itertools::EitherOrBoth,
     crate::{
-        Rando,
-        region::{
-            RegionLookup,
-            RegionLookupError,
-        },
         save::{
             self,
             Save,
@@ -17,6 +11,16 @@ use {
         scene::{
             Scene,
             SceneFlags,
+        },
+    },
+};
+#[cfg(not(target_arch = "wasm32"))] use {
+    itertools::EitherOrBoth,
+    crate::{
+        Rando,
+        region::{
+            RegionLookup,
+            RegionLookupError,
         },
     },
 };
@@ -84,6 +88,7 @@ impl Ram {
         })
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn current_region(&self, rando: &Rando) -> Result<RegionLookup, RegionLookupError> { //TODO disambiguate MQ-ness
         Ok(match Scene::current(self).region(rando, self)? {
             RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, mq)) => {

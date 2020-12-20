@@ -1,12 +1,12 @@
-use {
+use std::{
+    fmt,
+    hash::Hash,
+};
+#[cfg(not(target_arch = "wasm32"))] use {
     std::{
         collections::BTreeMap,
         ffi::OsStr,
-        fmt,
-        hash::{
-            Hash,
-            Hasher,
-        },
+        hash::Hasher,
         io,
         sync::Arc,
     },
@@ -15,9 +15,10 @@ use {
         Itertools as _,
     },
     serde::Deserialize,
-    crate::Rando,
+    crate::Rando
 };
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
 pub enum RegionLookupError {
     Filename,
@@ -27,12 +28,14 @@ pub enum RegionLookupError {
     NotFound,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl From<io::Error> for RegionLookupError {
     fn from(e: io::Error) -> RegionLookupError {
         RegionLookupError::Io(Arc::new(e))
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl fmt::Display for RegionLookupError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -45,6 +48,7 @@ impl fmt::Display for RegionLookupError {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegionLookup {
     Overworld(Region),
@@ -52,6 +56,7 @@ pub enum RegionLookup {
     Dungeon(EitherOrBoth<Region, Region>),
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl RegionLookup {
     pub fn new(candidates: impl IntoIterator<Item = (Mq, Region)>) -> Result<RegionLookup, RegionLookupError> {
         let mut candidates = candidates.into_iter().collect_vec();
@@ -83,15 +88,18 @@ impl RegionLookup {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
 struct MissingRegionError(pub String);
 
+#[cfg(not(target_arch = "wasm32"))]
 impl fmt::Display for MissingRegionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "missing region: {}", self.0)
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl std::error::Error for MissingRegionError {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -111,6 +119,7 @@ impl fmt::Display for Mq {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Region {
@@ -128,6 +137,7 @@ pub struct Region {
     pub exits: BTreeMap<String, String>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Region {
     pub fn new(rando: &Rando, name: &str) -> Result<RegionLookup, RegionLookupError> {
         RegionLookup::new(Region::all(rando)?.into_iter().filter(|(_, region)| region.region_name == name))
@@ -161,20 +171,24 @@ impl Region {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl PartialEq for Region {
     fn eq(&self, rhs: &Region) -> bool {
         self.region_name == rhs.region_name
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Eq for Region {}
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Hash for Region {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.region_name.hash(state);
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl fmt::Display for Region {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.hint.as_ref().unwrap_or(&self.region_name).fmt(f)

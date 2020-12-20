@@ -1,13 +1,14 @@
-use {
-    std::{
-        fmt,
-        str::FromStr,
-    },
+use std::{
+    fmt,
+    str::FromStr,
+};
+#[cfg(not(target_arch = "wasm32"))] use {
     async_trait::async_trait,
     oottracker_derive::Protocol,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum Dungeon {
     Main(MainDungeon),
     IceCavern,
@@ -42,42 +43,22 @@ impl fmt::Display for Dungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum DungeonReward {
     Medallion(Medallion),
     Stone(Stone),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum DungeonRewardLocation {
     LinksPocket,
     Dungeon(MainDungeon),
 }
 
-/*
-#[derive(Debug, Clone)]
-pub enum DungeonRewardLocationReadError {
-    Io(Arc<io::Error>),
-    UnknownLocationId(u8),
-}
-
-impl From<io::Error> for DungeonRewardLocationReadError {
-    fn from(e: io::Error) -> DungeonRewardLocationReadError {
-        DungeonRewardLocationReadError::Io(Arc::new(e))
-    }
-}
-
-impl fmt::Display for DungeonRewardLocationReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DungeonRewardLocationReadError::Io(e) => write!(f, "I/O error: {}", e),
-            DungeonRewardLocationReadError::UnknownLocationId(id) => write!(f, "unknown location ID: {}", id),
-        }
-    }
-}
-*/
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum MainDungeon {
     DekuTree,
     DodongosCavern,
@@ -122,7 +103,8 @@ impl fmt::Display for MainDungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum Medallion {
     Light,
     Forest,
@@ -146,7 +128,8 @@ impl Medallion {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum Stone {
     KokiriEmerald,
     GoronRuby,

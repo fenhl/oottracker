@@ -3,14 +3,14 @@
 use {
     std::fmt,
     oottracker_derive::scene_flags,
-    crate::{
-        Ram,
-        Rando,
-        region::{
-            Mq,
-            Region,
-            RegionLookupError,
-        },
+    crate::Ram,
+};
+#[cfg(not(target_arch = "wasm32"))] use crate::{
+    Rando,
+    region::{
+        Mq,
+        Region,
+        RegionLookupError,
     },
 };
 
@@ -211,6 +211,7 @@ impl Scene {
         Scene::from_id(ram.current_scene_id)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn regions(&self, rando: &Rando) -> Result<impl Iterator<Item = (Mq, Region)>, RegionLookupError> {
         let name = self.0;
         Ok(Region::all(rando)?.into_iter().filter(move |(_, region)| region.scene.as_ref().map_or(false, |scene| scene == name) || region.dungeon.as_ref().map_or(false, |dungeon| dungeon == name)))

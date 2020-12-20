@@ -860,10 +860,8 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         }
     }).next());
     TokenStream::from(quote! {
-        use {
-            itertools::Itertools as _,
-            crate::region::RegionLookup,
-        };
+        use itertools::Itertools as _;
+        #[cfg(not(target_arch = "wasm32"))] use crate::region::RegionLookup;
 
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
         #vis #struct_token #name {
@@ -929,6 +927,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                 })
             }
 
+            #[cfg(not(target_arch = "wasm32"))]
             #[allow(unused)] //DEBUG
             pub(crate) fn region(&self, rando: &Rando, ram: &Ram) -> Result<RegionLookup, RegionLookupError> {
                 match self.0 {
