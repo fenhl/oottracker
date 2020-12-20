@@ -246,8 +246,8 @@ impl TrackerCellKind {
         match self {
             Composite { state: state_fn, toggle_left, toggle_right } | Overlay { state: state_fn, toggle_main: toggle_left, toggle_overlay: toggle_right } => {
                 let (_, right) = state_fn(state);
-                if right { toggle_left(state) }
-                toggle_right(state);
+                if left { toggle_right(state) }
+                toggle_left(state);
             }
             _ => self.left_click(KeyboardModifiers::default(), state),
         }

@@ -206,7 +206,7 @@ async fn build_web() -> Result<(), Error> {
     Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").arg("--target=wasm32-unknown-unknown").check("cargo build --target=wasm32-unknown-unknown").await?;
     Command::new("wasm-bindgen").arg("target/wasm32-unknown-unknown/release/oottracker-gui.wasm").arg("--out-dir=assets/wasm").arg("--target=web").check("wasm-bindgen").await?;
     eprintln!("uploading web app");
-    Command::new("scp").arg("assets/wasm/*").arg("mercredi:/var/www/oottracker.fenhl.net").check("scp").await?;
+    Command::new("scp").arg("-r").arg("assets/wasm/*").arg("mercredi:/var/www/oottracker.fenhl.net").check("scp").await?;
     Command::new("scp").arg("-r").arg("assets/xopar-*").arg("mercredi:/var/www/oottracker.fenhl.net/assets").check("scp").await?;
     Ok(())
 }
