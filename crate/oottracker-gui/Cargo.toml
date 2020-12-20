@@ -6,12 +6,12 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
-iced_futures = "0.1"
+iced_futures = "0.2"
 itertools = "0.9"
 num-traits = "0.2"
 
 [dependencies.iced]
-version = "0.1"
+version = "0.2"
 features = ["image", "tokio"]
 
 [dependencies.oottracker]
@@ -27,8 +27,8 @@ branch = "main"
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-iced_native = "0.2"
+iced_native = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
-version = "0.2"  #TODO upgrade to 0.3 once supported by iced
+version = "0.3"
 features = ["net", "stream", "time"]

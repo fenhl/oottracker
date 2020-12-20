@@ -15,7 +15,6 @@ use {
         Element,
         Length,
         Settings,
-        Subscription,
         widget::{
             Column,
             Image,
@@ -32,6 +31,7 @@ use {
         },
         window,
     },
+    iced_futures::Subscription,
     itertools::Itertools as _,
     structopt::StructOpt,
     oottracker::{
@@ -58,7 +58,8 @@ use {
 #[cfg(not(target_arch = "wasm32"))] use {
     std::time::Duration,
     iced::image,
-    tokio::time::delay_for,
+    iced_native::keyboard::Modifiers as KeyboardModifiers,
+    tokio::time::sleep,
     oottracker::proto::{
         self,
         Packet,
@@ -81,6 +82,12 @@ macro_rules! embed_image {
 
 const WIDTH: u32 = 50 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
 const HEIGHT: u32 = 18 + 50 * 7 + 9; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 1px spacing
+
+#[cfg(target_arch = "wasm32")]
+#[derive(Default)]
+struct KeyboardModifiers {
+    control: bool,
+}
 
 struct ContainerStyle;
 
@@ -188,8 +195,12 @@ impl TrackerCellKind {
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    fn left_click(&self, state: &mut ModelState) {
+    #[cfg_attr(not(target_os = "macos"), allow(unused))]
+    fn left_click(&self, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) {
+        #[cfg(target_os = "macos")] if keyboard_modifiers.control {
+            self.right_click(state);
+            return
+        }
         match self {
             Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple(toggle) => toggle(state),
             Count { get, set, max } => {
@@ -223,11 +234,11 @@ impl TrackerCellKind {
     fn click(&self, state: &mut ModelState) {
         match self {
             Composite { state: state_fn, toggle_left, toggle_right } | Overlay { state: state_fn, toggle_main: toggle_left, toggle_overlay: toggle_right } => {
-                let (left, right) = state_fn(state);
+                let (_, right) = state_fn(state);
                 if right { toggle_left(state) }
                 toggle_right(state);
             }
-            _ => self.left_click(state),
+            _ => self.left_click(KeyboardModifiers::default(), state),
         }
     }
 }
@@ -806,12 +817,16 @@ enum Message {
     ClientDisconnected,
     DismissNotification,
     #[cfg(not(target_arch = "wasm32"))]
-    Event(iced_native::Event),
+    KeyboardModifiers(KeyboardModifiers),
     LeftClick(TrackerCellId),
+    #[cfg(not(target_arch = "wasm32"))]
+    MouseMoved([f32; 2]),
     #[cfg(not(target_arch = "wasm32"))]
     NetworkError(proto::ReadError),
     #[cfg(not(target_arch = "wasm32"))]
     Packet(Packet),
+    #[cfg(not(target_arch = "wasm32"))]
+    RightClick,
     UpdateAvailableChecks(HashMap<Check, CheckStatus>),
 }
 
@@ -834,6 +849,7 @@ impl fmt::Display for Message {
 struct State {
     flags: bool,
     client_connected: bool,
+    keyboard_modifiers: KeyboardModifiers,
     last_cursor_pos: [f32; 2],
     cell_buttons: CellButtons,
     model: ModelState,
@@ -854,7 +870,7 @@ impl State {
     #[cfg(not(target_arch = "wasm32"))]
     fn notify_temp(&mut self, message: Message) -> Command<Message> {
         self.notification = Some((true, message));
-        async { delay_for(Duration::from_secs(10)).await; Message::AutoDismissNotification }.into()
+        async { sleep(Duration::from_secs(10)).await; Message::AutoDismissNotification }.into()
     }
 }
 
@@ -903,18 +919,11 @@ impl Application for State {
             }
             Message::DismissNotification => self.notification = None,
             #[cfg(not(target_arch = "wasm32"))]
-            Message::Event(iced_native::Event::Mouse(event)) => match event {
-                iced_native::input::mouse::Event::CursorMoved { x, y } => self.last_cursor_pos = [x, y],
-                iced_native::input::mouse::Event::Input { state: iced_native::input::ButtonState::Released, button: iced_native::input::mouse::Button::Right } => {
-                    if let Some(cell) = TrackerCellId::at(self.last_cursor_pos, self.notification.is_none()) {
-                        cell.kind().right_click(&mut self.model);
-                    }
-                }
-                _ => {}
-            },
-            Message::Event(_) => {}
+            Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
+            #[cfg(not(target_arch = "wasm32"))]
+            Message::MouseMoved(pos) => self.last_cursor_pos = pos,
             Message::LeftClick(cell) => {
-                #[cfg(not(target_arch = "wasm32"))] cell.kind().left_click(&mut self.model);
+                #[cfg(not(target_arch = "wasm32"))] cell.kind().left_click(self.keyboard_modifiers, &mut self.model);
                 #[cfg(target_arch = "wasm32")] cell.kind().click(&mut self.model);
             }
             #[cfg(not(target_arch = "wasm32"))]
@@ -936,6 +945,12 @@ impl Application for State {
                             Err(e) => Message::CheckStatusError(e),
                         }
                     }.into()
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            Message::RightClick => {
+                if let Some(cell) = TrackerCellId::at(self.last_cursor_pos, self.notification.is_none()) {
+                    cell.kind().right_click(&mut self.model);
                 }
             }
             Message::UpdateAvailableChecks(checks) => self.checks = checks,
@@ -1006,7 +1021,7 @@ impl Application for State {
                 .push(cell!(Hookshot))
                 .push(cell!(Bow))
                 .push(cell!(Arrows))
-                .push(cell!(Hammer)) 
+                .push(cell!(Hammer))
                 .push(cell!(Boots))
                 .push(cell!(MirrorShield))
                 .spacing(1)
@@ -1075,10 +1090,15 @@ impl Application for State {
         }
     }
 
-    fn subscription(&self) -> Subscription<Message> {
+    fn subscription(&self) -> iced::Subscription<Message> {
         #[cfg(not(target_arch = "wasm32"))] {
             Subscription::batch(vec![
-                iced_native::subscription::events().map(Message::Event),
+                iced_native::subscription::events_with(|event, status| match (event, status) {
+                    (iced_native::Event::Keyboard(iced_native::keyboard::Event::ModifiersChanged(modifiers)), _) => Some(Message::KeyboardModifiers(modifiers)),
+                    (iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { x, y }), _) => Some(Message::MouseMoved([x, y])),
+                    (iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Right)), iced_native::event::Status::Ignored) => Some(Message::RightClick),
+                    _ => None,
+                }),
                 Subscription::from_recipe(tcp_server::Subscription),
             ])
         }
@@ -1095,7 +1115,7 @@ struct Args {
 }
 
 #[wheel::main]
-fn main(Args { show_available_checks }: Args) {
+fn main(Args { show_available_checks }: Args) -> iced::Result {
     State::run(Settings {
         window: window::Settings {
             size: (WIDTH, HEIGHT + if show_available_checks { 400 } else { 0 }),
@@ -1104,5 +1124,5 @@ fn main(Args { show_available_checks }: Args) {
         },
         flags: show_available_checks,
         ..Settings::default()
-    });
+    })
 }

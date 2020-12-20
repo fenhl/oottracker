@@ -49,6 +49,8 @@ enum Error {
     #[cfg(windows)]
     DirLock(dir_lock::Error),
     #[cfg(windows)]
+    EmptyReleaseNotes,
+    #[cfg(windows)]
     InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
     Io(io::Error),
     #[cfg(windows)]
@@ -219,6 +221,7 @@ async fn write_release_notes() -> Result<String, Error> {
     Command::new("C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd").arg("--wait").arg(release_notes_file.path()).check("code").await?;
     let mut buf = String::default();
     <NamedTempFile as io::Read>::read_to_string(&mut release_notes_file, &mut buf)?;
+    if buf.is_empty() { return Err(Error::EmptyReleaseNotes) }
     Ok(buf)
 }
 

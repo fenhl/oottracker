@@ -33,12 +33,12 @@ version = "1"
 features = ["derive"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
-version = "0.2" #TODO upgrade to 0.3 once supported by iced
+version = "0.3"
 features = [
     "fs",
     "io-util",
     "macros", # for tests
     "net",
-    "rt-threaded", # for tests
+    "rt-multi-thread", # for tests
     "stream"
 ]
