@@ -645,7 +645,7 @@ impl TrackerCellId {
 
         let content = match self {
             TrackerCellId::LightMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Light)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -657,7 +657,7 @@ impl TrackerCellId {
                 Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
             }.width(Length::Units(50)),
             TrackerCellId::ForestMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Forest)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -669,7 +669,7 @@ impl TrackerCellId {
                 Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
             }.width(Length::Units(50)),
             TrackerCellId::FireMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Fire)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -681,7 +681,7 @@ impl TrackerCellId {
                 Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
             }.width(Length::Units(50)),
             TrackerCellId::WaterMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Water)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -693,7 +693,7 @@ impl TrackerCellId {
                 Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
             }.width(Length::Units(50)),
             TrackerCellId::ShadowMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Shadow)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -705,7 +705,7 @@ impl TrackerCellId {
                 Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
             }.width(Length::Units(50)),
             TrackerCellId::SpiritMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Spirit)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -737,7 +737,7 @@ impl TrackerCellId {
             },
             TrackerCellId::Skulltula => if state.ram.save.skull_tokens == 0 { xopar_image!(dimmed golden_skulltula) } else { xopar_image!(count = state.ram.save.skull_tokens, skulls) },
             TrackerCellId::KokiriEmeraldLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(Stone::KokiriEmerald)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -750,7 +750,7 @@ impl TrackerCellId {
             }.width(Length::Units(33)),
             TrackerCellId::KokiriEmerald => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::KOKIRI_EMERALD), kokiri_emerald).width(Length::Units(33)),
             TrackerCellId::GoronRubyLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(Stone::GoronRuby)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
@@ -763,7 +763,7 @@ impl TrackerCellId {
             }.width(Length::Units(33)),
             TrackerCellId::GoronRuby => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(33)),
             TrackerCellId::ZoraSapphireLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(Stone::ZoraSapphire)) {
-                None => xopar_image!(unknown_text),
+                None => xopar_image!(dimmed unknown_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
