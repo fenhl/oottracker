@@ -27,6 +27,7 @@ use {
             ItemGetInf,
         },
         item_ids,
+        model::Stone,
         scene::SceneFlags,
     },
 };
@@ -642,11 +643,29 @@ bitflags! {
 }
 
 impl QuestItems {
+    pub fn has(&self, items: impl Into<QuestItems>) -> bool {
+        self.contains(items.into())
+    }
+
     pub fn num_stones(&self) -> u8 {
         (if self.contains(QuestItems::KOKIRI_EMERALD) { 1 } else { 0 })
         + if self.contains(QuestItems::GORON_RUBY) { 1 } else { 0 }
         + if self.contains(QuestItems::ZORA_SAPPHIRE) { 1 } else { 0 }
     }
+}
+
+impl From<Stone> for QuestItems {
+    fn from(stone: Stone) -> QuestItems {
+        match stone {
+            Stone::KokiriEmerald => QuestItems::KOKIRI_EMERALD,
+            Stone::GoronRuby => QuestItems::GORON_RUBY,
+            Stone::ZoraSapphire => QuestItems::ZORA_SAPPHIRE,
+        }
+    }
+}
+
+impl<'a, T: Into<QuestItems> + Clone> From<&'a T> for QuestItems {
+    fn from(x: &T) -> QuestItems { x.clone().into() }
 }
 
 impl TryFrom<Vec<u8>> for QuestItems {

@@ -171,45 +171,54 @@ impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> 
 
 enum TrackerCellKind {
     Composite {
-        #[cfg_attr(not(target_arch = "wasm32"), allow(unused))] //TODO (should be used in view)
-        state: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        left_img: &'static str,
+        right_img: &'static str,
+        both_img: &'static str,
+        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
         toggle_left: Box<dyn Fn(&mut ModelState)>,
         toggle_right: Box<dyn Fn(&mut ModelState)>,
     },
     Count {
+        dimmed_img: &'static str,
+        img: &'static str,
         get: Box<dyn Fn(&ModelState) -> u8>,
         set: Box<dyn Fn(&mut ModelState, u8)>,
         max: u8,
     },
     MedallionLocation(Medallion),
     OptionalOverlay {
+        main_img: &'static str,
+        overlay_img: &'static str,
+        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
         toggle_main: Box<dyn Fn(&mut ModelState)>,
         #[cfg(not(target_arch = "wasm32"))]
         toggle_overlay: Box<dyn Fn(&mut ModelState)>,
     },
     Overlay {
-        #[cfg_attr(not(target_arch = "wasm32"), allow(unused))] //TODO (should be used in view)
-        state: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        main_img: &'static str,
+        overlay_img: &'static str,
+        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
         toggle_main: Box<dyn Fn(&mut ModelState)>,
         toggle_overlay: Box<dyn Fn(&mut ModelState)>,
     },
     Sequence {
+        img: Box<dyn Fn(&ModelState) -> (bool, &'static str)>,
         increment: Box<dyn Fn(&mut ModelState)>,
         #[cfg(not(target_arch = "wasm32"))]
         decrement: Box<dyn Fn(&mut ModelState)>,
     },
-    Simple(Box<dyn Fn(&mut ModelState)>),
+    Simple {
+        img: &'static str,
+        active: Box<dyn Fn(&ModelState) -> bool>,
+        toggle: Box<dyn Fn(&mut ModelState)>,
+    },
     Song {
         song: QuestItems,
+        check: &'static str,
         #[cfg(not(target_arch = "wasm32"))]
         toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
     },
-    SpecialSequence {
-        increment: Box<dyn Fn(&mut ModelState)>,
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box<dyn Fn(&mut ModelState)>,
-    },
-    Stone(QuestItems),
+    Stone(Stone),
     StoneLocation(Stone),
 }
 
@@ -233,20 +242,114 @@ impl TrackerCellKind {
         }
     }
 
+    fn render(&self, state: &ModelState) -> Image {
+        match self {
+            Composite { left_img, right_img, both_img, active, .. } => match active(state) {
+                (false, false) => images::xopar_images_dimmed(both_img, "png"),
+                (false, true) => images::xopar_images(right_img, "png"),
+                (true, false) => images::xopar_images(left_img, "png"),
+                (true, true) => images::xopar_images(both_img, "png"),
+            },
+            Count { dimmed_img, img, get, .. } => {
+                let count = get(state);
+                if count == 0 {
+                    images::xopar_images_dimmed(dimmed_img, "png")
+                } else {
+                    images::xopar_images_count(&format!("{}_{}", img, count), "png")
+                }
+            }
+            MedallionLocation(med) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med)) {
+                None => images::xopar_images_dimmed::<Image>("unknown_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text", "png"),
+                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text", "png"),
+            }.width(Length::Units(50)),
+            OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => match active(state) {
+                (false, false) => images::xopar_images_dimmed(main_img, "png"),
+                (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_{}", main_img, overlay_img), "png"),
+                (true, false) => images::xopar_images(main_img, "png"),
+                (true, true) => images::xopar_images_overlay(&format!("{}_{}", main_img, overlay_img), "png"),
+            },
+            Sequence { img, .. } => match img(state) {
+                (false, img) => images::xopar_images_dimmed(img, "png"),
+                (true, img) => images::xopar_images(img, "png"),
+            },
+            Simple { img, active, .. } => if active(state) {
+                images::xopar_images(img, "png")
+            } else {
+                images::xopar_images_dimmed(img, "png")
+            },
+            Song { song, check, .. } => {
+                let song_filename = match *song {
+                    QuestItems::ZELDAS_LULLABY => "lullaby",
+                    QuestItems::EPONAS_SONG => "epona",
+                    QuestItems::SARIAS_SONG => "saria",
+                    QuestItems::SUNS_SONG => "sun",
+                    QuestItems::SONG_OF_TIME => "time",
+                    QuestItems::SONG_OF_STORMS => "storms",
+                    QuestItems::MINUET_OF_FOREST => "minuet",
+                    QuestItems::BOLERO_OF_FIRE => "bolero",
+                    QuestItems::SERENADE_OF_WATER => "serenade",
+                    QuestItems::NOCTURNE_OF_SHADOW => "nocturne",
+                    QuestItems::REQUIEM_OF_SPIRIT => "requiem",
+                    QuestItems::PRELUDE_OF_LIGHT => "prelude",
+                    _ => unreachable!(),
+                };
+                match (state.ram.save.quest_items.contains(*song), Check::Location(check.to_string()).checked(state).unwrap_or(false)) {
+                    (false, false) => images::xopar_images_dimmed(song_filename, "png"),
+                    (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_check", song_filename), "png"),
+                    (true, false) => images::xopar_images(song_filename, "png"),
+                    (true, true) => images::xopar_images_overlay(&format!("{}_check", song_filename), "png"),
+                }
+            }
+            Stone(stone) => {
+                let stone_filename = match *stone {
+                    Stone::KokiriEmerald => "kokiri_emerald",
+                    Stone::GoronRuby => "goron_ruby",
+                    Stone::ZoraSapphire => "zora_sapphire",
+                };
+                if state.ram.save.quest_items.has(*stone) {
+                    images::xopar_images::<Image>(stone_filename, "png")
+                } else {
+                    images::xopar_images_dimmed(stone_filename, "png")
+                }.width(Length::Units(33))
+            }
+            StoneLocation(stone) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone)) {
+                None => images::xopar_images_dimmed::<Image>("unknown_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text", "png"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text", "png"),
+                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text", "png"),
+            }.width(Length::Units(33)),
+        }
+    }
+
     fn left_click(&self, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
             self.right_click(state);
             return
         }
         match self {
-            Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple(toggle) => toggle(state),
-            Count { get, set, max } => {
+            Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
+            Count { get, set, max, .. } => {
                 let current = get(state);
                 if current == *max { set(state, 0) } else { set(state, current + 1) }
             }
             MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
-            Sequence { increment, .. } | SpecialSequence { increment, .. } => increment(state),
-            Song { song: quest_item, .. } | Stone(quest_item) => state.ram.save.quest_items.toggle(*quest_item),
+            Sequence { increment, .. } => increment(state),
+            Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
+            Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
         }
     }
@@ -255,13 +358,13 @@ impl TrackerCellKind {
     fn right_click(&self, state: &mut ModelState) {
         match self {
             Composite { toggle_right: toggle, .. } | OptionalOverlay { toggle_overlay: toggle, .. } | Overlay { toggle_overlay: toggle, .. } => toggle(state),
-            Count { get, set, max } => {
+            Count { get, set, max, .. } => {
                 let current = get(state);
                 if current == 0 { set(state, *max) } else { set(state, current - 1) }
             }
             MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
-            Sequence { decrement, .. } | SpecialSequence { decrement, .. } => decrement(state),
-            Simple(_) | Stone(_) => {}
+            Sequence { decrement, .. } => decrement(state),
+            Simple { .. } | Stone(_) => {}
             Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
         }
@@ -345,15 +448,52 @@ cells! {
         SpiritMedallionLocation: MedallionLocation(Medallion::Spirit),
     ],
     [
-        LightMedallion: Simple(Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::LIGHT_MEDALLION))),
-        ForestMedallion: Simple(Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::FOREST_MEDALLION))),
-        FireMedallion: Simple(Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::FIRE_MEDALLION))),
-        WaterMedallion: Simple(Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::WATER_MEDALLION))),
-        ShadowMedallion: Simple(Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::SHADOW_MEDALLION))),
-        SpiritMedallion: Simple(Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::SPIRIT_MEDALLION))),
+        LightMedallion: Simple {
+            img: "light_medallion",
+            active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::LIGHT_MEDALLION)),
+            toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::LIGHT_MEDALLION)),
+        },
+        ForestMedallion: Simple {
+            img: "forest_medallion",
+            active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::FOREST_MEDALLION)),
+            toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::FOREST_MEDALLION)),
+        },
+        FireMedallion: Simple {
+            img: "fire_medallion",
+            active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::FIRE_MEDALLION)),
+            toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::FIRE_MEDALLION)),
+        },
+        WaterMedallion: Simple {
+            img: "water_medallion",
+            active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::WATER_MEDALLION)),
+            toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::WATER_MEDALLION)),
+        },
+        ShadowMedallion: Simple {
+            img: "shadow_medallion",
+            active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::SHADOW_MEDALLION)),
+            toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::SHADOW_MEDALLION)),
+        },
+        SpiritMedallion: Simple {
+            img: "spirit_medallion",
+            active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::SPIRIT_MEDALLION)),
+            toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::SPIRIT_MEDALLION)),
+        },
     ],
     [
         AdultTrade: Sequence {
+            img: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+                AdultTradeItem::None => (false, "blue_egg"),
+                AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
+                AdultTradeItem::Cojiro => (true, "cojiro"),
+                AdultTradeItem::OddMushroom => (true, "odd_mushroom"),
+                AdultTradeItem::OddPotion => (true, "odd_poultice"),
+                AdultTradeItem::PoachersSaw => (true, "poachers_saw"),
+                AdultTradeItem::BrokenSword => (true, "broken_sword"),
+                AdultTradeItem::Prescription => (true, "prescription"),
+                AdultTradeItem::EyeballFrog => (true, "eyeball_frog"),
+                AdultTradeItem::Eyedrops => (true, "eye_drops"),
+                AdultTradeItem::ClaimCheck => (true, "claim_check"),
+            }),
             increment: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
                 AdultTradeItem::None => AdultTradeItem::PocketEgg,
                 AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::Cojiro,
@@ -383,22 +523,32 @@ cells! {
             }),
         },
         Skulltula: Count {
+            dimmed_img: "golden_skulltula",
+            img: "skulls",
             get: Box::new(|state| state.ram.save.skull_tokens),
             set: Box::new(|state, value| state.ram.save.skull_tokens = value),
             max: 100,
         },
         KokiriEmeraldLocation: StoneLocation(Stone::KokiriEmerald),
-        KokiriEmerald: Stone(QuestItems::KOKIRI_EMERALD),
+        KokiriEmerald: Stone(Stone::KokiriEmerald),
         GoronRubyLocation: StoneLocation(Stone::GoronRuby),
-        GoronRuby: Stone(QuestItems::GORON_RUBY),
+        GoronRuby: Stone(Stone::GoronRuby),
         ZoraSapphireLocation: StoneLocation(Stone::ZoraSapphire),
-        ZoraSapphire: Stone(QuestItems::ZORA_SAPPHIRE),
+        ZoraSapphire: Stone(Stone::ZoraSapphire),
         Bottle: OptionalOverlay {
+            main_img: "bottle",
+            overlay_img: "letter",
+            active: Box::new(|state| (state.ram.save.inv.has_emptiable_bottle(), state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if the pit has been delivered
             toggle_main: Box::new(|state| state.ram.save.inv.toggle_emptiable_bottle()),
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
         },
         Scale: Sequence {
+            img: Box::new(|state| match state.ram.save.upgrades.scale() {
+                Upgrades::SILVER_SCALE => (true, "silver_scale"),
+                Upgrades::GOLD_SCALE => (true, "gold_scale"),
+                _ => (false, "silver_scale"),
+            }),
             increment: Box::new(|state| state.ram.save.upgrades.set_scale(match state.ram.save.upgrades.scale() {
                 Upgrades::SILVER_SCALE => Upgrades::GOLD_SCALE,
                 Upgrades::GOLD_SCALE => Upgrades::NONE,
@@ -413,9 +563,15 @@ cells! {
         },
     ],
     [
-        Slingshot: Simple(Box::new(|state| state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot)),
+        Slingshot: Simple {
+            img: "slingshot",
+            active: Box::new(|state| state.ram.save.inv.slingshot),
+            toggle: Box::new(|state| state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot),
+        },
         Bombs: Overlay {
-            state: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, state.ram.save.inv.bombchus)),
+            main_img: "bomb_bag",
+            overlay_img: "bombchu",
+            active: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, state.ram.save.inv.bombchus)),
             toggle_main: Box::new(|state| if state.ram.save.upgrades.bomb_bag() == Upgrades::NONE {
                 state.ram.save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG);
             } else {
@@ -423,8 +579,18 @@ cells! {
             }),
             toggle_overlay: Box::new(|state| state.ram.save.inv.bombchus = !state.ram.save.inv.bombchus),
         },
-        Boomerang: Simple(Box::new(|state| state.ram.save.inv.boomerang = !state.ram.save.inv.boomerang)),
+        Boomerang: Simple {
+            img: "boomerang",
+            active: Box::new(|state| state.ram.save.inv.boomerang),
+            toggle: Box::new(|state| state.ram.save.inv.boomerang = !state.ram.save.inv.boomerang),
+        },
         Strength: Sequence {
+            img: Box::new(|state| match state.ram.save.upgrades.strength() {
+                Upgrades::GORON_BRACELET => (true, "goron_bracelet"),
+                Upgrades::SILVER_GAUNTLETS => (true, "silver_gauntlets"),
+                Upgrades::GOLD_GAUNTLETS => (true, "gold_gauntlets"),
+                _ => (false, "goron_bracelet"),
+            }),
             increment: Box::new(|state| state.ram.save.upgrades.set_strength(match state.ram.save.upgrades.strength() {
                 Upgrades::GORON_BRACELET => Upgrades::SILVER_GAUNTLETS,
                 Upgrades::SILVER_GAUNTLETS => Upgrades::GOLD_GAUNTLETS,
@@ -440,7 +606,9 @@ cells! {
             })),
         },
         Magic: Overlay {
-            state: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, state.ram.save.inv.lens)),
+            main_img: "magic",
+            overlay_img: "lens",
+            active: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, state.ram.save.inv.lens)),
             toggle_main: Box::new(|state| if state.ram.save.magic == MagicCapacity::None {
                 state.ram.save.magic = MagicCapacity::Small;
             } else {
@@ -449,13 +617,21 @@ cells! {
             toggle_overlay: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
         },
         Spells: Composite {
-            state: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
+            left_img: "dins_fire",
+            right_img: "faores_wind",
+            both_img: "composite_magic",
+            active: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
             toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
             toggle_right: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
         },
     ],
     [
-        Hookshot: SpecialSequence {
+        Hookshot: Sequence {
+            img: Box::new(|state| match state.ram.save.inv.hookshot {
+                Hookshot::None => (false, "hookshot"),
+                Hookshot::Hookshot => (true, "hookshot_accessible"),
+                Hookshot::Longshot => (true, "longshot_accessible"),
+            }),
             increment: Box::new(|state| state.ram.save.inv.hookshot = match state.ram.save.inv.hookshot {
                 Hookshot::None => Hookshot::Hookshot,
                 Hookshot::Hookshot => Hookshot::Longshot,
@@ -469,25 +645,53 @@ cells! {
             }),
         },
         Bow: OptionalOverlay {
+            main_img: "bow",
+            overlay_img: "ice_arrows",
+            active: Box::new(|state| (state.ram.save.inv.bow, state.ram.save.inv.ice_arrows)),
             toggle_main: Box::new(|state| state.ram.save.inv.bow = !state.ram.save.inv.bow),
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
         },
         Arrows: Composite {
-            state: Box::new(|state| (state.ram.save.inv.fire_arrows, state.ram.save.inv.light_arrows)),
+            left_img: "fire_arrows",
+            right_img: "light_arrows",
+            both_img: "composite_arrows",
+            active: Box::new(|state| (state.ram.save.inv.fire_arrows, state.ram.save.inv.light_arrows)),
             toggle_left: Box::new(|state| state.ram.save.inv.fire_arrows = !state.ram.save.inv.fire_arrows),
             toggle_right: Box::new(|state| state.ram.save.inv.light_arrows = !state.ram.save.inv.light_arrows),
         },
-        Hammer: Simple(Box::new(|state| state.ram.save.inv.hammer = !state.ram.save.inv.hammer)),
+        Hammer: Simple {
+            img: "hammer",
+            active: Box::new(|state| state.ram.save.inv.hammer),
+            toggle: Box::new(|state| state.ram.save.inv.hammer = !state.ram.save.inv.hammer),
+        },
         Boots: Composite {
-            state: Box::new(|state| (state.ram.save.equipment.contains(Equipment::IRON_BOOTS), state.ram.save.equipment.contains(Equipment::HOVER_BOOTS))),
+            left_img: "iron_boots",
+            right_img: "hover_boots",
+            both_img: "composite_boots",
+            active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::IRON_BOOTS), state.ram.save.equipment.contains(Equipment::HOVER_BOOTS))),
             toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::IRON_BOOTS)),
             toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::HOVER_BOOTS)),
         },
-        MirrorShield: Simple(Box::new(|state| state.ram.save.equipment.toggle(Equipment::MIRROR_SHIELD))),
+        MirrorShield: Simple {
+            img: "mirror_shield",
+            active: Box::new(|state| state.ram.save.equipment.contains(Equipment::MIRROR_SHIELD)),
+            toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::MIRROR_SHIELD)),
+        },
     ],
     [
         ChildTrade: Sequence {
+            img: Box::new(|state| match state.ram.save.inv.child_trade_item {
+                ChildTradeItem::None => (false, "white_egg"),
+                ChildTradeItem::WeirdEgg => (true, "white_egg"),
+                ChildTradeItem::Chicken => (true, "white_chicken"),
+                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
+                ChildTradeItem::KeatonMask => (true, "keaton_mask"),
+                ChildTradeItem::SkullMask => (true, "skull_mask"),
+                ChildTradeItem::SpookyMask => (true, "spooky_mask"),
+                ChildTradeItem::BunnyHood => (true, "bunny_hood"),
+                ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
+            }),
             increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
                 ChildTradeItem::None => ChildTradeItem::WeirdEgg,
                 ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
@@ -513,22 +717,36 @@ cells! {
             }),
         },
         Ocarina: Overlay {
-            state: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
+            main_img: "ocarina",
+            overlay_img: "scarecrow",
+            active: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
             toggle_main: Box::new(|state| state.ram.save.inv.ocarina = !state.ram.save.inv.ocarina),
-            toggle_overlay: Box::new(|state| state.ram.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)),
+            toggle_overlay: Box::new(|state| state.ram.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)), //TODO make sure free scarecrow knowledge is toggled off properly
         },
-        Beans: Simple(Box::new(|state| state.ram.save.inv.beans = !state.ram.save.inv.beans)),
+        Beans: Simple { //TODO overlay with number bought if autotracker is on?
+            img: "beans",
+            active: Box::new(|state| state.ram.save.inv.beans),
+            toggle: Box::new(|state| state.ram.save.inv.beans = !state.ram.save.inv.beans),
+        },
         SwordCard: Composite {
-            state: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD))),
+            left_img: "kokiri_sword",
+            right_img: "gerudo_card",
+            both_img: "composite_ksword_gcard",
+            active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD))),
             toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
             toggle_right: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
         },
         Tunics: Composite {
-            state: Box::new(|state| (state.ram.save.equipment.contains(Equipment::GORON_TUNIC), state.ram.save.equipment.contains(Equipment::ZORA_TUNIC))),
+            left_img: "goron_tunic",
+            right_img: "zora_tunic",
+            both_img: "composite_tunics",
+            active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::GORON_TUNIC), state.ram.save.equipment.contains(Equipment::ZORA_TUNIC))),
             toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::GORON_TUNIC)),
             toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
         },
         Triforce: Count {
+            dimmed_img: "triforce",
+            img: "force",
             get: Box::new(|state| state.ram.save.triforce_pieces()),
             set: Box::new(|state, value| state.ram.save.set_triforce_pieces(value)),
             max: 100,
@@ -537,31 +755,37 @@ cells! {
     [
         ZeldasLullaby: Song {
             song: QuestItems::ZELDAS_LULLABY,
+            check: "Song from Impa",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_IMPA)),
         },
         EponasSong: Song {
             song: QuestItems::EPONAS_SONG,
+            check: "Song from Malon",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_MALON)),
         },
         SariasSong: Song {
             song: QuestItems::SARIAS_SONG,
+            check: "Song from Saria",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
         },
         SunsSong: Song {
             song: QuestItems::SUNS_SONG,
+            check: "Song from Composers Grave",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
         },
         SongOfTime: Song {
             song: QuestItems::SONG_OF_TIME,
+            check: "Song from Ocarina of Time",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SONG_FROM_OCARINA_OF_TIME)),
         },
         SongOfStorms: Song {
             song: QuestItems::SONG_OF_STORMS,
+            check: "Song from Windmill",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_WINDMILL)),
         },
@@ -569,31 +793,37 @@ cells! {
     [
         Minuet: Song {
             song: QuestItems::MINUET_OF_FOREST,
+            check: "Sheik in Forest",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_FOREST)),
         },
         Bolero: Song {
             song: QuestItems::BOLERO_OF_FIRE,
+            check: "Sheik in Crater",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_CRATER)),
         },
         Serenade: Song {
             song: QuestItems::SERENADE_OF_WATER,
+            check: "Sheik in Ice Cavern",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_ICE_CAVERN)),
         },
         Requiem: Song {
             song: QuestItems::REQUIEM_OF_SPIRIT,
+            check: "Sheik at Colossus",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SHEIK_AT_COLOSSUS)),
         },
         Nocturne: Song {
             song: QuestItems::NOCTURNE_OF_SHADOW,
+            check: "Sheik in Kakariko",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_KAKARIKO)),
         },
         Prelude: Song {
             song: QuestItems::PRELUDE_OF_LIGHT,
+            check: "Sheik at Temple",
             #[cfg(not(target_arch = "wasm32"))]
             toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
         },
@@ -601,236 +831,8 @@ cells! {
 }
 
 impl TrackerCellId {
-    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> { //TODO generate code to allow getting embedded images using non-static paths, then move this method to TrackerCellKind
-        macro_rules! xopar_image {
-            ($filename:ident) => {{
-                images::xopar_images::<Image>(stringify!($filename), "png")
-            }};
-            (count = $count:expr, $filename:ident) => {{
-                images::xopar_images_count::<Image>(&format!("{}_{}", stringify!($filename), $count), "png")
-            }};
-            (dimmed $filename:ident) => {{
-                images::xopar_images_dimmed::<Image>(stringify!($filename), "png")
-            }};
-            (undim = $undim:expr, $filename:ident) => {{
-                if $undim {
-                    xopar_image!($filename)
-                } else {
-                    xopar_image!(dimmed $filename)
-                }
-            }};
-            (undim = $undim:expr, $filename:ident, overlay = $overlay:expr, $overlay_filename:ident) => {{
-                match ($undim, $overlay) {
-                    (false, false) => xopar_image!(dimmed $filename),
-                    (false, true) => xopar_image!(overlay_dimmed $overlay_filename),
-                    (true, false) => xopar_image!($filename),
-                    (true, true) => xopar_image!(overlay $overlay_filename),
-                }
-            }};
-            (overlay $filename:ident) => {{
-                images::xopar_images_overlay::<Image>(stringify!($filename), "png")
-            }};
-            (overlay_dimmed $filename:ident) => {{
-                images::xopar_images_overlay_dimmed::<Image>(stringify!($filename), "png")
-            }};
-            (composite = $left:expr, $left_filename:ident, $right:expr, $right_filename:ident, $composite_filename:ident) => {{
-                match ($left, $right) {
-                    (false, false) => xopar_image!(dimmed $composite_filename),
-                    (false, true) => xopar_image!($right_filename),
-                    (true, false) => xopar_image!($left_filename),
-                    (true, true) => xopar_image!($composite_filename),
-                }
-            }};
-        }
-
-        let content = match self {
-            TrackerCellId::LightMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Light)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(50)),
-            TrackerCellId::ForestMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Forest)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(50)),
-            TrackerCellId::FireMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Fire)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(50)),
-            TrackerCellId::WaterMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Water)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(50)),
-            TrackerCellId::ShadowMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Shadow)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(50)),
-            TrackerCellId::SpiritMedallionLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(Medallion::Spirit)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(50)),
-            TrackerCellId::LightMedallion => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::LIGHT_MEDALLION), light_medallion),
-            TrackerCellId::ForestMedallion => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::FOREST_MEDALLION), forest_medallion),
-            TrackerCellId::FireMedallion => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::FIRE_MEDALLION), fire_medallion),
-            TrackerCellId::WaterMedallion => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::WATER_MEDALLION), water_medallion),
-            TrackerCellId::ShadowMedallion => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SHADOW_MEDALLION), shadow_medallion),
-            TrackerCellId::SpiritMedallion => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SPIRIT_MEDALLION), spirit_medallion),
-            TrackerCellId::AdultTrade => match state.ram.save.inv.adult_trade_item {
-                AdultTradeItem::None => xopar_image!(dimmed blue_egg),
-                AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => xopar_image!(blue_egg),
-                AdultTradeItem::Cojiro => xopar_image!(cojiro),
-                AdultTradeItem::OddMushroom => xopar_image!(odd_mushroom),
-                AdultTradeItem::OddPotion => xopar_image!(odd_poultice),
-                AdultTradeItem::PoachersSaw => xopar_image!(poachers_saw),
-                AdultTradeItem::BrokenSword => xopar_image!(broken_sword),
-                AdultTradeItem::Prescription => xopar_image!(prescription),
-                AdultTradeItem::EyeballFrog => xopar_image!(eyeball_frog),
-                AdultTradeItem::Eyedrops => xopar_image!(eye_drops),
-                AdultTradeItem::ClaimCheck => xopar_image!(claim_check),
-            },
-            TrackerCellId::Skulltula => if state.ram.save.skull_tokens == 0 { xopar_image!(dimmed golden_skulltula) } else { xopar_image!(count = state.ram.save.skull_tokens, skulls) },
-            TrackerCellId::KokiriEmeraldLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(Stone::KokiriEmerald)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(33)),
-            TrackerCellId::KokiriEmerald => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::KOKIRI_EMERALD), kokiri_emerald).width(Length::Units(33)),
-            TrackerCellId::GoronRubyLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(Stone::GoronRuby)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(33)),
-            TrackerCellId::GoronRuby => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::GORON_RUBY), goron_ruby).width(Length::Units(33)),
-            TrackerCellId::ZoraSapphireLocation => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(Stone::ZoraSapphire)) {
-                None => xopar_image!(dimmed unknown_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => xopar_image!(deku_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => xopar_image!(dc_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => xopar_image!(jabu_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => xopar_image!(forest_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => xopar_image!(fire_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => xopar_image!(water_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => xopar_image!(shadow_text),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => xopar_image!(spirit_text),
-                Some(DungeonRewardLocation::LinksPocket) => xopar_image!(free_text),
-            }.width(Length::Units(33)),
-            TrackerCellId::ZoraSapphire => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::ZORA_SAPPHIRE), zora_sapphire).width(Length::Units(33)),
-            TrackerCellId::Bottle => xopar_image!(undim = state.ram.save.inv.has_emptiable_bottle(), bottle, overlay = state.ram.save.inv.has_rutos_letter(), bottle_letter),
-            TrackerCellId::Scale => match state.ram.save.upgrades.scale() {
-                Upgrades::SILVER_SCALE => xopar_image!(silver_scale),
-                Upgrades::GOLD_SCALE => xopar_image!(gold_scale),
-                _ => xopar_image!(dimmed silver_scale),
-            },
-            TrackerCellId::Slingshot => xopar_image!(undim = state.ram.save.inv.slingshot, slingshot),
-            TrackerCellId::Bombs => xopar_image!(undim = state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, bomb_bag, overlay = state.ram.save.inv.bombchus, bomb_bag_bombchu),
-            TrackerCellId::Boomerang => xopar_image!(undim = state.ram.save.inv.boomerang, boomerang),
-            TrackerCellId::Strength => match state.ram.save.upgrades.strength() {
-                Upgrades::GORON_BRACELET => xopar_image!(goron_bracelet),
-                Upgrades::SILVER_GAUNTLETS => xopar_image!(silver_gauntlets),
-                Upgrades::GOLD_GAUNTLETS => xopar_image!(gold_gauntlets),
-                _ => xopar_image!(dimmed goron_bracelet),
-            },
-            TrackerCellId::Magic => xopar_image!(undim = state.ram.save.magic != MagicCapacity::None, magic, overlay = state.ram.save.inv.lens, magic_lens),
-            TrackerCellId::Spells => xopar_image!(composite = state.ram.save.inv.dins_fire, dins_fire, state.ram.save.inv.farores_wind, faores_wind, composite_magic),
-            TrackerCellId::Hookshot => match state.ram.save.inv.hookshot {
-                Hookshot::None => xopar_image!(dimmed hookshot),
-                Hookshot::Hookshot => xopar_image!(hookshot_accessible),
-                Hookshot::Longshot => xopar_image!(longshot_accessible),
-            },
-            TrackerCellId::Bow => xopar_image!(undim = state.ram.save.inv.bow, bow, overlay = state.ram.save.inv.ice_arrows, bow_ice_arrows),
-            TrackerCellId::Arrows => xopar_image!(composite = state.ram.save.inv.fire_arrows, fire_arrows, state.ram.save.inv.light_arrows, light_arrows, composite_arrows),
-            TrackerCellId::Hammer => xopar_image!(undim = state.ram.save.inv.hammer, hammer),
-            TrackerCellId::Boots => xopar_image!(composite = state.ram.save.equipment.contains(Equipment::IRON_BOOTS), iron_boots, state.ram.save.equipment.contains(Equipment::HOVER_BOOTS), hover_boots, composite_boots),
-            TrackerCellId::MirrorShield => xopar_image!(undim = state.ram.save.equipment.contains(Equipment::MIRROR_SHIELD), mirror_shield),
-            TrackerCellId::ChildTrade => match state.ram.save.inv.child_trade_item {
-                ChildTradeItem::None => xopar_image!(dimmed white_egg),
-                ChildTradeItem::WeirdEgg => xopar_image!(white_egg),
-                ChildTradeItem::Chicken => xopar_image!(white_chicken),
-                ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => xopar_image!(zelda_letter), //TODO for SOLD OUT, check trade quest progress
-                ChildTradeItem::KeatonMask => xopar_image!(keaton_mask),
-                ChildTradeItem::SkullMask => xopar_image!(skull_mask),
-                ChildTradeItem::SpookyMask => xopar_image!(spooky_mask),
-                ChildTradeItem::BunnyHood => xopar_image!(bunny_hood),
-                ChildTradeItem::MaskOfTruth => xopar_image!(mask_of_truth),
-            },
-            TrackerCellId::Ocarina => xopar_image!(undim = state.ram.save.inv.ocarina, ocarina, overlay = state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG), ocarina_scarecrow), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
-            TrackerCellId::Beans => xopar_image!(undim = state.ram.save.inv.beans, beans), //TODO overlay with number bought if autotracker is on?
-            TrackerCellId::SwordCard => xopar_image!(composite = state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), kokiri_sword, state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD), gerudo_card, composite_ksword_gcard),
-            TrackerCellId::Tunics => xopar_image!(composite = state.ram.save.equipment.contains(Equipment::GORON_TUNIC), goron_tunic, state.ram.save.equipment.contains(Equipment::ZORA_TUNIC), zora_tunic, composite_tunics),
-            TrackerCellId::Triforce => if state.ram.save.triforce_pieces() == 0 { xopar_image!(dimmed triforce) } else { xopar_image!(count = state.ram.save.triforce_pieces(), force) },
-            TrackerCellId::ZeldasLullaby => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::ZELDAS_LULLABY), lullaby, overlay = Check::Location(format!("Song from Impa")).checked(state).unwrap_or(false), lullaby_check),
-            TrackerCellId::EponasSong => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::EPONAS_SONG), epona, overlay = Check::Location(format!("Song from Malon")).checked(state).unwrap_or(false), epona_check),
-            TrackerCellId::SariasSong => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SARIAS_SONG), saria, overlay = Check::Location(format!("Song from Saria")).checked(state).unwrap_or(false), saria_check),
-            TrackerCellId::SunsSong => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SUNS_SONG), sun, overlay = Check::Location(format!("Song from Composers Grave")).checked(state).unwrap_or(false), sun_check),
-            TrackerCellId::SongOfTime => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SONG_OF_TIME), time, overlay = Check::Location(format!("Song from Ocarina of Time")).checked(state).unwrap_or(false), time_check),
-            TrackerCellId::SongOfStorms => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SONG_OF_STORMS), storms, overlay = Check::Location(format!("Song from Windmill")).checked(state).unwrap_or(false), storms_check),
-            TrackerCellId::Minuet => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::MINUET_OF_FOREST), minuet, overlay = Check::Location(format!("Sheik in Forest")).checked(state).unwrap_or(false), minuet_check),
-            TrackerCellId::Bolero => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::BOLERO_OF_FIRE), bolero, overlay = Check::Location(format!("Sheik in Crater")).checked(state).unwrap_or(false), bolero_check),
-            TrackerCellId::Serenade => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::SERENADE_OF_WATER), serenade, overlay = Check::Location(format!("Sheik in Ice Cavern")).checked(state).unwrap_or(false), serenade_check),
-            TrackerCellId::Requiem => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT), requiem, overlay = Check::Location(format!("Sheik at Colossus")).checked(state).unwrap_or(false), requiem_check),
-            TrackerCellId::Nocturne => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW), nocturne, overlay = Check::Location(format!("Sheik in Kakariko")).checked(state).unwrap_or(false), nocturne_check),
-            TrackerCellId::Prelude => xopar_image!(undim = state.ram.save.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT), prelude, overlay = Check::Location(format!("Sheik at Temple")).checked(state).unwrap_or(false), prelude_check),
-        };
+    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> {
+        let content = self.kind().render(state);
         if let Some(cell_button) = cell_button {
             Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(*self).into()
         } else {
