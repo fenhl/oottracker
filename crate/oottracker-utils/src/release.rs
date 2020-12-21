@@ -14,6 +14,7 @@ use {
     std::{
         cmp::Ordering::*,
         env,
+        fmt,
         io::Cursor,
         path::Path,
         process::Stdio,
@@ -25,6 +26,7 @@ use {
         SemVerError,
         Version,
     },
+    structopt::StructOpt,
     tempfile::NamedTempFile,
     tokio::{
         fs::File,
@@ -67,6 +69,13 @@ enum Error {
     Zip(ZipError),
 }
 
+#[cfg(windows)]
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[async_trait]
 trait CommandOutputExt {
     async fn check(&mut self, name: &'static str) -> Result<Output, Error>;
@@ -97,6 +106,13 @@ impl IoResultExt for io::Result<()> {
             _ => self,
         }
     }
+}
+
+#[cfg(windows)]
+#[derive(StructOpt)]
+struct Args {
+    #[structopt(long = "web-dev-only")]
+    web_dev_only: bool,
 }
 
 #[cfg(windows)]
@@ -201,13 +217,15 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release) -
 }
 
 #[cfg(windows)]
-async fn build_web() -> Result<(), Error> {
+async fn build_web(dev: bool) -> Result<(), Error> {
+    let www_path = if dev { "/var/www/oottracker-dev.fenhl.net" } else { "/var/www/oottracker.fenhl.net" };
     eprintln!("building for wasm");
     Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").arg("--target=wasm32-unknown-unknown").check("cargo build --target=wasm32-unknown-unknown").await?;
     Command::new("wasm-bindgen").arg("target/wasm32-unknown-unknown/release/oottracker-gui.wasm").arg("--out-dir=assets/wasm").arg("--target=web").check("wasm-bindgen").await?;
     eprintln!("uploading web app");
-    Command::new("scp").arg("-r").arg("assets/wasm/*").arg("mercredi:/var/www/oottracker.fenhl.net").check("scp").await?;
-    Command::new("scp").arg("-r").arg("assets/xopar-*").arg("mercredi:/var/www/oottracker.fenhl.net/assets").check("scp").await?;
+    Command::new("scp").arg("-r").arg("assets/wasm/*").arg(format!("mercredi:{}", www_path)).check("scp").await?;
+    Command::new("scp").arg("assets/icon.ico").arg(format!("mercredi:{}/favicon.ico", www_path)).check("scp").await?;
+    Command::new("scp").arg("-r").arg("assets/xopar-*").arg(format!("mercredi:{}/assets", www_path)).check("scp").await?;
     Ok(())
 }
 
@@ -238,27 +256,31 @@ async fn main() -> Result<(), Error> {
 }
 
 #[cfg(windows)]
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    let (setup_res, release_notes) = tokio::join!(
-        setup(),
-        write_release_notes(),
-    );
-    let (client, repo) = setup_res?;
-    let release_notes = release_notes?;
-    eprintln!("creating release");
-    let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
-    let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
-        build_bizhawk(&client, &repo, &release),
-        build_gui(&client, &repo, &release),
-        build_macos(&client, &repo, &release),
-        build_web(),
-    );
-    let () = build_bizhawk_res?;
-    let () = build_gui_res?;
-    let () = build_macos_res?;
-    let () = build_web_res?;
-    eprintln!("publishing release");
-    repo.publish_release(&client, release).await?;
+#[wheel::main]
+async fn main(Args { web_dev_only }: Args) -> Result<(), Error> {
+    if web_dev_only {
+        build_web(true).await?;
+    } else {
+        let (setup_res, release_notes) = tokio::join!(
+            setup(),
+            write_release_notes(),
+        );
+        let (client, repo) = setup_res?;
+        let release_notes = release_notes?;
+        eprintln!("creating release");
+        let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
+        let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
+            build_bizhawk(&client, &repo, &release),
+            build_gui(&client, &repo, &release),
+            build_macos(&client, &repo, &release),
+            build_web(false),
+        );
+        let () = build_bizhawk_res?;
+        let () = build_gui_res?;
+        let () = build_macos_res?;
+        let () = build_web_res?;
+        eprintln!("publishing release");
+        repo.publish_release(&client, release).await?;
+    }
     Ok(())
 }

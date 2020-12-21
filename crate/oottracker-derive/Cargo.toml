@@ -9,6 +9,7 @@ proc-macro = true
 
 [dependencies]
 convert_case = "0.4"
+itertools = "0.9"
 proc-macro2 = "1"
 quote = "1"
 syn = "1"

@@ -1,13 +1,25 @@
 #![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
 
 use {
-    std::convert::TryFrom,
+    std::{
+        convert::TryFrom,
+        fs::{
+            self,
+            File,
+        },
+        io::prelude::*,
+        path::Path,
+    },
     convert_case::{
         Case,
         Casing as _,
     },
+    itertools::Itertools as _,
     proc_macro::TokenStream,
-    proc_macro2::Span,
+    proc_macro2::{
+        Literal,
+        Span,
+    },
     quote::quote,
     syn::{
         Data,
@@ -61,7 +73,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                                     read_error_display_arms.push(quote!(#read_error::#variant_name(e) => e.fmt(f)));
                                     quote!(<#ty as crate::proto::Protocol>::read(tcp_stream).await?)
                                 })
-                                .collect::<Vec<_>>();
+                                .collect_vec();
                             quote!(#idx => Ok(#ty::#var(#(#read_fields,)*)))
                         }
                         Fields::Named(FieldsNamed { named, .. }) => {
@@ -72,12 +84,12 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                                     read_error_display_arms.push(quote!(#read_error::#variant_name(e) => e.fmt(f)));
                                     quote!(#ident: <#ty as crate::proto::Protocol>::read(tcp_stream).await?)
                                 })
-                                .collect::<Vec<_>>();
+                                .collect_vec();
                             quote!(#idx => Ok(#ty::#var { #(#read_fields,)* }))
                         }
                     }
                 })
-                .collect::<Vec<_>>();
+                .collect_vec();
             let write_arms = enum_data.variants.iter()
                 .enumerate()
                 .map(|(idx, Variant { ident: var, fields, .. })| {
@@ -88,7 +100,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                             let field_idents = unnamed.iter()
                                 .enumerate()
                                 .map(|(idx, _)| Ident::new(&format!("__field{}", idx), Span::call_site()))
-                                .collect::<Vec<_>>();
+                                .collect_vec();
                             let write_fields = field_idents.iter()
                                 .map(|ident| quote!(#ident.write(tcp_stream).await?;));
                             quote!(#ty::#var(#(#field_idents,)*) => {
@@ -99,7 +111,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                         Fields::Named(FieldsNamed { named, .. }) => {
                             let field_idents = named.iter()
                                 .map(|Field { ident, .. }| ident)
-                                .collect::<Vec<_>>();
+                                .collect_vec();
                             let write_fields = field_idents.iter()
                                 .map(|ident| quote!(#ident.write(tcp_stream).await?;));
                             quote!(#ty::#var { #(#field_idents,)* } => {
@@ -109,7 +121,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                         }
                     }
                 })
-                .collect::<Vec<_>>();
+                .collect_vec();
             let write_sync_arms = enum_data.variants.iter()
                 .enumerate()
                 .map(|(idx, Variant { ident: var, fields, .. })| {
@@ -120,7 +132,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                             let field_idents = unnamed.iter()
                                 .enumerate()
                                 .map(|(idx, _)| Ident::new(&format!("__field{}", idx), Span::call_site()))
-                                .collect::<Vec<_>>();
+                                .collect_vec();
                             let write_fields = field_idents.iter()
                                 .map(|ident| quote!(#ident.write_sync(tcp_stream)?;));
                             quote!(#ty::#var(#(#field_idents,)*) => {
@@ -131,7 +143,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                         Fields::Named(FieldsNamed { named, .. }) => {
                             let field_idents = named.iter()
                                 .map(|Field { ident, .. }| ident)
-                                .collect::<Vec<_>>();
+                                .collect_vec();
                             let write_fields = field_idents.iter()
                                 .map(|ident| quote!(#ident.write_sync(tcp_stream)?;));
                             quote!(#ty::#var { #(#field_idents,)* } => {
@@ -141,7 +153,7 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
                         }
                     }
                 })
-                .collect::<Vec<_>>();
+                .collect_vec();
             (
                 read_error_variants,
                 read_error_display_arms,
@@ -191,6 +203,54 @@ pub fn derive_protocol(input: TokenStream) -> TokenStream {
             async fn read(tcp_stream: &mut ::tokio::net::TcpStream) -> Result<#ty, #read_error> { #impl_read }
             async fn write(&self, tcp_stream: &mut ::tokio::net::TcpStream) -> ::std::io::Result<()> { #impl_write }
             fn write_sync(&self, tcp_stream: &mut ::std::net::TcpStream) -> ::std::io::Result<()> { #impl_write_sync }
+        }
+    })
+}
+
+#[proc_macro]
+pub fn embed_image(input: TokenStream) -> TokenStream {
+    let img_path = parse_macro_input!(input as LitStr).value();
+    let img_path = Path::new(&img_path);
+    let name = Ident::new(&img_path.file_name().expect("empty filename").to_string_lossy().split('.').next().expect("empty filename").to_case(Case::Snake), Span::call_site());
+    let path_lit = img_path.to_str().expect("filename is not valid UTF-8");
+    let mut buf = Vec::default();
+    File::open(img_path).expect("failed to open image to embed").read_to_end(&mut buf).expect("failed to read image to embed");
+    let contents_lit = Literal::byte_string(&buf);
+    TokenStream::from(quote! {
+        pub fn #name<T: FromEmbeddedImage>() -> T {
+            T::from_embedded_image(::std::path::Path::new(#path_lit), #contents_lit)
+        }
+    })
+}
+
+#[proc_macro]
+pub fn embed_images(input: TokenStream) -> TokenStream {
+    let dir_path = parse_macro_input!(input as LitStr).value();
+    let dir_path = Path::new(&dir_path);
+    let name = Ident::new(&dir_path.file_name().expect("empty filename").to_string_lossy().to_case(Case::Snake), Span::call_site());
+    let path_lit = dir_path.to_str().expect("filename is not valid UTF-8");
+    let img_consts = fs::read_dir(dir_path).expect("failed to open images dir") //TODO compile error instead of panic
+        .map(|img_path| img_path.and_then(|img_path| Ok({
+            let name = img_path.file_name();
+            let name = name.to_string_lossy();
+            let name = name.split('.').next().expect("empty filename");
+            let mut buf = Vec::default();
+            File::open(img_path.path())?.read_to_end(&mut buf)?;
+            let lit = Literal::byte_string(&buf);
+            quote!(consts.insert(#name, #lit);)
+        })))
+        .try_collect::<_, Vec<_>, _>().expect("failed to read images"); //TODO compile error instead of panic
+    TokenStream::from(quote! {
+        pub fn #name<T: FromEmbeddedImage>(name: &str, ext: &str) -> T {
+            ::lazy_static::lazy_static! {
+                static ref IMG_CONSTS: ::std::collections::HashMap<&'static str, &'static [u8]> = {
+                    let mut consts = ::std::collections::HashMap::<&'static str, &'static [u8]>::default();
+                    #(#img_consts)*
+                    consts
+                };
+            }
+
+            T::from_embedded_image(&::std::path::Path::new(#path_lit).join(format!("{}.{}", name, ext)), IMG_CONSTS[name])
         }
     })
 }
@@ -325,7 +385,7 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
         Ok(n) => n,
         Err(e) => return e.to_compile_error().into(),
     };
-    let mut all_fields = (0..num_fields).map(|_| None).collect::<Vec<_>>();
+    let mut all_fields = (0..num_fields).map(|_| None).collect_vec();
     for Flags { idx, fields } in fields {
         let idx = match idx.base10_parse::<usize>() {
             Ok(n) => n,
@@ -335,11 +395,11 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
     }
     let fields_tys = (0..num_fields).map(|i|
         Ident::new(&format!("{}{}", name, i), Span::call_site())
-    ).collect::<Vec<_>>();
+    ).collect_vec();
     let contents = all_fields.iter().zip(&fields_tys).map(|(fields, fields_ty)| {
         if fields.is_some() { quote!(#vis #fields_ty) } else { quote!(#fields_ty) }
-    }).collect::<Vec<_>>();
-    let tup_idxs = (0..num_fields).map(Index::from).collect::<Vec<_>>();
+    }).collect_vec();
+    let tup_idxs = (0..num_fields).map(Index::from).collect_vec();
     let mut entrance_prereqs = Vec::default();
     let mut event_checks = Vec::default();
     let mut location_checks = Vec::default();
@@ -422,7 +482,7 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
                 }
             }
         }
-    ).collect::<Vec<_>>();
+    ).collect_vec();
     TokenStream::from(quote! {
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
         #vis #struct_token #name(#(#contents,)*);
@@ -681,7 +741,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         let scene_field = name.to_field();
         let scene_ty = name.to_type();
         quote!(#vis #scene_field: #scene_ty)
-    }).collect::<Vec<_>>();
+    }).collect_vec();
     let mut entrance_prereqs = Vec::default();
     let mut event_checks = Vec::default();
     let mut location_checks = Vec::default();
@@ -734,7 +794,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         let struct_fields = scene.fields().map(|(kind, _)| {
             let fields_ty = kind.ty(&scene.name);
             quote!(#vis #kind: #fields_ty)
-        }).collect::<Vec<_>>();
+        }).collect_vec();
         let try_from_items = scene.fields()
             .map(|(kind, _)| {
                 let fields_ty = kind.ty(&scene.name);
@@ -804,7 +864,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                     }
                 }
             }
-        }).collect::<Vec<_>>();
+        }).collect_vec();
         quote! {
             #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
             #vis struct #scene_ty {
@@ -838,7 +898,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
 
             #(#subdecls)*
         }
-    }).collect::<Vec<_>>();
+    }).collect_vec();
     let from_id_arms = scenes.iter().map(|Scene { idx, name, .. }| {
         let name_lit = name.to_lit();
         quote!(#idx => #name_lit)

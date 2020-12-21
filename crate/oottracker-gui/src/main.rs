@@ -6,7 +6,9 @@ use {
     std::{
         collections::HashMap,
         fmt,
+        path::Path,
     },
+    derive_more::From,
     iced::{
         Application,
         Background,
@@ -54,8 +56,9 @@ use {
 };
 #[cfg(not(target_arch = "wasm32"))] use {
     std::time::Duration,
-    iced::image,
+    iced::window::Icon,
     iced_native::keyboard::Modifiers as KeyboardModifiers,
+    image::DynamicImage,
     tokio::time::sleep,
     oottracker::{
         Rando,
@@ -73,15 +76,38 @@ use {
 mod lang;
 #[cfg(not(target_arch = "wasm32"))] mod tcp_server;
 
-macro_rules! embed_image {
-    ($path:expr) => {{
-        #[cfg(not(target_arch = "wasm32"))] {
-            Image::new(image::Handle::from_memory(include_bytes!(concat!("../../../assets/", $path)).to_vec()))
-        }
-        #[cfg(target_arch = "wasm32")] {
-            Image::new(concat!("assets/", $path))
-        }
-    }};
+pub trait FromEmbeddedImage {
+    fn from_embedded_image(name: &Path, contents: &[u8]) -> Self;
+}
+
+impl FromEmbeddedImage for Image {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn from_embedded_image(_: &Path, contents: &[u8]) -> Image {
+        Image::new(iced::image::Handle::from_memory(contents.to_vec()))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn from_embedded_image(path: &Path, _: &[u8]) -> Image {
+        Image::new(iced::image::Handle::from_path(path))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FromEmbeddedImage for DynamicImage {
+    fn from_embedded_image(_: &Path, contents: &[u8]) -> DynamicImage {
+        image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
+    }
+}
+
+mod images {
+    use super::FromEmbeddedImage;
+
+    oottracker_derive::embed_images!("assets/xopar-images");
+    oottracker_derive::embed_images!("assets/xopar-images-count");
+    oottracker_derive::embed_images!("assets/xopar-images-dimmed");
+    oottracker_derive::embed_images!("assets/xopar-images-overlay");
+    oottracker_derive::embed_images!("assets/xopar-images-overlay-dimmed");
+    oottracker_derive::embed_image!("assets/icon.ico");
 }
 
 const WIDTH: u32 = 50 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
@@ -245,7 +271,7 @@ impl TrackerCellKind {
     fn click(&self, state: &mut ModelState) {
         match self {
             Composite { state: state_fn, toggle_left, toggle_right } | Overlay { state: state_fn, toggle_main: toggle_left, toggle_overlay: toggle_right } => {
-                let (_, right) = state_fn(state);
+                let (left, _) = state_fn(state);
                 if left { toggle_right(state) }
                 toggle_left(state);
             }
@@ -577,34 +603,14 @@ cells! {
 impl TrackerCellId {
     fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> { //TODO generate code to allow getting embedded images using non-static paths, then move this method to TrackerCellKind
         macro_rules! xopar_image {
-            (@count_inner $filename:ident $count:expr, $($n:literal),*) => {{
-                match $count {
-                    $(
-                        $n => embed_image!(concat!("xopar-images-count/", stringify!($filename), "_", stringify!($n), ".png")),
-                    )*
-                    _ => unreachable!(),
-                }
-            }};
             ($filename:ident) => {{
-                embed_image!(concat!("xopar-images/", stringify!($filename), ".png"))
+                images::xopar_images::<Image>(stringify!($filename), "png")
             }};
             (count = $count:expr, $filename:ident) => {{
-                xopar_image!(@count_inner $filename $count,
-                    1, 2, 3, 4, 5, 6, 7, 8, 9,
-                    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-                    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-                    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-                    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-                    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-                    60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-                    70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
-                    80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
-                    90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
-                    100
-                )
+                images::xopar_images_count::<Image>(&format!("{}_{}", stringify!($filename), $count), "png")
             }};
             (dimmed $filename:ident) => {{
-                embed_image!(concat!("xopar-images-dimmed/", stringify!($filename), ".png"))
+                images::xopar_images_dimmed::<Image>(stringify!($filename), "png")
             }};
             (undim = $undim:expr, $filename:ident) => {{
                 if $undim {
@@ -622,10 +628,10 @@ impl TrackerCellId {
                 }
             }};
             (overlay $filename:ident) => {{
-                embed_image!(concat!("xopar-images-overlay/", stringify!($filename), ".png"))
+                images::xopar_images_overlay::<Image>(stringify!($filename), "png")
             }};
             (overlay_dimmed $filename:ident) => {{
-                embed_image!(concat!("xopar-images-overlay-dimmed/", stringify!($filename), ".png"))
+                images::xopar_images_overlay_dimmed::<Image>(stringify!($filename), "png")
             }};
             (composite = $left:expr, $left_filename:ident, $right:expr, $right_filename:ident, $composite_filename:ident) => {{
                 match ($left, $right) {
@@ -1150,15 +1156,39 @@ struct Args {
     show_available_checks: bool,
 }
 
+#[derive(From)]
+enum Error {
+    Iced(iced::Error),
+    #[cfg(not(target_arch = "wasm32"))]
+    Icon(iced::window::icon::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Iced(e) => e.fmt(f),
+            #[cfg(not(target_arch = "wasm32"))]
+            Error::Icon(e) => write!(f, "failed to set app icon: {}", e),
+        }
+    }
+}
+
 #[wheel::main]
-fn main(Args { show_available_checks }: Args) -> iced::Result {
+fn main(Args { show_available_checks }: Args) -> Result<(), Error> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let icon = images::icon::<DynamicImage>().to_rgba8();
     State::run(Settings {
         window: window::Settings {
             size: (WIDTH, HEIGHT + if show_available_checks { 400 } else { 0 }),
+            min_size: Some((WIDTH, HEIGHT)),
+            max_size: if show_available_checks { Some((WIDTH, u32::MAX)) } else { Some((WIDTH, HEIGHT)) },
             resizable: show_available_checks,
+            #[cfg(not(target_arch = "wasm32"))]
+            icon: Some(Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height())?),
             ..window::Settings::default()
         },
         flags: show_available_checks,
         ..Settings::default()
-    })
+    })?;
+    Ok(())
 }

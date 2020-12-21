@@ -8,7 +8,13 @@ edition = "2018"
 futures = "0.3"
 iced_futures = "0.2"
 itertools = "0.9"
+lazy_static = "1"
 num-traits = "0.2"
+
+[dependencies.derive_more]
+version = "0.99"
+default-features = false
+features = ["from"]
 
 [dependencies.iced]
 version = "0.2"
@@ -16,6 +22,9 @@ features = ["image", "tokio"]
 
 [dependencies.oottracker]
 path = "../oottracker"
+
+[dependencies.oottracker-derive]
+path = "../oottracker-derive"
 
 [dependencies.structopt]
 version = "0.3"
@@ -28,6 +37,7 @@ default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 iced_native = "0.3"
+image = "0.23"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "0.3"

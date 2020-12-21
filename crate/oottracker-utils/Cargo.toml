@@ -57,3 +57,12 @@ features = ["json", "rustls-tls"]
 [target.'cfg(windows)'.dependencies.serde]
 version = "1"
 features = ["derive"]
+
+[target.'cfg(windows)'.dependencies.structopt]
+version = "0.3"
+features = ["paw"]
+
+[target.'cfg(windows)'.dependencies.wheel]
+git = "https://github.com/fenhl/wheel"
+branch = "main"
+default-features = false
