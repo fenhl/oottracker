@@ -8,11 +8,13 @@ edition = "2018"
 winres = "0.1"
 
 [dependencies]
+enum-iterator = "0.6"
 futures = "0.3"
 iced_futures = "0.2"
 itertools = "0.9"
 lazy_static = "1"
 num-traits = "0.2"
+smart-default = "0.6"
 
 [dependencies.derive_more]
 version = "0.99"
@@ -39,8 +41,14 @@ branch = "main"
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+directories = "3"
 iced_native = "0.3"
 image = "0.23"
+serde_json = "1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.serde]
+version = "1"
+features = ["derive"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "0.3"

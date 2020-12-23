@@ -27,7 +27,10 @@ use {
             ItemGetInf,
         },
         item_ids,
-        model::Stone,
+        model::{
+            Medallion,
+            Stone,
+        },
         scene::SceneFlags,
     },
 };
@@ -651,6 +654,19 @@ impl QuestItems {
         (if self.contains(QuestItems::KOKIRI_EMERALD) { 1 } else { 0 })
         + if self.contains(QuestItems::GORON_RUBY) { 1 } else { 0 }
         + if self.contains(QuestItems::ZORA_SAPPHIRE) { 1 } else { 0 }
+    }
+}
+
+impl From<Medallion> for QuestItems {
+    fn from(med: Medallion) -> QuestItems {
+        match med {
+            Medallion::Light => QuestItems::LIGHT_MEDALLION,
+            Medallion::Forest => QuestItems::FOREST_MEDALLION,
+            Medallion::Fire => QuestItems::FIRE_MEDALLION,
+            Medallion::Water => QuestItems::WATER_MEDALLION,
+            Medallion::Shadow => QuestItems::SHADOW_MEDALLION,
+            Medallion::Spirit => QuestItems::SPIRIT_MEDALLION,
+        }
     }
 }
 
