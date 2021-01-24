@@ -9,8 +9,12 @@ name = "oottracker"
 crate-type = ["cdylib"]
 
 [dependencies]
+#async-proto = "0.3" #TODO publish changes
 libc = "0.2"
 semver = "0.11"
+
+[dependencies.async-proto]
+path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto"
 
 [dependencies.oottracker]
 path = "../oottracker"

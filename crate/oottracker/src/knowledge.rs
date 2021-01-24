@@ -2,56 +2,65 @@ use {
     std::collections::HashMap,
     collect_mac::collect,
     smart_default::SmartDefault,
-    crate::model::*,
+    ootr::model::*,
 };
 #[cfg(not(target_arch = "wasm32"))] use {
     std::{
         fmt,
-        io,
+        future::Future,
+        io::{
+            self,
+            prelude::*,
+        },
+        pin::Pin,
         sync::Arc,
     },
-    async_trait::async_trait,
-    derive_more::From,
-    tokio::net::TcpStream,
-    crate::proto::Protocol,
+    async_proto::{
+        Protocol,
+        impls::MapReadError,
+    },
+    tokio::io::{
+        AsyncRead,
+        AsyncWrite,
+    },
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Debug, From, Clone)]
+#[derive(Debug, Clone)]
 pub enum KnowledgeReadError {
-    ActiveTrials(Arc<<HashMap<Medallion, bool> as Protocol>::ReadError>),
-    BoolSettings(Arc<<HashMap<String, bool> as Protocol>::ReadError>),
-    DungeonRewardLocations(Arc<<HashMap<DungeonReward, DungeonRewardLocation> as Protocol>::ReadError>),
-    Exits(Arc<<HashMap<String, HashMap<String, String>> as Protocol>::ReadError>),
+    ActiveTrials(Arc<MapReadError<Medallion, bool>>),
+    BoolSettings(Arc<MapReadError<String, bool>>),
+    DungeonRewardLocations(Arc<MapReadError<DungeonReward, DungeonRewardLocation>>),
+    Exits(Arc<MapReadError<String, HashMap<String, String>>>),
     Io(Arc<io::Error>),
-    Mq(Arc<<HashMap<Dungeon, bool> as Protocol>::ReadError>),
+    Mq(Arc<MapReadError<Dungeon, bool>>),
     UnknownPreset(u8),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl From<<HashMap<Medallion, bool> as Protocol>::ReadError> for KnowledgeReadError {
-    fn from(e: <HashMap<Medallion, bool> as Protocol>::ReadError) -> KnowledgeReadError {
+impl From<MapReadError<Medallion, bool>> for KnowledgeReadError {
+    fn from(e: MapReadError<Medallion, bool>) -> KnowledgeReadError {
         KnowledgeReadError::ActiveTrials(Arc::new(e))
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl From<<HashMap<String, bool> as Protocol>::ReadError> for KnowledgeReadError {
-    fn from(e: <HashMap<String, bool> as Protocol>::ReadError) -> KnowledgeReadError {
+impl From<MapReadError<String, bool>> for KnowledgeReadError {
+    fn from(e: MapReadError<String, bool>) -> KnowledgeReadError {
         KnowledgeReadError::BoolSettings(Arc::new(e))
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl From<<HashMap<DungeonReward, DungeonRewardLocation> as Protocol>::ReadError> for KnowledgeReadError {
-    fn from(e: <HashMap<DungeonReward, DungeonRewardLocation> as Protocol>::ReadError) -> KnowledgeReadError {
+impl From<MapReadError<DungeonReward, DungeonRewardLocation>> for KnowledgeReadError {
+    fn from(e: MapReadError<DungeonReward, DungeonRewardLocation>) -> KnowledgeReadError {
         KnowledgeReadError::DungeonRewardLocations(Arc::new(e))
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl From<<HashMap<String, HashMap<String, String>> as Protocol>::ReadError> for KnowledgeReadError {
-    fn from(e: <HashMap<String, HashMap<String, String>> as Protocol>::ReadError) -> KnowledgeReadError {
+impl From<MapReadError<String, HashMap<String, String>>> for KnowledgeReadError {
+    fn from(e: MapReadError<String, HashMap<String, String>>) -> KnowledgeReadError {
         KnowledgeReadError::Exits(Arc::new(e))
     }
 }
@@ -64,8 +73,8 @@ impl From<io::Error> for KnowledgeReadError {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl From<<HashMap<Dungeon, bool> as Protocol>::ReadError> for KnowledgeReadError {
-    fn from(e: <HashMap<Dungeon, bool> as Protocol>::ReadError) -> KnowledgeReadError {
+impl From<MapReadError<Dungeon, bool>> for KnowledgeReadError {
+    fn from(e: MapReadError<Dungeon, bool>) -> KnowledgeReadError {
         KnowledgeReadError::Mq(Arc::new(e))
     }
 }
@@ -187,19 +196,55 @@ impl Knowledge {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[async_trait]
 impl Protocol for Knowledge {
     type ReadError = KnowledgeReadError;
 
-    async fn read(tcp_stream: &mut TcpStream) -> Result<Knowledge, KnowledgeReadError> {
-        Ok(match u8::read(tcp_stream).await? {
+    fn read<'a, R: AsyncRead + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Knowledge, KnowledgeReadError>> + Send + 'a>> {
+        Box::pin(async move {
+            Ok(match u8::read(&mut stream).await? {
+                0 => Knowledge {
+                    bool_settings: HashMap::read(&mut stream).await?,
+                    tricks: Some(HashMap::read(&mut stream).await?),
+                    dungeon_reward_locations: HashMap::read(&mut stream).await?,
+                    mq: HashMap::read(&mut stream).await?,
+                    exits: Some(HashMap::read(&mut stream).await?),
+                    active_trials: HashMap::read(stream).await?,
+                },
+                1 => Knowledge::default(),
+                2 => Knowledge::vanilla(),
+                n => return Err(KnowledgeReadError::UnknownPreset(n)),
+            })
+        })
+    }
+
+    fn write<'a, W: AsyncWrite + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            if *self == Knowledge::default() {
+                1u8.write(sink).await?;
+            } else if *self == Knowledge::vanilla() {
+                2u8.write(sink).await?;
+            } else {
+                0u8.write(&mut sink).await?;
+                self.bool_settings.write(&mut sink).await?;
+                self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write(&mut sink).await?;
+                self.dungeon_reward_locations.write(&mut sink).await?;
+                self.mq.write(&mut sink).await?;
+                self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(&mut sink).await?;
+                self.active_trials.write(sink).await?;
+            }
+            Ok(())
+        })
+    }
+
+    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Knowledge, KnowledgeReadError> {
+        Ok(match u8::read_sync(&mut stream)? {
             0 => Knowledge {
-                bool_settings: HashMap::read(tcp_stream).await?,
-                tricks: Some(HashMap::read(tcp_stream).await?),
-                dungeon_reward_locations: HashMap::read(tcp_stream).await?,
-                mq: HashMap::read(tcp_stream).await?,
-                exits: Some(HashMap::read(tcp_stream).await?),
-                active_trials: HashMap::read(tcp_stream).await?,
+                bool_settings: HashMap::read_sync(&mut stream)?,
+                tricks: Some(HashMap::read_sync(&mut stream)?),
+                dungeon_reward_locations: HashMap::read_sync(&mut stream)?,
+                mq: HashMap::read_sync(&mut stream)?,
+                exits: Some(HashMap::read_sync(&mut stream)?),
+                active_trials: HashMap::read_sync(stream)?,
             },
             1 => Knowledge::default(),
             2 => Knowledge::vanilla(),
@@ -207,36 +252,19 @@ impl Protocol for Knowledge {
         })
     }
 
-    async fn write(&self, tcp_stream: &mut TcpStream) -> io::Result<()> {
+    fn write_sync<'a>(&self, mut sink: impl Write + 'a) -> io::Result<()> {
         if *self == Knowledge::default() {
-            1u8.write(tcp_stream).await?;
+            1u8.write_sync(sink)?;
         } else if *self == Knowledge::vanilla() {
-            2u8.write(tcp_stream).await?;
+            2u8.write_sync(sink)?;
         } else {
-            0u8.write(tcp_stream).await?;
-            self.bool_settings.write(tcp_stream).await?;
-            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write(tcp_stream).await?;
-            self.dungeon_reward_locations.write(tcp_stream).await?;
-            self.mq.write(tcp_stream).await?;
-            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(tcp_stream).await?;
-            self.active_trials.write(tcp_stream).await?;
-        }
-        Ok(())
-    }
-
-    fn write_sync(&self, tcp_stream: &mut std::net::TcpStream) -> io::Result<()> {
-        if *self == Knowledge::default() {
-            1u8.write_sync(tcp_stream)?;
-        } else if *self == Knowledge::vanilla() {
-            2u8.write_sync(tcp_stream)?;
-        } else {
-            0u8.write_sync(tcp_stream)?;
-            self.bool_settings.write_sync(tcp_stream)?;
-            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write_sync(tcp_stream)?;
-            self.dungeon_reward_locations.write_sync(tcp_stream)?;
-            self.mq.write_sync(tcp_stream)?;
-            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write_sync(tcp_stream)?;
-            self.active_trials.write_sync(tcp_stream)?;
+            0u8.write_sync(&mut sink)?;
+            self.bool_settings.write_sync(&mut sink)?;
+            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write_sync(&mut sink)?;
+            self.dungeon_reward_locations.write_sync(&mut sink)?;
+            self.mq.write_sync(&mut sink)?;
+            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write_sync(&mut sink)?;
+            self.active_trials.write_sync(sink)?;
         }
         Ok(())
     }

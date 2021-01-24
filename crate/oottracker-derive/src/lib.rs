@@ -1,4 +1,5 @@
-#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![forbid(unsafe_code)]
 
 use {
     std::{
@@ -22,19 +23,12 @@ use {
     },
     quote::quote,
     syn::{
-        Data,
-        DeriveInput,
         Expr,
-        Field,
-        Fields,
-        FieldsNamed,
-        FieldsUnnamed,
         Ident,
         Index,
         LitInt,
         LitStr,
         Token,
-        Variant,
         Visibility,
         braced,
         bracketed,
@@ -47,165 +41,6 @@ use {
         punctuated::Punctuated,
     },
 };
-
-#[proc_macro_derive(Protocol)]
-pub fn derive_protocol(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident: ty, generics, data, .. } = parse_macro_input!(input as DeriveInput);
-    if generics.lt_token.is_some() || generics.where_clause.is_some() { return quote!(compile_error!("generics not supported in derive(Protocol)")).into() }
-    let read_error = Ident::new(&format!("{}ReadError", ty), Span::call_site());
-    let (read_error_variants, read_error_display_arms, impl_read, impl_write, impl_write_sync) = match data {
-        Data::Struct(_) => return quote!(compile_error!("derive(Protocol) can't be derived for structs yet")).into(), //TODO
-        Data::Enum(enum_data) => {
-            let mut read_error_variants = vec![quote!(UnknownVariant(u8))];
-            let mut read_error_display_arms = vec![quote!(#read_error::UnknownVariant(n) => write!(f, "unknown variant: {}", n))];
-            let read_arms = enum_data.variants.iter()
-                .enumerate()
-                .map(|(idx, Variant { ident: var, fields, .. })| {
-                    let idx = u8::try_from(idx).expect("Protocol can't be derived for enums with more than u8::MAX variants");
-                    match fields {
-                        Fields::Unit => quote!(#idx => Ok(#ty::#var)),
-                        Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
-                            let read_fields = unnamed.iter()
-                                .enumerate()
-                                .map(|(idx, Field { ty, .. })| {
-                                    let variant_name = Ident::new(&format!("{}Field{}", var, idx), Span::call_site());
-                                    read_error_variants.push(quote!(#variant_name(<#ty as crate::proto::Protocol>::ReadError)));
-                                    read_error_display_arms.push(quote!(#read_error::#variant_name(e) => e.fmt(f)));
-                                    quote!(<#ty as crate::proto::Protocol>::read(tcp_stream).await?)
-                                })
-                                .collect_vec();
-                            quote!(#idx => Ok(#ty::#var(#(#read_fields,)*)))
-                        }
-                        Fields::Named(FieldsNamed { named, .. }) => {
-                            let read_fields = named.iter()
-                                .map(|Field { ident, ty, .. }| {
-                                    let variant_name = Ident::new(&format!("{}{}", var, ident.as_ref().expect("missing ident in named field").to_string().to_case(Case::Pascal)), Span::call_site());
-                                    read_error_variants.push(quote!(#variant_name(<#ty as crate::proto::Protocol>::ReadError)));
-                                    read_error_display_arms.push(quote!(#read_error::#variant_name(e) => e.fmt(f)));
-                                    quote!(#ident: <#ty as crate::proto::Protocol>::read(tcp_stream).await?)
-                                })
-                                .collect_vec();
-                            quote!(#idx => Ok(#ty::#var { #(#read_fields,)* }))
-                        }
-                    }
-                })
-                .collect_vec();
-            let write_arms = enum_data.variants.iter()
-                .enumerate()
-                .map(|(idx, Variant { ident: var, fields, .. })| {
-                    let idx = u8::try_from(idx).expect("Protocol can't be derived for enums with more than u8::MAX variants");
-                    match fields {
-                        Fields::Unit => quote!(#ty::#var => #idx.write(tcp_stream).await?),
-                        Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
-                            let field_idents = unnamed.iter()
-                                .enumerate()
-                                .map(|(idx, _)| Ident::new(&format!("__field{}", idx), Span::call_site()))
-                                .collect_vec();
-                            let write_fields = field_idents.iter()
-                                .map(|ident| quote!(#ident.write(tcp_stream).await?;));
-                            quote!(#ty::#var(#(#field_idents,)*) => {
-                                #idx.write(tcp_stream).await?;
-                                #(#write_fields)*
-                            })
-                        }
-                        Fields::Named(FieldsNamed { named, .. }) => {
-                            let field_idents = named.iter()
-                                .map(|Field { ident, .. }| ident)
-                                .collect_vec();
-                            let write_fields = field_idents.iter()
-                                .map(|ident| quote!(#ident.write(tcp_stream).await?;));
-                            quote!(#ty::#var { #(#field_idents,)* } => {
-                                #idx.write(tcp_stream).await?;
-                                #(#write_fields)*
-                            })
-                        }
-                    }
-                })
-                .collect_vec();
-            let write_sync_arms = enum_data.variants.iter()
-                .enumerate()
-                .map(|(idx, Variant { ident: var, fields, .. })| {
-                    let idx = u8::try_from(idx).expect("Protocol can't be derived for enums with more than u8::MAX variants");
-                    match fields {
-                        Fields::Unit => quote!(#ty::#var => #idx.write_sync(tcp_stream)?),
-                        Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
-                            let field_idents = unnamed.iter()
-                                .enumerate()
-                                .map(|(idx, _)| Ident::new(&format!("__field{}", idx), Span::call_site()))
-                                .collect_vec();
-                            let write_fields = field_idents.iter()
-                                .map(|ident| quote!(#ident.write_sync(tcp_stream)?;));
-                            quote!(#ty::#var(#(#field_idents,)*) => {
-                                #idx.write_sync(tcp_stream)?;
-                                #(#write_fields)*
-                            })
-                        }
-                        Fields::Named(FieldsNamed { named, .. }) => {
-                            let field_idents = named.iter()
-                                .map(|Field { ident, .. }| ident)
-                                .collect_vec();
-                            let write_fields = field_idents.iter()
-                                .map(|ident| quote!(#ident.write_sync(tcp_stream)?;));
-                            quote!(#ty::#var { #(#field_idents,)* } => {
-                                #idx.write_sync(tcp_stream)?;
-                                #(#write_fields)*
-                            })
-                        }
-                    }
-                })
-                .collect_vec();
-            (
-                read_error_variants,
-                read_error_display_arms,
-                quote! {
-                    match <u8 as crate::proto::Protocol>::read(tcp_stream).await? {
-                        #(#read_arms,)*
-                        n => Err(#read_error::UnknownVariant(n)),
-                    }
-                },
-                quote! {
-                    match self {
-                        #(#write_arms,)*
-                    }
-                    Ok(())
-                },
-                quote! {
-                    match self {
-                        #(#write_sync_arms,)*
-                    }
-                    Ok(())
-                },
-            )
-        }
-        Data::Union(_) => return quote!(compile_error!("unions not supported in derive(Protocol)")).into(),
-    };
-    TokenStream::from(quote! {
-        #[derive(Debug, ::derive_more::From)]
-        pub enum #read_error {
-            Io(::std::io::Error),
-            #(#read_error_variants,)*
-        }
-
-        impl ::std::fmt::Display for #read_error {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                match self {
-                    #read_error::Io(e) => write!(f, "I/O error: {}", e),
-                    #(#read_error_display_arms,)*
-                }
-            }
-        }
-
-        #[cfg(not(target_arch = "wasm32"))]
-        #[async_trait]
-        impl crate::proto::Protocol for #ty {
-            type ReadError = #read_error;
-
-            async fn read(tcp_stream: &mut ::tokio::net::TcpStream) -> Result<#ty, #read_error> { #impl_read }
-            async fn write(&self, tcp_stream: &mut ::tokio::net::TcpStream) -> ::std::io::Result<()> { #impl_write }
-            fn write_sync(&self, tcp_stream: &mut ::std::net::TcpStream) -> ::std::io::Result<()> { #impl_write_sync }
-        }
-    })
-}
 
 #[proc_macro]
 pub fn embed_image(input: TokenStream) -> TokenStream {
@@ -488,20 +323,20 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
         #vis #struct_token #name(#(#contents,)*);
 
         impl #name {
-            pub(crate) fn checked(&self, check: &crate::check::Check) -> Option<bool> {
+            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
                 match check {
-                    crate::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
-                        crate::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
+                    ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
+                        ootr::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
                             #(#entrance_prereqs,)*
                             _ => None,
                         },
                         _ => None,
                     },
-                    crate::check::Check::Event(event) => match &event[..] {
+                    ootr::check::Check::Event(event) => match &event[..] {
                         #(#event_checks,)*
                         _ => None,
                     }
-                    crate::check::Check::Location(loc) => match &loc[..] {
+                    ootr::check::Check::Location(loc) => match &loc[..] {
                         #(#location_checks,)*
                         _ => None,
                     },
@@ -921,7 +756,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
     }).next());
     TokenStream::from(quote! {
         use itertools::Itertools as _;
-        #[cfg(not(target_arch = "wasm32"))] use crate::region::RegionLookup;
+        use crate::region::RegionLookup;
 
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
         #vis #struct_token #name {
@@ -929,20 +764,20 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         }
 
         impl #name {
-            pub(crate) fn checked(&self, check: &crate::check::Check) -> Option<bool> {
+            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
                 match check {
-                    crate::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
-                        crate::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
+                    ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
+                        ootr::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
                             #(#entrance_prereqs,)*
                             _ => None,
                         },
                         _ => None,
                     },
-                    crate::check::Check::Event(event) => match &event[..] {
+                    ootr::check::Check::Event(event) => match &event[..] {
                         #(#event_checks,)*
                         _ => None,
                     }
-                    crate::check::Check::Location(loc) => match &loc[..] {
+                    ootr::check::Check::Location(loc) => match &loc[..] {
                         #(#location_checks,)*
                         _ => None,
                     },
@@ -987,9 +822,8 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                 })
             }
 
-            #[cfg(not(target_arch = "wasm32"))]
-            #[allow(unused)] //DEBUG
-            pub(crate) fn region(&self, rando: &Rando, ram: &Ram) -> Result<RegionLookup, RegionLookupError> {
+            //#[allow(unused)] //DEBUG
+            pub(crate) fn region<R: Rando>(&self, rando: &R, ram: &Ram) -> Result<RegionLookup, RegionLookupError<R>> {
                 match self.0 {
                     #(#region_arms,)*
                     _ => RegionLookup::new(self.regions(rando)?),

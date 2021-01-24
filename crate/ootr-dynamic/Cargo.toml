@@ -1,0 +1,24 @@
+[package]
+name = "ootr-dynamic"
+version = "0.1.6"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+edition = "2018"
+
+[dependencies]
+itertools = "0.10"
+lazy_static = "1"
+pyo3 = "0.13"
+regex = "1"
+serde_json = "1"
+
+[dependencies.derive_more]
+version = "0.99"
+default-features = false
+features = ["from"]
+
+[dependencies.ootr]
+path = "../ootr"
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]

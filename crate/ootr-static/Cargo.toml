@@ -1,0 +1,14 @@
+[package]
+name = "ootr-static"
+version = "0.1.6"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+edition = "2018"
+
+[dependencies]
+lazy_static = "1"
+
+[dependencies.ootr]
+path = "../ootr"
+
+[dependencies.ootr-static-derive]
+path = "../ootr-static-derive"

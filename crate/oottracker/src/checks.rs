@@ -5,10 +5,14 @@ use {
         sync::Arc,
     },
     derive_more::From,
+    ootr::{
+        access,
+        region::Mq,
+    },
     crate::{
         Check,
         ModelState,
-        region::Mq,
+        region::RegionExt as _,
     },
 };
 #[cfg(not(target_arch = "wasm32"))] use {
@@ -21,14 +25,13 @@ use {
         EitherOrBoth,
         Itertools as _,
     },
-    pyo3::prelude::*,
-    crate::{
+    ootr::{
         Rando,
-        region::{
-            Region,
-            RegionLookup,
-            RegionLookupError,
-        },
+        region::Region,
+    },
+    crate::region::{
+        RegionLookup,
+        RegionLookupError,
     },
 };
 
@@ -902,12 +905,6 @@ impl CheckExt for Check {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-/// Returns `Ok(Err)` if the check has unmet prerequisites.
-fn can_check<'a>(py: Python<'_>, rando: &'a Rando, model: &'a ModelState, check: &Check, cond: &str) -> Result<Result<bool, HashSet<Check>>, crate::access::RuleParseError> {
-    Ok(model.can_access(py, rando, &crate::access::Rule::parse(py, rando, check, cond.trim())?))
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CheckStatus {
     Checked,
@@ -916,34 +913,27 @@ pub enum CheckStatus {
 }
 
 #[derive(Debug, From, Clone)]
-pub enum CheckStatusError {
-    #[cfg(not(target_arch = "wasm32"))]
-    AccessRuleParse(crate::access::RuleParseError),
+pub enum CheckStatusError<R: Rando> {
     Io(Arc<io::Error>),
-    #[cfg(not(target_arch = "wasm32"))]
-    RegionLookup(RegionLookupError),
+    RegionLookup(RegionLookupError<R>),
 }
 
-impl From<io::Error> for CheckStatusError {
-    fn from(e: io::Error) -> CheckStatusError {
+impl<R: Rando> From<io::Error> for CheckStatusError<R> {
+    fn from(e: io::Error) -> CheckStatusError<R> {
         CheckStatusError::Io(Arc::new(e))
     }
 }
 
-impl fmt::Display for CheckStatusError {
+impl<R: Rando> fmt::Display for CheckStatusError<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            #[cfg(not(target_arch = "wasm32"))]
-            CheckStatusError::AccessRuleParse(e) => e.fmt(f),
             CheckStatusError::Io(e) => write!(f, "I/O error: {}", e),
-            #[cfg(not(target_arch = "wasm32"))]
             CheckStatusError::RegionLookup(e) => e.fmt(f),
         }
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckStatus>, CheckStatusError> {
+pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, CheckStatus>, CheckStatusError<R>> {
     let mut map = HashMap::default();
     let mut reachable_regions = collect![as HashSet<_>: (Mq::Overworld, Region::root(rando)?)];
     let mut unhandled_reachable_checks = Vec::default();
@@ -957,19 +947,19 @@ pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckS
     }
     let mut unhandled_reachable_regions = reachable_regions.iter().cloned().collect_vec();
     let mut unhandled_unreachable_regions = Region::all(rando)?.into_iter().filter(|region_info| !reachable_regions.contains(region_info)).collect::<HashSet<_>>();
-    let mut unhandled_unreachable_checks = Vec::<(_, String)>::default();
-    Python::with_gil(|py| loop {
+    let mut unhandled_unreachable_checks = Vec::<(_, access::Expr)>::default();
+    loop {
         if let Some((from_mq, region)) = unhandled_reachable_regions.pop() {
-            for (exit, cond) in &region.exits {
-                unhandled_reachable_checks.push((Check::Exit { from_mq, from: region.region_name.clone(), to: exit.clone() }, cond.clone()));
+            for (exit, rule) in &region.exits {
+                unhandled_reachable_checks.push((Check::Exit { from_mq, from: region.region_name.clone(), to: exit.clone() }, rule.clone()));
             }
             //TODO events, locations, setting checks
-        } else if let Some((check, cond)) = unhandled_reachable_checks.pop() {
+        } else if let Some((check, rule)) = unhandled_reachable_checks.pop() {
             let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
                 if let Check::Exit { ref to, .. } = check {
                     let region_behind_exit = to; //TODO entrance rando support (look up exit knowledge)
                     if !reachable_regions.iter().any(|(_, region)| region.region_name == *region_behind_exit) {
-                        if can_check(py, rando, model, &check, &cond)? == Ok(true) {
+                        if model.can_access(rando, &rule) == Ok(true) {
                             // exit is checked (i.e. we know what's behind it) and reachable (i.e. we can actually use it), so the region behind it becomes reachable
                             let region_info = match Region::new(rando, &region_behind_exit)? {
                                 RegionLookup::Overworld(region) => (Mq::Overworld, region),
@@ -985,7 +975,7 @@ pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckS
                 }
                 CheckStatus::Checked
             } else {
-                match can_check(py, rando, model, &check, &cond)? {
+                match model.can_access(rando, &rule) {
                     Ok(true) => CheckStatus::Reachable,
                     Ok(false) => CheckStatus::NotYetReachable,
                     Err(deps) => {
@@ -1002,11 +992,11 @@ pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckS
                 }
                 //TODO events, locations, setting checks
             }
-        } else if let Some((check, cond)) = unhandled_unreachable_checks.pop() {
+        } else if let Some((check, rule)) = unhandled_unreachable_checks.pop() {
             let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
                 CheckStatus::Checked
             } else {
-                match can_check(py, rando, model, &check, &cond)? {
+                match model.can_access(rando, &rule)? {
                     Ok(_) => CheckStatus::NotYetReachable,
                     Err(deps) => {
                         map.extend(deps.into_iter().map(|dep| (dep, CheckStatus::NotYetReachable))); //TODO check reachability of dependency
@@ -1016,16 +1006,15 @@ pub fn status(rando: &Rando, model: &ModelState) -> Result<HashMap<Check, CheckS
             };
             map.insert(check, status);
         } else {
-            break Ok::<_, CheckStatusError>(())
+            break
         }
-    })?;
+    }
     Ok(map)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn default_status() {
-    if let Err(e) = status(&Rando::dynamic("C:\\Users\\Fenhl\\git\\github.com\\fenhl\\OoT-Randomizer\\stage"), &ModelState::default()) { //TODO test with static rando instead
+    if let Err(e) = status(&ootr_static::Rando, &ModelState::default()) {
         eprintln!("{:?}", e);
         panic!("{}", e) // for better error message
     }

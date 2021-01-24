@@ -1,13 +1,13 @@
-use std::{
-    fmt,
-    str::FromStr,
+use {
+    std::{
+        fmt,
+        str::FromStr,
+    },
+    quote_value::QuoteValue,
 };
-#[cfg(not(target_arch = "wasm32"))] use {
-    async_trait::async_trait,
-    oottracker_derive::Protocol,
-};
+#[cfg(not(target_arch = "wasm32"))] use async_proto::Protocol;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum Dungeon {
     Main(MainDungeon),
@@ -57,7 +57,7 @@ pub enum DungeonRewardLocation {
     Dungeon(MainDungeon),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum MainDungeon {
     DekuTree,
@@ -103,7 +103,7 @@ impl fmt::Display for MainDungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub enum Medallion {
     Light,
@@ -134,4 +134,20 @@ pub enum Stone {
     KokiriEmerald,
     GoronRuby,
     ZoraSapphire,
+}
+
+#[derive(Debug, Clone, Copy, QuoteValue)]
+pub enum TimeRange {
+    /// 06:00–18:00.
+    ///
+    /// Playing Sun's Song during `Night` sets the time to 12:00.
+    Day,
+    /// 18:00–06:00.
+    ///
+    /// Playing Sun's Song during `Day` sets the time to 00:00.
+    Night,
+    /// The time of day when Dampé's Heart-Pounding Gravedigging Tour is available: 18:00–21:00, a subset of `Night`.
+    ///
+    /// Going to outside Ganon's Castle sets the time to 18:01.
+    Dampe,
 }

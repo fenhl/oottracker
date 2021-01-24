@@ -1,4 +1,4 @@
-#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
 
 use {
     std::{
@@ -13,6 +13,7 @@ use {
         slice,
         time::Duration,
     },
+    async_proto::Protocol as _,
     libc::c_char,
     semver::Version,
     oottracker::{
@@ -20,7 +21,6 @@ use {
         proto::{
             self,
             Packet,
-            Protocol as _,
         },
         save::*,
     },

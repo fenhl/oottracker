@@ -1,12 +1,7 @@
-use std::{
-    fmt,
-    hash::Hash,
-};
-#[cfg(not(target_arch = "wasm32"))] use {
+use {
     std::{
-        collections::BTreeMap,
         ffi::OsStr,
-        hash::Hasher,
+        fmt,
         io,
         sync::Arc,
     },
@@ -14,29 +9,32 @@ use std::{
         EitherOrBoth,
         Itertools as _,
     },
-    serde::Deserialize,
-    crate::Rando
+    ootr::{
+        Rando,
+        region::{
+            Mq,
+            Region,
+        },
+    },
 };
 
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
-pub enum RegionLookupError {
+pub enum RegionLookupError<R: Rando> {
     Filename,
     Io(Arc<io::Error>),
     MixedOverworldAndDungeon,
     MultipleFound,
     NotFound,
+    Rando(R::Err),
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-impl From<io::Error> for RegionLookupError {
-    fn from(e: io::Error) -> RegionLookupError {
+impl<R: Rando> From<io::Error> for RegionLookupError<R> {
+    fn from(e: io::Error) -> RegionLookupError<R> {
         RegionLookupError::Io(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-impl fmt::Display for RegionLookupError {
+impl<R: Rando> fmt::Display for RegionLookupError<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RegionLookupError::Filename => write!(f, "region file name is not valid UTF-8"),
@@ -44,11 +42,11 @@ impl fmt::Display for RegionLookupError {
             RegionLookupError::MixedOverworldAndDungeon => write!(f, "region found in both the overworld and a dungeon"),
             RegionLookupError::MultipleFound => write!(f, "found multiple regions with the same name"),
             RegionLookupError::NotFound => write!(f, "region not found"),
+            RegionLookupError::Rando(e) => e.fmt(f),
         }
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegionLookup {
     Overworld(Region),
@@ -56,9 +54,8 @@ pub enum RegionLookup {
     Dungeon(EitherOrBoth<Region, Region>),
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl RegionLookup {
-    pub fn new(candidates: impl IntoIterator<Item = (Mq, Region)>) -> Result<RegionLookup, RegionLookupError> {
+    pub fn new<R: Rando>(candidates: impl IntoIterator<Item = (Mq, Region)>) -> Result<RegionLookup, RegionLookupError<R>> {
         let mut candidates = candidates.into_iter().collect_vec();
         Ok(if candidates.len() == 0 {
             return Err(RegionLookupError::NotFound)
@@ -88,62 +85,29 @@ impl RegionLookup {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
 struct MissingRegionError(pub String);
 
-#[cfg(not(target_arch = "wasm32"))]
 impl fmt::Display for MissingRegionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "missing region: {}", self.0)
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl std::error::Error for MissingRegionError {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Mq {
-    Overworld,
-    Vanilla,
-    Mq,
+pub trait RegionExt {
+    fn new<R: Rando>(rando: &R, name: &str) -> Result<RegionLookup, RegionLookupError<R>>;
+    fn all<R: Rando>(rando: &R) -> Result<Vec<(Mq, Region)>, RegionLookupError<R>>;
+    fn root<R: Rando>(rando: &R) -> io::Result<Region>; //TODO glitched param
 }
 
-impl fmt::Display for Mq {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Mq::Overworld => write!(f, "overworld"),
-            Mq::Vanilla => write!(f, "vanilla"),
-            Mq::Mq => write!(f, "MQ"),
-        }
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Region {
-    pub region_name: String,
-    pub dungeon: Option<String>,
-    pub scene: Option<String>,
-    hint: Option<String>,
-    #[serde(default)]
-    time_passes: bool,
-    #[serde(default)]
-    events: BTreeMap<String, String>,
-    #[serde(default)]
-    locations: BTreeMap<String, String>,
-    #[serde(default)]
-    pub exits: BTreeMap<String, String>,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl Region {
-    pub fn new(rando: &Rando, name: &str) -> Result<RegionLookup, RegionLookupError> {
+impl RegionExt for Region {
+    fn new<R: Rando>(rando: &R, name: &str) -> Result<RegionLookup, RegionLookupError<R>> {
         RegionLookup::new(Region::all(rando)?.into_iter().filter(|(_, region)| region.region_name == name))
     }
 
-    pub fn all(rando: &Rando) -> Result<Vec<(Mq, Region)>, RegionLookupError> {
+    fn all<R: Rando>(rando: &R) -> Result<Vec<(Mq, Region)>, RegionLookupError<R>> {
         let mut buf = Vec::default();
         let region_files = rando.regions()?;
         for (filename, regions) in region_files.iter() {
@@ -158,7 +122,7 @@ impl Region {
         Ok(buf)
     }
 
-    pub fn root(rando: &Rando) -> io::Result<Region> { //TODO glitched param
+    fn root<R: Rando>(rando: &R) -> io::Result<Region> {
         Ok(
             rando.regions()?
                 .get(OsStr::new("Overworld.json"))
@@ -168,29 +132,5 @@ impl Region {
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, MissingRegionError(format!("Root"))))?
                 .clone()
         )
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl PartialEq for Region {
-    fn eq(&self, rhs: &Region) -> bool {
-        self.region_name == rhs.region_name
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl Eq for Region {}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl Hash for Region {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.region_name.hash(state);
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl fmt::Display for Region {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.hint.as_ref().unwrap_or(&self.region_name).fmt(f)
     }
 }

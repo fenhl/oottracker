@@ -1,0 +1,10 @@
+query DevRVersionQuery {
+  repository(owner: "Roman971", name: "OoT-Randomizer") {
+    object(expression: "Dev-R:version.py") {
+      __typename
+      ... on Blob {
+        text
+      }
+    }
+  }
+}

@@ -1,41 +1,30 @@
-#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![forbid(unsafe_code)]
 
-use semver::Version;
+use {
+    std::collections::HashSet,
+    collect_mac::collect,
+    semver::Version,
+    ootr::{
+        Rando,
+        access,
+        check::Check,
+        item::Item,
+    },
+    crate::checks::CheckExt as _,
+};
 pub use crate::{
-    check::Check,
     knowledge::Knowledge,
     ram::Ram,
     save::Save,
 };
-#[cfg(not(target_arch = "wasm32"))] use {
-    std::collections::HashSet,
-    collect_mac::collect,
-    pyo3::prelude::*,
-    crate::{
-        access::{
-            Expr,
-            Rule,
-        },
-        checks::CheckExt as _,
-    },
-};
-#[cfg(not(target_arch = "wasm32"))] pub use crate::{
-    item::Item,
-    rando_info::Rando,
-    region::Region,
-};
 
-#[cfg(not(target_arch = "wasm32"))] mod access;
-mod check;
 pub mod checks;
 pub mod info_tables;
-#[cfg(not(target_arch = "wasm32"))] mod item;
 mod item_ids;
 pub mod knowledge;
-pub mod model;
 #[cfg(not(target_arch = "wasm32"))] pub mod proto;
 pub mod ram;
-#[cfg(not(target_arch = "wasm32"))] mod rando_info;
 pub mod region;
 pub mod save;
 mod scene;
@@ -47,14 +36,13 @@ pub struct ModelState {
 }
 
 impl ModelState {
-    #[cfg(not(target_arch = "wasm32"))]
     /// If access depends on other checks (including an event or the value of an unknown setting), those checks are returned.
-    pub(crate) fn can_access<'a>(&self, py: Python<'_>, rando: &Rando, rule: &'a Rule) -> Result<bool, HashSet<Check>> {
+    pub(crate) fn can_access<'a>(&self, rando: &impl Rando, rule: &'a access::Expr) -> Result<bool, HashSet<Check>> {
         Ok(match rule {
-            Rule::All(rules) => {
+            access::Expr::All(rules) => {
                 let mut deps = HashSet::default();
                 for rule in rules {
-                    match self.can_access(py, rando, rule) {
+                    match self.can_access(rando, rule) {
                         Ok(true) => {}
                         Ok(false) => return Ok(false),
                         Err(part_deps) => deps.extend(part_deps),
@@ -62,10 +50,10 @@ impl ModelState {
                 }
                 if deps.is_empty() { true } else { return Err(deps) }
             }
-            Rule::Any(rules) => {
+            access::Expr::Any(rules) => {
                 let mut deps = HashSet::default();
                 for rule in rules {
-                    match self.can_access(py, rando, rule) {
+                    match self.can_access(rando, rule) {
                         Ok(true) => return Ok(true),
                         Ok(false) => {}
                         Err(part_deps) => deps.extend(part_deps),
@@ -73,39 +61,38 @@ impl ModelState {
                 }
                 if deps.is_empty() { false } else { return Err(deps) }
             }
-            Rule::AnonymousEvent(at_check, id) => Check::AnonymousEvent(Box::new(at_check.clone()), *id).checked(self).expect(&format!("unimplemented anonymous event check: {} for {}", id, at_check)),
-            Rule::Eq(left, right) => self.access_exprs_eq(py, rando, left, right)?,
-            Rule::Event(event) => Check::Event(event.clone()).checked(self).expect(&format!("unimplemented event check: {}", event)),
-            Rule::HasStones(count) => self.ram.save.quest_items.num_stones() >= *count,
-            Rule::Item(item, count) => self.ram.save.amount_of_item(item) >= *count,
-            Rule::Not(inner) => !self.can_access(py, rando, inner)?,
-            Rule::Setting(setting) => if let Some(&setting_value) = self.knowledge.bool_settings.get(setting) {
+            access::Expr::AnonymousEvent(at_check, id) => Check::AnonymousEvent(Box::new(at_check.clone()), *id).checked(self).expect(&format!("unimplemented anonymous event check: {} for {}", id, at_check)),
+            access::Expr::Eq(left, right) => self.access_exprs_eq(rando, left, right)?,
+            access::Expr::Event(event) => Check::Event(event.clone()).checked(self).expect(&format!("unimplemented event check: {}", event)),
+            access::Expr::HasStones(count) => self.ram.save.quest_items.num_stones() >= *count,
+            access::Expr::Item(item, count) => self.ram.save.amount_of_item(item) >= *count,
+            access::Expr::Not(inner) => !self.can_access(rando, inner)?,
+            access::Expr::Setting(setting) => if let Some(&setting_value) = self.knowledge.bool_settings.get(setting) {
                 setting_value
             } else {
                 return Err(collect![Check::Setting(setting.clone())])
             },
-            Rule::TrialActive(trial) => if let Some(&trial_active) = self.knowledge.active_trials.get(trial) {
+            access::Expr::TrialActive(trial) => if let Some(&trial_active) = self.knowledge.active_trials.get(trial) {
                 trial_active
             } else {
                 return Err(collect![Check::TrialActive(trial.clone())]) //TODO remove clone call once `trial` is a `Medallion`
             },
-            Rule::Trick(trick) => if let Some(trick_value) = self.knowledge.tricks.as_ref().map_or(Some(false), |tricks| tricks.get(trick).copied()) {
+            access::Expr::Trick(trick) => if let Some(trick_value) = self.knowledge.tricks.as_ref().map_or(Some(false), |tricks| tricks.get(trick).copied()) {
                 trick_value
             } else {
                 return Err(collect![Check::Trick(trick.clone())])
             },
-            Rule::Time(range) => self.ram.save.time_of_day.matches(*range), //TODO take location of check into account, as well as available ways to pass time
-            Rule::True => true,
+            access::Expr::Time(range) => self.ram.save.time_of_day.matches(*range), //TODO take location of check into account, as well as available ways to pass time
+            access::Expr::True => true,
         })
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    fn access_exprs_eq<'a>(&self, py: Python<'_>, rando: &Rando, left: &'a Expr, right: &'a Expr) -> Result<bool, HashSet<Check>> {
+    fn access_exprs_eq<'a>(&self, rando: &impl Rando, left: &'a access::Expr, right: &'a access::Expr) -> Result<bool, HashSet<Check>> {
         Ok(match (left, right) {
-            (Expr::All(exprs), expr) | (expr, Expr::All(exprs)) => {
+            (access::Expr::All(exprs), expr) | (expr, access::Expr::All(exprs)) => {
                 let mut deps = HashSet::default();
                 for other in exprs {
-                    match self.access_exprs_eq(py, rando, expr, other) {
+                    match self.access_exprs_eq(rando, expr, other) {
                         Ok(true) => {}
                         Ok(false) => return Ok(false),
                         Err(part_deps) => deps.extend(part_deps),
@@ -113,10 +100,10 @@ impl ModelState {
                 }
                 if deps.is_empty() { true } else { return Err(deps) }
             }
-            (Expr::Any(exprs), expr) | (expr, Expr::Any(exprs)) => {
+            (access::Expr::Any(exprs), expr) | (expr, access::Expr::Any(exprs)) => {
                 let mut deps = HashSet::default();
                 for other in exprs {
-                    match self.access_exprs_eq(py, rando, expr, other) {
+                    match self.access_exprs_eq(rando, expr, other) {
                         Ok(true) => return Ok(true),
                         Ok(false) => {}
                         Err(part_deps) => deps.extend(part_deps),
@@ -124,16 +111,17 @@ impl ModelState {
                 }
                 if deps.is_empty() { false } else { return Err(deps) }
             }
-            (Expr::Age, Expr::LitStr(s)) if s == "child" => !self.ram.save.is_adult,
-            (Expr::Age, Expr::LitStr(s)) if s == "adult" => self.ram.save.is_adult,
-            (Expr::Age, Expr::StartingAge) => true, // we always assume that we started as the current age, since going to the other age requires finding the Temple of Time first
-            (Expr::Item(item1, count1), Expr::Item(item2, count2)) => item1 == item2 && count1 == count2,
-            (Expr::Item(item, 1), Expr::LitStr(s)) |
-            (Expr::LitStr(s), Expr::Item(item, 1)) => *item == Item::from_str(py, rando, s).expect(&format!("tried to compare item with non-item string literal {}", s)),
-            (Expr::Item(_, _), Expr::LitStr(_)) |
-            (Expr::LitStr(_), Expr::Item(_, _)) => false, // multiple items are never the same as another single item
-            (Expr::LitStr(s1), Expr::LitStr(s2)) => s1 == s2,
-            (Expr::Setting(setting), Expr::LitStr(_)) => return Err(collect![Check::Setting(setting.clone())]), //TODO check knowledge
+            (access::Expr::Age, access::Expr::LitStr(s)) if s == "child" => !self.ram.save.is_adult,
+            (access::Expr::Age, access::Expr::LitStr(s)) if s == "adult" => self.ram.save.is_adult,
+            (access::Expr::Age, access::Expr::StartingAge) => true, // we always assume that we started as the current age, since going to the other age requires finding the Temple of Time first
+            (access::Expr::ForAge(age1), access::Expr::ForAge(age2)) => age1 == age2,
+            (access::Expr::Item(item1, count1), access::Expr::Item(item2, count2)) => item1 == item2 && count1 == count2,
+            (access::Expr::Item(item, 1), access::Expr::LitStr(s)) |
+            (access::Expr::LitStr(s), access::Expr::Item(item, 1)) => *item == Item::from_str(rando, s).expect(&format!("tried to compare item with non-item string literal {}", s)),
+            (access::Expr::Item(_, _), access::Expr::LitStr(_)) |
+            (access::Expr::LitStr(_), access::Expr::Item(_, _)) => false, // multiple items are never the same as another single item
+            (access::Expr::LitStr(s1), access::Expr::LitStr(s2)) => s1 == s2,
+            (access::Expr::Setting(setting), access::Expr::LitStr(_)) => return Err(collect![Check::Setting(setting.clone())]), //TODO check knowledge
             (_, _) => unimplemented!("comparison of access expressions {:?} and {:?}", left, right),
         })
     }

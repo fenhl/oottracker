@@ -20,6 +20,11 @@ use {
     },
     derive_more::From,
     smart_default::SmartDefault,
+    ootr::model::{
+        Medallion,
+        Stone,
+        TimeRange,
+    },
     crate::{
         info_tables::{
             EventChkInf,
@@ -27,25 +32,22 @@ use {
             ItemGetInf,
         },
         item_ids,
-        model::{
-            Medallion,
-            Stone,
-        },
         scene::SceneFlags,
     },
 };
 #[cfg(not(target_arch = "wasm32"))] use {
-    std::io::prelude::*,
-    async_trait::async_trait,
-    tokio::{
-        net::TcpStream,
-        prelude::*,
+    std::{
+        future::Future,
+        io::prelude::*,
+        pin::Pin,
     },
-    crate::{
-        info_tables::EventChkInf3,
-        Item,
-        proto::Protocol,
+    async_proto::Protocol,
+    tokio::io::{
+        AsyncRead,
+        AsyncWrite,
     },
+    ootr::item::Item,
+    crate::info_tables::EventChkInf3,
 };
 
 pub const SIZE: usize = 0x1450;
@@ -53,13 +55,12 @@ pub const SIZE: usize = 0x1450;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct TimeOfDay(u16);
 
-#[cfg(not(target_arch = "wasm32"))]
 impl TimeOfDay {
-    pub fn matches(&self, range: crate::access::TimeRange) -> bool {
+    pub fn matches(&self, range: TimeRange) -> bool {
         match range {
-            crate::access::TimeRange::Day => (0x4555..0xc001).contains(&self.0),
-            crate::access::TimeRange::Night => (0x0000..0x4555).contains(&self.0) || (0xc001..=0xffff).contains(&self.0),
-            crate::access::TimeRange::Dampe => (0xc001..0xe000).contains(&self.0),
+            TimeRange::Day => (0x4555..0xc001).contains(&self.0),
+            TimeRange::Night => (0x0000..0x4555).contains(&self.0) || (0xc001..=0xffff).contains(&self.0),
+            TimeRange::Dampe => (0xc001..0xe000).contains(&self.0),
         }
     }
 }
@@ -1007,27 +1008,36 @@ impl fmt::Display for SaveDataReadError {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[async_trait]
 impl Protocol for Save {
     type ReadError = SaveDataReadError;
 
-    async fn read(tcp_stream: &mut TcpStream) -> Result<Save, SaveDataReadError> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Save, SaveDataReadError>> + Send + 'a>> {
+        Box::pin(async move {
+            let mut buf = vec![0; SIZE];
+            stream.read_exact(&mut buf).await?;
+            Ok(Save::from_save_data(&buf)?)
+        })
+    }
+
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let buf = self.to_save_data();
+            assert_eq!(buf.len(), SIZE);
+            sink.write_all(&buf).await?;
+            Ok(())
+        })
+    }
+
+    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Save, SaveDataReadError> {
         let mut buf = vec![0; SIZE];
-        tcp_stream.read_exact(&mut buf).await?;
+        stream.read_exact(&mut buf)?;
         Ok(Save::from_save_data(&buf)?)
     }
 
-    async fn write(&self, tcp_stream: &mut TcpStream) -> io::Result<()> {
+    fn write_sync<'a>(&self, mut sink: impl Write + 'a) -> io::Result<()> {
         let buf = self.to_save_data();
         assert_eq!(buf.len(), SIZE);
-        tcp_stream.write_all(&buf).await?;
-        Ok(())
-    }
-
-    fn write_sync(&self, tcp_stream: &mut std::net::TcpStream) -> io::Result<()> {
-        let buf = self.to_save_data();
-        assert_eq!(buf.len(), SIZE);
-        tcp_stream.write_all(&buf)?;
+        sink.write_all(&buf)?;
         Ok(())
     }
 }
@@ -1064,37 +1074,5 @@ impl<'a, 'b> Sub<&'b Save> for &'a Save {
 
 /// The difference between two save states.
 #[derive(Debug, Clone)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
 pub struct Delta(Vec<(u16, u8)>);
-
-#[cfg(not(target_arch = "wasm32"))]
-#[async_trait]
-impl Protocol for Delta {
-    type ReadError = io::Error;
-
-    async fn read(tcp_stream: &mut TcpStream) -> io::Result<Delta> {
-        let len = u16::read(tcp_stream).await?.into();
-        let mut buf = Vec::with_capacity(len);
-        for _ in 0..len {
-            buf.push((u16::read(tcp_stream).await?, u8::read(tcp_stream).await?));
-        }
-        Ok(Delta(buf))
-    }
-
-    async fn write(&self, tcp_stream: &mut TcpStream) -> io::Result<()> {
-        (self.0.len() as u16).write(tcp_stream).await?;
-        for &(offset, value) in &self.0 {
-            offset.write(tcp_stream).await?;
-            value.write(tcp_stream).await?;
-        }
-        Ok(())
-    }
-
-    fn write_sync(&self, tcp_stream: &mut std::net::TcpStream) -> io::Result<()> {
-        (self.0.len() as u16).write_sync(tcp_stream)?;
-        for &(offset, value) in &self.0 {
-            offset.write_sync(tcp_stream)?;
-            value.write_sync(tcp_stream)?;
-        }
-        Ok(())
-    }
-}

@@ -1,0 +1,38 @@
+[package]
+name = "ootr-static-derive"
+version = "0.1.6"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+convert_case = "0.4"
+directories = "3"
+graphql_client = "0.9"
+proc-macro2 = "1"
+pyo3 = "0.13"
+quote = "1"
+serde = "1"
+syn = "1"
+zip = "0.5"
+
+[dependencies.derive_more]
+version = "0.99"
+default-features = false
+features = ["from"]
+
+[dependencies.ootr]
+path = "../ootr"
+
+[dependencies.ootr-dynamic]
+path = "../ootr-dynamic"
+
+[dependencies.quote-value]
+path = "C:\\Users\\fenhl\\Desktop\\quote-value\\crate\\quote-value" #TODO upload/publish
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["blocking", "json", "rustls-tls"]

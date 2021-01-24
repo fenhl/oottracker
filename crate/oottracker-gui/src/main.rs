@@ -1,4 +1,5 @@
-#![deny(rust_2018_idioms, unused, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![forbid(unsafe_code)]
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -37,6 +38,7 @@ use {
     itertools::Itertools as _,
     smart_default::SmartDefault,
     structopt::StructOpt,
+    ootr_static::Rando,
     oottracker::{
         Check,
         ModelState,
@@ -74,7 +76,6 @@ use {
     image::DynamicImage,
     tokio::time::sleep,
     oottracker::{
-        Rando,
         checks::{
             self,
             CheckStatusError,
@@ -1138,7 +1139,7 @@ impl Application for State {
                 if self.flags { // show available checks
                     let model = self.model.clone();
                     return async move {
-                        let rando = Rando::dynamic("C:\\Users\\Fenhl\\git\\github.com\\fenhl\\OoT-Randomizer\\stage"); //TODO use precompiled data by default, allow config override
+                        let rando = ootr_static::Rando; //TODO use precompiled data by default, allow specifying dynamic Rando path in settings
                         match checks::status(&rando, &model) {
                             Ok(status) => Message::UpdateAvailableChecks(status),
                             Err(e) => Message::CheckStatusError(e),
