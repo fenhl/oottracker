@@ -27,6 +27,7 @@ use {
         SemVerError,
         Version,
     },
+    serde::Deserialize,
     structopt::StructOpt,
     tempfile::NamedTempFile,
     ::tokio::{
@@ -127,8 +128,16 @@ async fn release_client() -> Result<reqwest::Client, Error> {
 }
 
 #[cfg(windows)]
+#[derive(Deserialize)]
+struct Plist {
+    #[serde(rename = "CFBundleShortVersionString")]
+    bundle_short_version_string: Version,
+}
+
+#[cfg(windows)]
 async fn version() -> Version {
     let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
+    assert_eq!(version, plist::from_file::<_, Plist>("assets/macos/OoT Tracker.app/Contents/Info.plist").expect("failed to read plist for version check").bundle_short_version_string);
     assert_eq!(version, ootr::version());
     assert_eq!(version, ootr_dynamic::version());
     assert_eq!(version, ootr_static::version()); // also checks ootr-static-derive

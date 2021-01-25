@@ -339,6 +339,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chrono"
+version = "0.4.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "clap"
 version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1473,9 +1483,12 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.9.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+checksum = "e91b62f79061a0bc2e046024cb7ba44b08419ed238ecbd9adbd787434b9e8c25"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "heck"
@@ -1897,9 +1910,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.6.1"
+version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb1fa934250de4de8aef298d81c729a7d33d8c239daa3a7575e6b92bfc7313b"
+checksum = "4e47a3566dd4fd4eec714ae6ceabdee0caec795be835c223d92c2d40f1e8cf1c"
 dependencies = [
  "autocfg",
  "hashbrown",
@@ -2050,6 +2063,15 @@ checksum = "351a32417a12d5f7e82c368a66781e307834dae04c6ce0cd4456d52989229883"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "line-wrap"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f30344350a2a51da54c1d53be93fade8a237e545dbcc4bdbe635413f2117cab9"
+dependencies = [
+ "safemem",
 ]
 
 [[package]]
@@ -2487,7 +2509,7 @@ checksum = "13bd41f508810a131401606d54ac32a467c97172d74ba7662562ebba5ad07fa0"
 
 [[package]]
 name = "ootr"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "async-proto",
  "quote-value",
@@ -2496,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-dynamic"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "derive_more",
  "itertools",
@@ -2511,7 +2533,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "lazy_static",
  "ootr",
@@ -2521,7 +2543,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static-derive"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "convert_case",
  "derive_more",
@@ -2541,7 +2563,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "async-proto",
  "async-stream",
@@ -2562,14 +2584,14 @@ dependencies = [
 
 [[package]]
 name = "oottracker-bizhawk"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "semver 0.11.0",
 ]
 
 [[package]]
 name = "oottracker-csharp"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "async-proto",
  "libc",
@@ -2579,7 +2601,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-derive"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "convert_case",
  "itertools",
@@ -2590,7 +2612,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-gui"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "derive_more",
  "directories",
@@ -2619,7 +2641,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-utils"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2630,6 +2652,7 @@ dependencies = [
  "ootr-static",
  "oottracker",
  "oottracker-bizhawk",
+ "plist",
  "reqwest",
  "semver 0.11.0",
  "serde",
@@ -2838,6 +2861,20 @@ name = "platforms"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "feb3b2b1033b8a60b4da6ee470325f887758c95d5320f52f9ce0df055a55940e"
+
+[[package]]
+name = "plist"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dc57ccf442c7414b790e8e7b72fb4d776a66c7680129360946d9aaa6f5311e9"
+dependencies = [
+ "base64",
+ "chrono",
+ "indexmap",
+ "line-wrap",
+ "serde",
+ "xml-rs",
+]
 
 [[package]]
 name = "png"
@@ -3277,6 +3314,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
+name = "safemem"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3329,6 +3372,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f301af10236f6df4160f7c3f04eec6dbc70ace82d23326abad5edee88801c6b6"
 dependencies = [
  "semver-parser 0.10.2",
+ "serde",
 ]
 
 [[package]]
