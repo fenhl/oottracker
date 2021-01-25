@@ -1,19 +1,19 @@
 //! This module contains types representing the permanent scene flags section of save data. The type `SceneFlags` represents that entire section, and the other types appear in its fields.
 
 use {
-    std::fmt,
+    std::{
+        fmt,
+        sync::Arc,
+    },
     ootr::{
         Rando,
-        region::{
-            Mq,
-            Region,
-        },
+        region::Region,
     },
     oottracker_derive::scene_flags,
     crate::{
         Ram,
         region::{
-            RegionExt,
+            RegionExt as _,
             RegionLookupError,
         },
     },
@@ -216,9 +216,15 @@ impl Scene {
         Scene::from_id(ram.current_scene_id)
     }
 
-    pub(crate) fn regions<R: Rando>(&self, rando: &R) -> Result<impl Iterator<Item = (Mq, Region)>, RegionLookupError<R>> {
+    pub(crate) fn regions<'a, R: Rando>(&self, rando: &'a R) -> Result<Vec<Arc<Region>>, RegionLookupError<R>> {
         let name = self.0;
-        Ok(Region::all(rando)?.into_iter().filter(move |(_, region)| region.scene.as_ref().map_or(false, |scene| scene == name) || region.dungeon.as_ref().map_or(false, |dungeon| dungeon == name)))
+        Ok(
+            Region::all(rando)?
+                .iter()
+                .filter(move |region| region.scene.as_ref().map_or(false, |scene| scene == name) || region.dungeon.as_ref().map_or(false, |(dungeon, _)| dungeon.to_string() == name))
+                .cloned()
+                .collect()
+        )
     }
 }
 

@@ -5,6 +5,7 @@ use {
             Hash as _,
             Hasher,
         },
+        io,
         net::Ipv6Addr,
     },
     futures::{
@@ -13,6 +14,7 @@ use {
     },
     iced_futures::subscription::Recipe,
     tokio::net::TcpListener,
+    tokio_stream::wrappers::TcpListenerStream,
     oottracker::proto::{
         self,
         TCP_PORT,
@@ -31,7 +33,7 @@ impl<H: Hasher, I> Recipe<H, I> for Subscription {
 
     fn stream(self: Box<Self>, _: BoxStream<'_, I>) -> BoxStream<'_, Message> {
         Box::pin(
-            stream::once(TcpListener::bind((Ipv6Addr::LOCALHOST, TCP_PORT)))
+            stream::once(async { io::Result::Ok(TcpListenerStream::new(TcpListener::bind((Ipv6Addr::LOCALHOST, TCP_PORT)).await?)) })
                 .try_flatten()
                 .map_ok(|tcp_stream|
                     stream::once(async { Ok(Message::ClientConnected) })

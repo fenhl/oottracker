@@ -2,6 +2,10 @@ use {
     std::{
         collections::HashMap,
         fmt,
+        hash::{
+            Hash,
+            Hasher,
+        },
     },
     quote_value::QuoteValue,
     crate::{
@@ -35,4 +39,19 @@ pub struct Region {
     pub events: HashMap<String, access::Expr>,
     pub locations: HashMap<String, access::Expr>,
     pub exits: HashMap<String, access::Expr>,
+}
+
+impl PartialEq for Region {
+    fn eq(&self, other: &Region) -> bool {
+        self.dungeon == other.dungeon && self.name == other.name
+    }
+}
+
+impl Eq for Region {}
+
+impl Hash for Region {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.dungeon.hash(state);
+    }
 }

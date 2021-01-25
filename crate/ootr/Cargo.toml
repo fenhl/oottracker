@@ -4,10 +4,12 @@ version = "0.1.6"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
+[dependencies]
+semver = "0.11"
+
 [dependencies.quote-value]
 path = "C:\\Users\\fenhl\\Desktop\\quote-value\\crate\\quote-value" #TODO upload/publish
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.async-proto]
-#version = "0.3" #TODO publish changes
-path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto"
+version = "0.3"
 features = ["blocking"]

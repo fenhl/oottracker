@@ -40,6 +40,14 @@ use {
     ootr::Rando as _,
 };
 
+#[proc_macro]
+pub fn version(_: TokenStream) -> TokenStream {
+    let version = env!("CARGO_PKG_VERSION");
+    TokenStream::from(quote! {
+        ::semver::Version::parse(#version).expect("failed to parse current version")
+    })
+}
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "../../assets/graphql/github-schema.graphql",
@@ -112,9 +120,9 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         let data = vec![
             ("escaped_items", quote!(HashMap<String, Item>), rando.escaped_items()?.quote()),
             ("item_table", quote!(HashMap<String, Item>), rando.item_table()?.quote()),
-            ("logic_helpers", quote!(BTreeMap<String, String>), rando.logic_helpers()?.quote()),
+            ("logic_helpers", quote!(HashMap<String, (Vec<String>, Expr)>), rando.logic_helpers()?.quote()),
             ("logic_tricks", quote!(HashSet<String>), rando.logic_tricks()?.quote()),
-            ("regions", quote!(Vec<Region>), rando.regions()?.quote()),
+            ("regions", quote!(Vec<Arc<Region>>), rando.regions()?.quote()),
             ("setting_infos", quote!(HashSet<String>), rando.setting_infos()?.quote()),
         ];
         Ok::<_, Error>(data)
@@ -123,13 +131,13 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         .map(|(name, _, _)| Ident::new(&name.to_case(Case::ScreamingSnake), Span::call_site()))
         .collect::<Vec<_>>();
     let lazy_statics = screaming_idents.iter().zip(&data)
-        .map(|(screaming_ident, (_, ty, value))| quote!(static ref #screaming_ident: #ty = #value;));
+        .map(|(screaming_ident, (_, ty, value))| quote!(static ref #screaming_ident: Arc<#ty> = #value;));
     let trait_fns = screaming_idents.iter().zip(&data)
         .map(|(screaming_ident, (name, ty, _))| {
             let ident = Ident::new(name, Span::call_site());
             quote! {
-                fn #ident<'a>(&'a self) -> Result<Box<dyn Deref<Target = #ty> + 'a>, RandoErr> {
-                    Ok(Box::new(&*#screaming_ident))
+                fn #ident<'a>(&'a self) -> Result<Arc<#ty>, RandoErr> {
+                    Ok(Arc::clone(&#screaming_ident))
                 }
             }
         });

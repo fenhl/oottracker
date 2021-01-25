@@ -1,37 +1,32 @@
 use {
     std::{
+        collections::{
+            HashMap,
+            HashSet,
+        },
         fmt,
         io,
         sync::Arc,
     },
-    derive_more::From,
-    ootr::{
-        access,
-        region::Mq,
-    },
-    crate::{
-        Check,
-        ModelState,
-        region::RegionExt as _,
-    },
-};
-#[cfg(not(target_arch = "wasm32"))] use {
-    std::collections::{
-        HashMap,
-        HashSet,
-    },
     collect_mac::collect,
+    derive_more::From,
     itertools::{
         EitherOrBoth,
         Itertools as _,
     },
     ootr::{
         Rando,
+        access,
         region::Region,
     },
-    crate::region::{
-        RegionLookup,
-        RegionLookupError,
+    crate::{
+        Check,
+        ModelState,
+        region::{
+            RegionExt as _,
+            RegionLookup,
+            RegionLookupError,
+        },
     },
 };
 
@@ -48,13 +43,13 @@ impl CheckExt for Check {
         if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) } //TODO adjust for current-scene flags not being stored in save immediately
         match self {
             Check::AnonymousEvent(at_check, id) => match (&**at_check, id) {
-                (Check::Exit { from_mq: Mq::Overworld, from, to }, 0) if from == "Death Mountain" && to == "Death Mountain Summit" => Some(
+                (Check::Exit { from_mq: None, from, to }, 0) if from == "Death Mountain" && to == "Death Mountain Summit" => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_FIRST_BOULDER
                         | crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_SECOND_BOULDER
                     )
                 ),
-                (Check::Exit { from_mq: Mq::Overworld, from, to }, 1) if from == "Death Mountain" && to == "Death Mountain Summit" => Some(
+                (Check::Exit { from_mq: None, from, to }, 1) if from == "Death Mountain" && to == "Death Mountain Summit" => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::BLOW_UP_DC_ENTRANCE
                         | crate::scene::DeathMountainSwitches::PLANT_BEAN
@@ -897,6 +892,7 @@ impl CheckExt for Check {
 
                 _ => panic!("unknown location name: {}", loc),
             },
+            Check::LogicHelper(_) => panic!("logic helpers can't be checked"),
             Check::Mq(_) => Some(false), //TODO disambiguate MQ-ness here instead?
             Check::Setting(_) => panic!("setting checks not implemented"), //TODO check knowledge
             Check::TrialActive(_) => panic!("trial-active checks not implemented"), //TODO check knowledge
@@ -935,40 +931,41 @@ impl<R: Rando> fmt::Display for CheckStatusError<R> {
 
 pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, CheckStatus>, CheckStatusError<R>> {
     let mut map = HashMap::default();
-    let mut reachable_regions = collect![as HashSet<_>: (Mq::Overworld, Region::root(rando)?)];
+    let all_regions = Region::all(rando)?;
+    let mut reachable_regions = collect![as HashSet<_>: Region::root(rando)?];
     let mut unhandled_reachable_checks = Vec::default();
     match model.ram.current_region(rando)? {
         //TODO run separate logic check using knowledge only and not considering current region
-        RegionLookup::Overworld(region) => { reachable_regions.insert((Mq::Overworld, region)); }
-        RegionLookup::Dungeon(EitherOrBoth::Left(region)) => { reachable_regions.insert((Mq::Vanilla, region)); }
-        RegionLookup::Dungeon(EitherOrBoth::Right(region)) => { reachable_regions.insert((Mq::Mq, region)); }
+        RegionLookup::Overworld(region)
+        | RegionLookup::Dungeon(EitherOrBoth::Left(region))
+        | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => { reachable_regions.insert(region); }
         //TODO move checks to appropriate spots
-        RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, _)) => unhandled_reachable_checks.push((Check::Mq(vanilla.dungeon.expect("MQ-ambiguous non-dungeon region").parse().expect("unknown dungeon")), format!("True"))),
+        RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, _)) => unhandled_reachable_checks.push((Check::Mq(vanilla.dungeon.expect("MQ-ambiguous non-dungeon region").0), access::Expr::True)),
     }
     let mut unhandled_reachable_regions = reachable_regions.iter().cloned().collect_vec();
-    let mut unhandled_unreachable_regions = Region::all(rando)?.into_iter().filter(|region_info| !reachable_regions.contains(region_info)).collect::<HashSet<_>>();
+    let mut unhandled_unreachable_regions = all_regions.iter().filter(|region_info| !reachable_regions.contains(*region_info)).collect::<HashSet<_>>();
     let mut unhandled_unreachable_checks = Vec::<(_, access::Expr)>::default();
     loop {
-        if let Some((from_mq, region)) = unhandled_reachable_regions.pop() {
+        if let Some(region) = unhandled_reachable_regions.pop() {
             for (exit, rule) in &region.exits {
-                unhandled_reachable_checks.push((Check::Exit { from_mq, from: region.region_name.clone(), to: exit.clone() }, rule.clone()));
+                unhandled_reachable_checks.push((Check::Exit { from_mq: region.dungeon.map(|(_, mq)| mq), from: region.name.clone(), to: exit.clone() }, rule.clone()));
             }
             //TODO events, locations, setting checks
         } else if let Some((check, rule)) = unhandled_reachable_checks.pop() {
             let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
                 if let Check::Exit { ref to, .. } = check {
                     let region_behind_exit = to; //TODO entrance rando support (look up exit knowledge)
-                    if !reachable_regions.iter().any(|(_, region)| region.region_name == *region_behind_exit) {
+                    if !reachable_regions.iter().any(|region| region.name == *region_behind_exit) {
                         if model.can_access(rando, &rule) == Ok(true) {
                             // exit is checked (i.e. we know what's behind it) and reachable (i.e. we can actually use it), so the region behind it becomes reachable
                             let region_info = match Region::new(rando, &region_behind_exit)? {
-                                RegionLookup::Overworld(region) => (Mq::Overworld, region),
-                                RegionLookup::Dungeon(EitherOrBoth::Left(region)) => (Mq::Vanilla, region),
-                                RegionLookup::Dungeon(EitherOrBoth::Right(region)) => (Mq::Mq, region),
+                                RegionLookup::Overworld(region)
+                                | RegionLookup::Dungeon(EitherOrBoth::Left(region))
+                                | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => region,
                                 RegionLookup::Dungeon(EitherOrBoth::Both(_, _)) => unimplemented!(), //TODO disambiguate MQ-ness based on knowledge, add MQ-ness check if unknown
                             };
                             unhandled_unreachable_regions.remove(&region_info);
-                            reachable_regions.insert(region_info.clone());
+                            reachable_regions.insert(Arc::clone(&region_info));
                             unhandled_reachable_regions.push(region_info);
                         }
                     }
@@ -986,9 +983,9 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, 
             };
             map.insert(check, status);
         } else if !unhandled_unreachable_regions.is_empty() {
-            for (from_mq, region) in unhandled_unreachable_regions.drain() {
+            for region in unhandled_unreachable_regions.drain() {
                 for (exit, cond) in &region.exits {
-                    unhandled_unreachable_checks.push((Check::Exit { from_mq, from: region.region_name.clone(), to: exit.clone() }, cond.to_owned()));
+                    unhandled_unreachable_checks.push((Check::Exit { from_mq: region.dungeon.map(|(_, mq)| mq), from: region.name.clone(), to: exit.clone() }, cond.to_owned()));
                 }
                 //TODO events, locations, setting checks
             }
@@ -996,7 +993,7 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, 
             let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
                 CheckStatus::Checked
             } else {
-                match model.can_access(rando, &rule)? {
+                match model.can_access(rando, &rule) {
                     Ok(_) => CheckStatus::NotYetReachable,
                     Err(deps) => {
                         map.extend(deps.into_iter().map(|dep| (dep, CheckStatus::NotYetReachable))); //TODO check reachability of dependency
@@ -1011,6 +1008,8 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, 
     }
     Ok(map)
 }
+
+#[cfg(not(test))] use ootr_static as _; // used below
 
 #[test]
 fn default_status() {

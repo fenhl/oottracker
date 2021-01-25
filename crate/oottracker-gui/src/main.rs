@@ -38,15 +38,8 @@ use {
     itertools::Itertools as _,
     smart_default::SmartDefault,
     structopt::StructOpt,
-    ootr_static::Rando,
-    oottracker::{
-        Check,
-        ModelState,
-        checks::{
-            CheckExt as _,
-            CheckStatus,
-        },
-        info_tables::*,
+    ootr::{
+        check::Check,
         model::{
             DungeonReward,
             DungeonRewardLocation,
@@ -54,6 +47,14 @@ use {
             Medallion,
             Stone,
         },
+    },
+    oottracker::{
+        ModelState,
+        checks::{
+            CheckExt as _,
+            CheckStatus,
+        },
+        info_tables::*,
         save::*,
     },
     crate::save::{
@@ -920,7 +921,7 @@ enum Message {
     #[cfg(not(target_arch = "wasm32"))]
     AutoDismissNotification,
     #[cfg(not(target_arch = "wasm32"))]
-    CheckStatusError(CheckStatusError),
+    CheckStatusErrorStatic(CheckStatusError<ootr_static::Rando>),
     #[cfg(not(target_arch = "wasm32"))]
     ClientConnected,
     #[cfg(not(target_arch = "wasm32"))]
@@ -961,7 +962,7 @@ impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
-            Message::CheckStatusError(e) => write!(f, "error calculating checks: {}", e),
+            Message::CheckStatusErrorStatic(e) => write!(f, "error calculating checks: {}", e),
             #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => write!(f, "auto-tracker connected"),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1088,7 +1089,7 @@ impl Application for State {
                 self.notification = None;
             },
             #[cfg(not(target_arch = "wasm32"))]
-            Message::CheckStatusError(_) => self.notify(message),
+            Message::CheckStatusErrorStatic(_) => self.notify(message),
             #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => {
                 self.client_connected = true;
@@ -1139,11 +1140,13 @@ impl Application for State {
                 if self.flags { // show available checks
                     let model = self.model.clone();
                     return async move {
-                        let rando = ootr_static::Rando; //TODO use precompiled data by default, allow specifying dynamic Rando path in settings
-                        match checks::status(&rando, &model) {
-                            Ok(status) => Message::UpdateAvailableChecks(status),
-                            Err(e) => Message::CheckStatusError(e),
-                        }
+                        tokio::task::spawn_blocking(move || {
+                            let rando = ootr_static::Rando; //TODO use precompiled data by default, allow specifying dynamic Rando path in settings
+                            match checks::status(&rando, &model) {
+                                Ok(status) => Message::UpdateAvailableChecks(status),
+                                Err(e) => Message::CheckStatusErrorStatic(e),
+                            }
+                        }).await.expect("status checks task panicked")
                     }.into()
                 }
             }
@@ -1291,7 +1294,7 @@ impl Application for State {
             Subscription::batch(vec![
                 iced_native::subscription::events_with(|event, status| match (event, status) {
                     (iced_native::Event::Keyboard(iced_native::keyboard::Event::ModifiersChanged(modifiers)), _) => Some(Message::KeyboardModifiers(modifiers)),
-                    (iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { x, y }), _) => Some(Message::MouseMoved([x, y])),
+                    (iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { position }), _) => Some(Message::MouseMoved(position.into())),
                     (iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Right)), iced_native::event::Status::Ignored) => Some(Message::RightClick),
                     _ => None,
                 }),

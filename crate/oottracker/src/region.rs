@@ -1,6 +1,5 @@
 use {
     std::{
-        ffi::OsStr,
         fmt,
         io,
         sync::Arc,
@@ -47,26 +46,25 @@ impl<R: Rando> fmt::Display for RegionLookupError<R> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum RegionLookup {
-    Overworld(Region),
+    Overworld(Arc<Region>),
     /// vanilla data on the left, MQ data on the right
-    Dungeon(EitherOrBoth<Region, Region>),
+    Dungeon(EitherOrBoth<Arc<Region>, Arc<Region>>),
 }
 
 impl RegionLookup {
-    pub fn new<R: Rando>(candidates: impl IntoIterator<Item = (Mq, Region)>) -> Result<RegionLookup, RegionLookupError<R>> {
+    pub fn new<R: Rando>(candidates: impl IntoIterator<Item = Arc<Region>>) -> Result<RegionLookup, RegionLookupError<R>> {
         let mut candidates = candidates.into_iter().collect_vec();
         Ok(if candidates.len() == 0 {
             return Err(RegionLookupError::NotFound)
-        } else if candidates.len() == 1 && candidates[0].0 == Mq::Overworld {
-            RegionLookup::Overworld(candidates.pop().expect("just checked").1.clone())
-        } else if candidates.iter().all(|(mq_info, _)| *mq_info != Mq::Overworld) {
+        } else if candidates.len() == 1 && candidates[0].dungeon.is_none() {
+            RegionLookup::Overworld(candidates.pop().expect("just checked"))
+        } else if candidates.iter().all(|region| region.dungeon.is_some()) {
             let mut vanilla = None;
             let mut mq = None;
-            for (mq_info, region) in candidates {
-                let item = match mq_info {
-                    Mq::Overworld => unreachable!("just checked that no candidates are overworld"),
+            for region in candidates {
+                let item = match region.dungeon.expect("just_checked").1 {
                     Mq::Vanilla => &mut vanilla,
                     Mq::Mq => &mut mq,
                 };
@@ -83,6 +81,12 @@ impl RegionLookup {
             return Err(RegionLookupError::MixedOverworldAndDungeon)
         })
     }
+
+    pub fn by_name<R: Rando>(rando: &R, name: &str) -> Result<RegionLookup, RegionLookupError<R>> {
+        let all_regions = rando.regions().map_err(RegionLookupError::Rando)?;
+        let candidates = all_regions.iter().filter(|region| region.name == name).cloned().collect_vec();
+        RegionLookup::new(candidates)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -97,40 +101,22 @@ impl fmt::Display for MissingRegionError {
 impl std::error::Error for MissingRegionError {}
 
 pub trait RegionExt {
-    fn new<R: Rando>(rando: &R, name: &str) -> Result<RegionLookup, RegionLookupError<R>>;
-    fn all<R: Rando>(rando: &R) -> Result<Vec<(Mq, Region)>, RegionLookupError<R>>;
-    fn root<R: Rando>(rando: &R) -> io::Result<Region>; //TODO glitched param
+    fn new<'a, R: Rando>(rando: &'a R, name: &str) -> Result<RegionLookup, RegionLookupError<R>>;
+    /// A thin wrapper around [`Rando::regions`] with this module's error type.
+    fn all<'a, R: Rando>(rando: &'a R) -> Result<Arc<Vec<Arc<Region>>>, RegionLookupError<R>>;
+    fn root<R: Rando>(rando: &R) -> Result<Arc<Region>, RegionLookupError<R>>; //TODO glitched param
 }
 
 impl RegionExt for Region {
-    fn new<R: Rando>(rando: &R, name: &str) -> Result<RegionLookup, RegionLookupError<R>> {
-        RegionLookup::new(Region::all(rando)?.into_iter().filter(|(_, region)| region.region_name == name))
+    fn new<'a, R: Rando>(rando: &'a R, name: &str) -> Result<RegionLookup, RegionLookupError<R>> {
+        RegionLookup::by_name(rando, name)
     }
 
-    fn all<R: Rando>(rando: &R) -> Result<Vec<(Mq, Region)>, RegionLookupError<R>> {
-        let mut buf = Vec::default();
-        let region_files = rando.regions()?;
-        for (filename, regions) in region_files.iter() {
-            let filename = filename.to_str().ok_or(RegionLookupError::Filename)?;
-            for region in regions {
-                buf.push((
-                    if filename == "Overworld.json" { Mq::Overworld } else if filename.ends_with(" MQ.json") { Mq::Mq } else { Mq::Vanilla },
-                    region.clone(),
-                ));
-            }
-        }
-        Ok(buf)
+    fn all<'a, R: Rando>(rando: &'a R) -> Result<Arc<Vec<Arc<Region>>>, RegionLookupError<R>> {
+        rando.regions().map_err(RegionLookupError::Rando)
     }
 
-    fn root<R: Rando>(rando: &R) -> io::Result<Region> {
-        Ok(
-            rando.regions()?
-                .get(OsStr::new("Overworld.json"))
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, MissingRegionError(format!("Root"))))?
-                .iter()
-                .find(|Region { region_name, .. }| region_name == "Root")
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, MissingRegionError(format!("Root"))))?
-                .clone()
-        )
+    fn root<R: Rando>(rando: &R) -> Result<Arc<Region>, RegionLookupError<R>> {
+        Ok(Arc::clone(Region::all(rando)?.iter().find(|region| region.name == "Root").ok_or(RegionLookupError::NotFound)?))
     }
 }

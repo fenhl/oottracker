@@ -108,34 +108,35 @@ impl<T> PyResultExt for PyResult<T> {
 
 pub(crate) trait ExprExt {
     fn parse(rando: &Rando<'_>, ctx: &Check, expr: &str) -> Result<Expr, ParseError>;
-    fn parse_helper(rando: &Rando<'_>, ctx: &Check, args: &[String], expr: &str) -> Result<Expr, ParseError>;
+    fn parse_helper(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, args: &[String], expr: &str) -> Result<Expr, ParseError>;
 }
 
 impl ExprExt for Expr {
     fn parse(rando: &Rando<'_>, ctx: &Check, expr: &str) -> Result<Expr, ParseError> {
+        let logic_helpers = rando.logic_helpers()?;
+        let helpers = logic_helpers.iter().map(|(name, (args, _))| (&**name, args.len())).collect();
         let ast = rando.py.import("ast")?;
-        Expr::parse_inner(rando, ctx, &mut (0..), ast, ast.call_method1("parse", (expr, ctx.to_string(), "eval")).at("ast.parse in parse")?.getattr("body").at(".body in parse")?, &[], true)
+        Expr::parse_inner(rando, ctx, &helpers, &mut (0..), ast, ast.call_method1("parse", (expr, ctx.to_string(), "eval")).at("ast.parse in parse")?.getattr("body").at(".body in parse")?, &[])
     }
 
-    fn parse_helper(rando: &Rando<'_>, ctx: &Check, args: &[String], expr: &str) -> Result<Expr, ParseError> {
+    fn parse_helper(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, args: &[String], expr: &str) -> Result<Expr, ParseError> {
         let ast = rando.py.import("ast")?;
-        Expr::parse_inner(rando, ctx, &mut (0..), ast, ast.call_method1("parse", (expr, ctx.to_string(), "eval")).at("ast.parse in parse_helper")?.getattr("body").at(".body in parse_helper")?, args, false)
+        Expr::parse_inner(rando, ctx, helpers, &mut (0..), ast, ast.call_method1("parse", (expr, ctx.to_string(), "eval")).at("ast.parse in parse_helper")?.getattr("body").at(".body in parse_helper")?, args)
     }
 }
 
 trait ExprExtPrivate {
-    fn parse_inner(rando: &Rando<'_>, ctx: &Check, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String], allow_helpers: bool) -> Result<Expr, ParseError>;
+    fn parse_inner(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr, ParseError>;
 }
 
 impl ExprExtPrivate for Expr {
-    fn parse_inner(rando: &Rando<'_>, ctx: &Check, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String], allow_helpers: bool) -> Result<Expr, ParseError> {
+    fn parse_inner(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr, ParseError> {
         // based on RuleParser.py as of 4f83414c49ff65ef2eb285667bcb153f11f1f9ef
-        let logic_helpers = rando.logic_helpers()?;
         Ok(if ast.get("BoolOp")?.downcast::<PyType>()?.is_instance(expr)? {
             if ast.get("And")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
-                Expr::All(expr.getattr("values")?.iter()?.map(|expr| expr.at("next(expr.values)").and_then(|expr| Expr::parse_inner(rando, ctx, seq, ast, expr, args, allow_helpers))).try_collect()?)
+                Expr::All(expr.getattr("values")?.iter()?.map(|expr| expr.at("next(expr.values)").and_then(|expr| Expr::parse_inner(rando, ctx, helpers, seq, ast, expr, args))).try_collect()?)
             } else if ast.get("Or")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
-                Expr::Any(expr.getattr("values")?.iter()?.map(|expr| expr.at("next(expr.values)").and_then(|expr| Expr::parse_inner(rando, ctx, seq, ast, expr, args, allow_helpers))).try_collect()?)
+                Expr::Any(expr.getattr("values")?.iter()?.map(|expr| expr.at("next(expr.values)").and_then(|expr| Expr::parse_inner(rando, ctx, helpers, seq, ast, expr, args))).try_collect()?)
             } else {
                 unreachable!("found BoolOp expression with neither And nor Or: {}", display_expr(ast, expr))
             }
@@ -149,27 +150,27 @@ impl ExprExtPrivate for Expr {
                 Expr::AnonymousEvent(ctx.clone(), seq.next().expect("failed to get anonymous event ID"))
             }
             // expr alias (LogicHelpers.json)
-            else if let Some((params, _)) = if allow_helpers { logic_helpers.get(&name) } else { None } {
+            else if let Some(&num_params) = helpers.get(&*name) {
                 let args = expr.getattr("args")?
                     .iter()?
-                    .map(|arg| Ok::<_, ParseError>(Expr::parse_inner(rando, ctx, seq, ast, arg?, args, allow_helpers)?))
+                    .map(|arg| Ok::<_, ParseError>(Expr::parse_inner(rando, ctx, helpers, seq, ast, arg?, args)?))
                     .try_collect::<_, Vec<_>, _>()?;
-                if args.len() == params.len() {
+                if args.len() == num_params {
                     Expr::LogicHelper(name, args)
                 } else {
-                    return Err(ParseError::HelperNumArgs { name, expected: params.len(), found: args.len() })
+                    return Err(ParseError::HelperNumArgs { name, expected: num_params, found: args.len() })
                 }
             }
             //TODO attr of State (which ones are used?)
             else if name == "has_dungeon_rewards" {
                 let (count,) = expr.getattr("args")?.iter()?.collect_tuple().ok_or(ParseError::HelperNumArgs { name, expected: 1, found: expr.getattr("args")?.len()? })?;
-                Expr::HasDungeonRewards(Box::new(Expr::parse_inner(rando, ctx, seq, ast, count?, args, allow_helpers)?))
+                Expr::HasDungeonRewards(Box::new(Expr::parse_inner(rando, ctx, helpers, seq, ast, count?, args)?))
             } else if name == "has_medallions" {
                 let (count,) = expr.getattr("args")?.iter()?.collect_tuple().ok_or(ParseError::HelperNumArgs { name, expected: 1, found: expr.getattr("args")?.len()? })?;
-                Expr::HasMedallions(Box::new(Expr::parse_inner(rando, ctx, seq, ast, count?, args, allow_helpers)?))
+                Expr::HasMedallions(Box::new(Expr::parse_inner(rando, ctx, helpers, seq, ast, count?, args)?))
             } else if name == "has_stones" {
                 let (count,) = expr.getattr("args")?.iter()?.collect_tuple().ok_or(ParseError::HelperNumArgs { name, expected: 1, found: expr.getattr("args")?.len()? })?;
-                Expr::HasStones(Box::new(Expr::parse_inner(rando, ctx, seq, ast, count?, args, allow_helpers)?))
+                Expr::HasStones(Box::new(Expr::parse_inner(rando, ctx, helpers, seq, ast, count?, args)?))
             }
             else {
                 unimplemented!("converting call expression with name {} into Expr", name)
@@ -181,8 +182,8 @@ impl ExprExtPrivate for Expr {
                     .tuple_windows()
                     .zip(expr.getattr("ops")?.iter()?.collect::<PyResult<Vec<_>>>()?.into_iter())
                     .map(|((left, right), op)| {
-                        let left = Expr::parse_inner(rando, ctx, seq, ast, left, args, allow_helpers)?;
-                        let right = Expr::parse_inner(rando, ctx, seq, ast, right, args, allow_helpers)?;
+                        let left = Expr::parse_inner(rando, ctx, helpers, seq, ast, left, args)?;
+                        let right = Expr::parse_inner(rando, ctx, helpers, seq, ast, right, args)?;
                         Ok::<_, ParseError>(if ast.get("Eq")?.downcast::<PyType>()?.is_instance(op)? {
                             Expr::Eq(Box::new(left), Box::new(right))
                         } else if ast.get("NotEq")?.downcast::<PyType>()?.is_instance(op)? {
@@ -219,11 +220,11 @@ impl ExprExtPrivate for Expr {
                 Expr::Time(TimeRange::Night)
             }
             // expr alias (LogicHelpers.json)
-            else if let Some((params, _)) = if allow_helpers { logic_helpers.get(&name) } else { None } {
-                if params.len() == 0 {
+            else if let Some(&num_params) = helpers.get(&*name) {
+                if num_params == 0 {
                     Expr::LogicHelper(name, Vec::default())
                 } else {
-                    return Err(ParseError::HelperNumArgs { name, expected: params.len(), found: 0 })
+                    return Err(ParseError::HelperNumArgs { name, expected: num_params, found: 0 })
                 }
             }
             // escaped item (ItemList.item_table)
@@ -306,7 +307,7 @@ impl ExprExtPrivate for Expr {
             Expr::Item(item, Box::new(count))
         } else if ast.get("UnaryOp")?.downcast::<PyType>()?.is_instance(expr)? {
             if ast.get("Not")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
-                Expr::Not(Box::new(Expr::parse_inner(rando, ctx, seq, ast, expr.getattr("operand")?, args, allow_helpers)?))
+                Expr::Not(Box::new(Expr::parse_inner(rando, ctx, helpers, seq, ast, expr.getattr("operand")?, args)?))
             } else {
                 unimplemented!("found UnaryOp expression other than Not: {}", display_expr(ast, expr))
             }

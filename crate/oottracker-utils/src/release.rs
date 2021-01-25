@@ -1,4 +1,4 @@
-#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
 #![forbid(unsafe_code)]
 
 use {
@@ -8,7 +8,7 @@ use {
     },
     async_trait::async_trait,
     derive_more::From,
-    tokio::process::Command,
+    ::tokio::process::Command,
 };
 #[cfg(target_os = "macos")] use tokio::fs;
 #[cfg(windows)] use {
@@ -29,9 +29,9 @@ use {
     },
     structopt::StructOpt,
     tempfile::NamedTempFile,
-    tokio::{
+    ::tokio::{
         fs::File,
-        prelude::*,
+        io::AsyncReadExt as _,
     },
     zip::{
         ZipWriter,
@@ -129,6 +129,9 @@ async fn release_client() -> Result<reqwest::Client, Error> {
 #[cfg(windows)]
 async fn version() -> Version {
     let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
+    assert_eq!(version, ootr::version());
+    assert_eq!(version, ootr_dynamic::version());
+    assert_eq!(version, ootr_static::version()); // also checks ootr-static-derive
     assert_eq!(version, oottracker::version()); // also checks oottracker-derive
     assert_eq!(version, oottracker_bizhawk::version());
     //assert_eq!(version, oottracker_csharp::version()); //TODO

@@ -199,7 +199,7 @@ impl Knowledge {
 impl Protocol for Knowledge {
     type ReadError = KnowledgeReadError;
 
-    fn read<'a, R: AsyncRead + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Knowledge, KnowledgeReadError>> + Send + 'a>> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Knowledge, KnowledgeReadError>> + Send + 'a>> {
         Box::pin(async move {
             Ok(match u8::read(&mut stream).await? {
                 0 => Knowledge {
@@ -217,7 +217,7 @@ impl Protocol for Knowledge {
         })
     }
 
-    fn write<'a, W: AsyncWrite + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
         Box::pin(async move {
             if *self == Knowledge::default() {
                 1u8.write(sink).await?;

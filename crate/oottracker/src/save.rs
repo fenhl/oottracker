@@ -20,14 +20,18 @@ use {
     },
     derive_more::From,
     smart_default::SmartDefault,
-    ootr::model::{
-        Medallion,
-        Stone,
-        TimeRange,
+    ootr::{
+        item::Item,
+        model::{
+            Medallion,
+            Stone,
+            TimeRange,
+        },
     },
     crate::{
         info_tables::{
             EventChkInf,
+            EventChkInf3,
             InfTable,
             ItemGetInf,
         },
@@ -44,10 +48,10 @@ use {
     async_proto::Protocol,
     tokio::io::{
         AsyncRead,
+        AsyncReadExt as _,
         AsyncWrite,
+        AsyncWriteExt as _,
     },
-    ootr::item::Item,
-    crate::info_tables::EventChkInf3,
 };
 
 pub const SIZE: usize = 0x1450;
@@ -927,7 +931,6 @@ impl Save {
         self.scene_flags.windmill_and_dampes_grave.unused = crate::scene::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn amount_of_item(&self, item: &Item) -> u8 {
         match item.name() {
             "Blue Fire" | "Buy Blue Fire" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),

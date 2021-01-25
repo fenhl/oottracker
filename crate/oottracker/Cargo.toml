@@ -5,13 +5,10 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
 [dependencies]
-async-stream = "0.3"
 bitflags = "1"
 byteorder = "1"
 collect-mac = "0.1"
-futures = "0.3"
-itertools = "0.9"
-pin-utils = "0.1"
+itertools = "0.10"
 semver = "0.11"
 smart-default = "0.6"
 
@@ -23,17 +20,21 @@ features = ["from"]
 [dependencies.ootr]
 path = "../ootr"
 
-[dependencies.ootr-static]
+[dependencies.ootr-static] # used in tests
 path = "../ootr-static"
 
 [dependencies.oottracker-derive]
 path = "../oottracker-derive"
 
-[dependencies.tokio]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-stream = "0.3"
+futures = "0.3"
+pin-utils = "0.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
 version = "1"
 features = ["net"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.async-proto]
-#version = "0.3" #TODO publish changes
-path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto"
+version = "0.3"
 features = ["blocking"]

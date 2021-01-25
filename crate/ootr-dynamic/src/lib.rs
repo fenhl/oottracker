@@ -3,10 +3,7 @@
 
 use {
     std::{
-        cell::{
-            Ref,
-            RefCell,
-        },
+        cell::RefCell,
         collections::{
             BTreeMap,
             HashMap,
@@ -22,7 +19,6 @@ use {
             BufRead,
             BufReader,
         },
-        ops::Deref,
         path::{
             Path,
             PathBuf,
@@ -32,6 +28,7 @@ use {
     derive_more::From,
     itertools::Itertools as _,
     pyo3::prelude::*,
+    semver::Version,
     serde::de::DeserializeOwned,
     ootr::{
         check::Check,
@@ -53,12 +50,12 @@ mod region;
 pub struct Rando<'p> {
     py: Python<'p>,
     path: PathBuf,
-    escaped_items: RefCell<Option<HashMap<String, Item>>>,
-    item_table: RefCell<Option<HashMap<String, Item>>>,
-    logic_helpers: RefCell<Option<HashMap<String, (Vec<String>, ootr::access::Expr)>>>,
-    logic_tricks: RefCell<Option<HashSet<String>>>,
-    regions: RefCell<Option<Vec<Region>>>, //TODO glitched support
-    setting_infos: RefCell<Option<HashSet<String>>>,
+    escaped_items: RefCell<Option<Arc<HashMap<String, Item>>>>,
+    item_table: RefCell<Option<Arc<HashMap<String, Item>>>>,
+    logic_helpers: RefCell<Option<Arc<HashMap<String, (Vec<String>, ootr::access::Expr)>>>>,
+    logic_tricks: RefCell<Option<Arc<HashSet<String>>>>,
+    regions: RefCell<Option<Arc<Vec<Arc<Region>>>>>, //TODO glitched support
+    setting_infos: RefCell<Option<Arc<HashSet<String>>>>,
 }
 
 impl<'p> Rando<'p> {
@@ -135,7 +132,7 @@ impl ootr::RandoErr for RandoErr {
 impl<'p> ootr::Rando for Rando<'p> {
     type Err = RandoErr;
 
-    fn escaped_items<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashMap<String, Item>> + 'a>, RandoErr> {
+    fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, RandoErr> {
         if self.escaped_items.borrow().is_none() {
             let items = self.import("RuleParser")?
                 .get("escaped_items")?
@@ -157,12 +154,12 @@ impl<'p> ootr::Rando for Rando<'p> {
                     Err(e) => Some(Err(e.into())),
                 })
                 .try_collect()?;
-            *self.escaped_items.borrow_mut() = Some(items);
+            *self.escaped_items.borrow_mut() = Some(Arc::new(items));
         }
-        Ok(Box::new(Ref::map(self.escaped_items.borrow(), |items| items.as_ref().expect("just inserted"))))
+        Ok(Arc::clone(self.escaped_items.borrow().as_ref().expect("just inserted")))
     }
 
-    fn item_table<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashMap<String, Item>> + 'a>, RandoErr> {
+    fn item_table(&self) -> Result<Arc<HashMap<String, Item>>, RandoErr> {
         if self.item_table.borrow().is_none() {
             let items = self.import("ItemList")?
                 .get("item_table")?
@@ -180,43 +177,53 @@ impl<'p> ootr::Rando for Rando<'p> {
                     None
                 })
                 .collect();
-            *self.item_table.borrow_mut() = Some(items);
+            *self.item_table.borrow_mut() = Some(Arc::new(items));
         }
-        Ok(Box::new(Ref::map(self.item_table.borrow(), |items| items.as_ref().expect("just inserted"))))
+        Ok(Arc::clone(self.item_table.borrow().as_ref().expect("just inserted")))
     }
 
-    fn logic_helpers<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashMap<String, (Vec<String>, ootr::access::Expr)>> + 'a>, RandoErr> {
+    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, ootr::access::Expr)>>, RandoErr> {
         if self.logic_helpers.borrow().is_none() {
             let f = File::open(self.path.join("data").join("LogicHelpers.json"))?;
-            let mut helpers = HashMap::default();
-            for (fn_def, fn_body) in read_json_lenient_sync::<_, BTreeMap<String, String>>(BufReader::new(f))? {
+            let raw_helpers = read_json_lenient_sync::<_, BTreeMap<String, String>>(BufReader::new(f))?;
+            let mut helper_headers = HashMap::new();
+            for (fn_def, fn_body) in &raw_helpers {
                 let (fn_name, fn_params) = if fn_def.contains('(') {
                     fn_def[..fn_def.len() - 1].split('(').collect_tuple().ok_or(RandoErr::InvalidLogicHelper)?
                 } else {
-                    (&*fn_def, "")
+                    (&**fn_def, "")
                 };
-                let fn_params = fn_params.split(',').map(str::to_owned).collect_vec();
-                let ctx = Check::LogicHelper(fn_name.to_owned());
-                let expr = ootr::access::Expr::parse_helper(self, &ctx, &fn_params, &fn_body)?;
-                helpers.insert(fn_name.to_owned(), (fn_params, expr));
+                let fn_params = if fn_params.is_empty() {
+                    Vec::default()
+                } else {
+                    fn_params.split(',').map(str::to_owned).collect_vec()
+                };
+                helper_headers.insert(fn_name.to_owned(), (fn_params, fn_body));
             }
-            *self.logic_helpers.borrow_mut() = Some(helpers);
+            let arities = helper_headers.iter().map(|(fn_name, (fn_params, _))| (&**fn_name, fn_params.len())).collect();
+            let mut helpers = HashMap::default();
+            for (fn_name, (fn_params, fn_body)) in &helper_headers {
+                let ctx = Check::LogicHelper(fn_name.to_owned());
+                let expr = ootr::access::Expr::parse_helper(self, &ctx, &arities, &fn_params, &fn_body)?;
+                helpers.insert(fn_name.to_owned(), (fn_params.clone(), expr));
+            }
+            *self.logic_helpers.borrow_mut() = Some(Arc::new(helpers));
         }
-        Ok(Box::new(Ref::map(self.logic_helpers.borrow(), |helpers| helpers.as_ref().expect("just inserted"))))
+        Ok(Arc::clone(self.logic_helpers.borrow().as_ref().expect("just inserted")))
     }
 
-    fn logic_tricks<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashSet<String>> + 'a>, RandoErr> {
+    fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, RandoErr> {
         if self.logic_tricks.borrow().is_none() {
             let mut tricks = HashSet::default();
             for trick in self.import("SettingsList")?.get("logic_tricks")?.call_method0("values")?.iter()? {
                 tricks.insert(trick?.get_item("name")?.extract()?);
             }
-            *self.logic_tricks.borrow_mut() = Some(tricks);
+            *self.logic_tricks.borrow_mut() = Some(Arc::new(tricks));
         }
-        Ok(Box::new(Ref::map(self.logic_tricks.borrow(), |tricks| tricks.as_ref().expect("just inserted"))))
+        Ok(Arc::clone(self.logic_tricks.borrow().as_ref().expect("just inserted")))
     }
 
-    fn regions<'a>(&'a self) -> Result<Box<dyn Deref<Target = Vec<Region>> + 'a>, RandoErr> {
+    fn regions(&self) -> Result<Arc<Vec<Arc<Region>>>, RandoErr> {
         if self.regions.borrow().is_none() {
             let world_path = self.path.join("data").join("World"); //TODO glitched support
             let mut regions = Vec::default();
@@ -226,7 +233,7 @@ impl<'p> ootr::Rando for Rando<'p> {
                 let region_file = File::open(region_path.path())?;
                 for raw_region in read_json_lenient_sync::<_, Vec<RawRegion>>(BufReader::new(region_file))? {
                     let name = raw_region.region_name.clone();
-                    regions.push(Region {
+                    regions.push(Arc::new(Region {
                         dungeon,
                         scene: raw_region.scene,
                         hint: raw_region.hint,
@@ -235,23 +242,23 @@ impl<'p> ootr::Rando for Rando<'p> {
                         locations: raw_region.locations.into_iter().map(|(loc_name, rule_str)| Ok::<_, RandoErr>((loc_name.clone(), ootr::access::Expr::parse(self, &Check::Location(loc_name), rule_str.trim())?))).try_collect()?,
                         exits: raw_region.exits.into_iter().map(|(to, rule_str)| Ok::<_, RandoErr>((to.clone(), ootr::access::Expr::parse(self, &Check::Exit { to, from: name.clone(), from_mq: dungeon.map(|(_, mq)| mq) }, rule_str.trim())?))).try_collect()?,
                         name,
-                    });
+                    }));
                 }
             }
-            *self.regions.borrow_mut() = Some(regions);
+            *self.regions.borrow_mut() = Some(Arc::new(regions));
         }
-        Ok(Box::new(Ref::map(self.regions.borrow(), |regions| regions.as_ref().expect("just inserted"))))
+        Ok(Arc::clone(self.regions.borrow().as_ref().expect("just inserted")))
     }
 
-    fn setting_infos<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashSet<String>> + 'a>, RandoErr> {
+    fn setting_infos(&self) -> Result<Arc<HashSet<String>>, RandoErr> {
         if self.setting_infos.borrow().is_none() {
             let mut settings = HashSet::default();
             for setting in self.import("SettingsList")?.get("setting_infos")?.iter()? {
                 settings.insert(setting?.getattr("name")?.extract()?);
             }
-            *self.setting_infos.borrow_mut() = Some(settings);
+            *self.setting_infos.borrow_mut() = Some(Arc::new(settings));
         }
-        Ok(Box::new(Ref::map(self.setting_infos.borrow(), |settings| settings.as_ref().expect("just inserted"))))
+        Ok(Arc::clone(self.setting_infos.borrow().as_ref().expect("just inserted")))
     }
 }
 
@@ -268,6 +275,10 @@ fn read_json_lenient_sync<R: BufRead, T: DeserializeOwned>(mut reader: R) -> io:
         line_buf.clear();
     }
     Ok(serde_json::from_str(&buf)?)
+}
+
+pub fn version() -> Version {
+    Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version")
 }
 
 #[test]

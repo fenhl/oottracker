@@ -7,7 +7,7 @@ use {
     },
     enum_iterator::IntoEnumIterator,
     smart_default::SmartDefault,
-    oottracker::model::Medallion,
+    ootr::model::Medallion,
 };
 #[cfg(not(target_arch = "wasm32"))] use {
     std::{
@@ -24,7 +24,10 @@ use {
             self,
             File,
         },
-        prelude::*,
+        io::{
+            AsyncReadExt as _,
+            AsyncWriteExt as _,
+        },
     },
 };
 

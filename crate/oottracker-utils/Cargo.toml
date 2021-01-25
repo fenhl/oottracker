@@ -25,20 +25,29 @@ version = "0.3"
 features = ["paw"]
 
 [dependencies.tokio]
-version = "0.2" #TODO upgrade to 0.3 once supported by reqwest
-features = ["fs", "io-util", "macros", "process", "rt-threaded"]
+version = "1"
+features = ["fs", "io-util", "macros", "process", "rt-multi-thread"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
 
 [target.'cfg(windows)'.dependencies]
-dir-lock = "0.2"
-itertools = "0.9"
+dir-lock = "0.3"
+itertools = "0.10"
 semver = "0.11"
 serde_json = "1"
 tempfile = "3"
 zip = "0.5"
+
+[target.'cfg(windows)'.dependencies.ootr]
+path = "../ootr"
+
+[target.'cfg(windows)'.dependencies.ootr-dynamic]
+path = "../ootr-dynamic"
+
+[target.'cfg(windows)'.dependencies.ootr-static]
+path = "../ootr-static"
 
 [target.'cfg(windows)'.dependencies.oottracker]
 path = "../oottracker"
@@ -50,7 +59,7 @@ path = "../oottracker-bizhawk"
 #path = "../oottracker-csharp"
 
 [target.'cfg(windows)'.dependencies.reqwest]
-version = "0.10"
+version = "0.11"
 default-features = false
 features = ["json", "rustls-tls"]
 

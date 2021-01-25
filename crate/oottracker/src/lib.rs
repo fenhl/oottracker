@@ -64,8 +64,13 @@ impl ModelState {
             access::Expr::AnonymousEvent(at_check, id) => Check::AnonymousEvent(Box::new(at_check.clone()), *id).checked(self).expect(&format!("unimplemented anonymous event check: {} for {}", id, at_check)),
             access::Expr::Eq(left, right) => self.access_exprs_eq(rando, left, right)?,
             access::Expr::Event(event) => Check::Event(event.clone()).checked(self).expect(&format!("unimplemented event check: {}", event)),
-            access::Expr::HasStones(count) => self.ram.save.quest_items.num_stones() >= *count,
-            access::Expr::Item(item, count) => self.ram.save.amount_of_item(item) >= *count,
+            access::Expr::HasStones(count) => self.access_expr_le_val(count, self.ram.save.quest_items.num_stones())?,
+            access::Expr::Item(item, count) => self.access_expr_le_val(count, self.ram.save.amount_of_item(item))?,
+            access::Expr::LogicHelper(helper_name, args) => {
+                let helpers = rando.logic_helpers().expect("failed to load logic helpers");
+                let (params, helper) = helpers.get(helper_name).expect("no such logic helper");
+                self.can_access(rando, &helper.resolve_args(params, args))?
+            }
             access::Expr::Not(inner) => !self.can_access(rando, inner)?,
             access::Expr::Setting(setting) => if let Some(&setting_value) = self.knowledge.bool_settings.get(setting) {
                 setting_value
@@ -84,6 +89,7 @@ impl ModelState {
             },
             access::Expr::Time(range) => self.ram.save.time_of_day.matches(*range), //TODO take location of check into account, as well as available ways to pass time
             access::Expr::True => true,
+            _ => unimplemented!("can_access for {:?}", rule),
         })
     }
 
@@ -115,14 +121,36 @@ impl ModelState {
             (access::Expr::Age, access::Expr::LitStr(s)) if s == "adult" => self.ram.save.is_adult,
             (access::Expr::Age, access::Expr::StartingAge) => true, // we always assume that we started as the current age, since going to the other age requires finding the Temple of Time first
             (access::Expr::ForAge(age1), access::Expr::ForAge(age2)) => age1 == age2,
-            (access::Expr::Item(item1, count1), access::Expr::Item(item2, count2)) => item1 == item2 && count1 == count2,
-            (access::Expr::Item(item, 1), access::Expr::LitStr(s)) |
-            (access::Expr::LitStr(s), access::Expr::Item(item, 1)) => *item == Item::from_str(rando, s).expect(&format!("tried to compare item with non-item string literal {}", s)),
-            (access::Expr::Item(_, _), access::Expr::LitStr(_)) |
-            (access::Expr::LitStr(_), access::Expr::Item(_, _)) => false, // multiple items are never the same as another single item
+            (access::Expr::Item(item1, count1), access::Expr::Item(item2, count2)) => item1 == item2 && self.access_exprs_eq(rando, count1, count2)?,
+            (access::Expr::Item(item, count), access::Expr::LitStr(s)) |
+            (access::Expr::LitStr(s), access::Expr::Item(item, count)) => if self.access_expr_eq_val(count, 1)? {
+                *item == Item::from_str(rando, s).expect(&format!("tried to compare item with non-item string literal {}", s))
+            } else {
+                false // multiple items are never the same as another single item
+            },
+            (access::Expr::LitInt(n1), access::Expr::LitInt(n2)) => n1 == n2,
             (access::Expr::LitStr(s1), access::Expr::LitStr(s2)) => s1 == s2,
+            (access::Expr::LogicHelper(helper_name, args), expr) | (expr, access::Expr::LogicHelper(helper_name, args)) => {
+                let helpers = rando.logic_helpers().expect("failed to load logic helpers");
+                let (params, helper) = helpers.get(helper_name).expect("no such logic helper");
+                self.access_exprs_eq(rando, &helper.resolve_args(params, args), expr)?
+            }
             (access::Expr::Setting(setting), access::Expr::LitStr(_)) => return Err(collect![Check::Setting(setting.clone())]), //TODO check knowledge
             (_, _) => unimplemented!("comparison of access expressions {:?} and {:?}", left, right),
+        })
+    }
+
+    fn access_expr_eq_val(&self, expr: &access::Expr, value: u8) -> Result<bool, HashSet<Check>> {
+        Ok(match expr {
+            access::Expr::LitInt(n) => *n == value,
+            _ => unimplemented!("access expr {:?} == value", expr),
+        })
+    }
+
+    fn access_expr_le_val(&self, expr: &access::Expr, value: u8) -> Result<bool, HashSet<Check>> {
+        Ok(match expr {
+            access::Expr::LitInt(n) => *n <= value,
+            _ => unimplemented!("access expr {:?} <= value", expr),
         })
     }
 }

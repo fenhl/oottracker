@@ -2,15 +2,11 @@ use {
     std::{
         cmp::Ordering::*,
         fmt,
-        io::{
-            self,
-            prelude::*,
-        },
+        io,
         sync::Arc,
     },
     async_proto::Protocol,
     async_stream::try_stream,
-    derive_more::From,
     futures::prelude::*,
     pin_utils::pin_mut,
     tokio::net::TcpStream,
@@ -31,11 +27,10 @@ pub enum Packet {
     KnowledgeInit(knowledge::Knowledge),
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, Clone)]
 pub enum ReadError {
     Io(Arc<io::Error>),
-    #[from]
-    Packet(PacketReadError),
+    Packet(Arc<PacketReadError>),
     VersionMismatch {
         server: u8,
         client: u8,
@@ -45,6 +40,12 @@ pub enum ReadError {
 impl From<io::Error> for ReadError {
     fn from(e: io::Error) -> ReadError {
         ReadError::Io(Arc::new(e))
+    }
+}
+
+impl From<PacketReadError> for ReadError {
+    fn from(e: PacketReadError) -> ReadError {
+        ReadError::Packet(Arc::new(e))
     }
 }
 

@@ -12,8 +12,9 @@ use {
             HashSet,
         },
         fmt,
-        ops::Deref,
+        sync::Arc,
     },
+    semver::Version,
     crate::{
         item::Item,
         region::Region,
@@ -26,17 +27,21 @@ pub mod item;
 pub mod model;
 pub mod region;
 
-pub trait RandoErr: fmt::Debug + Clone {
+pub trait RandoErr: fmt::Debug + fmt::Display + Clone {
     const ITEM_NOT_FOUND: Self;
 }
 
 pub trait Rando {
     type Err: RandoErr;
 
-    fn escaped_items<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashMap<String, Item>> + 'a>, Self::Err>;
-    fn item_table<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashMap<String, Item>> + 'a>, Self::Err>;
-    fn logic_helpers<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashMap<String, (Vec<String>, access::Expr)>> + 'a>, Self::Err>;
-    fn logic_tricks<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashSet<String>> + 'a>, Self::Err>;
-    fn regions<'a>(&'a self) -> Result<Box<dyn Deref<Target = Vec<Region>> + 'a>, Self::Err>;
-    fn setting_infos<'a>(&'a self) -> Result<Box<dyn Deref<Target = HashSet<String>> + 'a>, Self::Err>;
+    fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
+    fn item_table(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
+    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, access::Expr)>>, Self::Err>;
+    fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
+    fn regions(&self) -> Result<Arc<Vec<Arc<Region>>>, Self::Err>;
+    fn setting_infos(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
+}
+
+pub fn version() -> Version {
+    Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version")
 }
