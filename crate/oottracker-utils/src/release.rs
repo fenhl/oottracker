@@ -265,6 +265,16 @@ async fn main() -> Result<(), Error> {
     fs::copy("target/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
     eprintln!("packing oottracker-mac-intel.dmg");
     Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-intel.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil").await?;
+
+    /*
+    eprintln!("building oottracker-mac-arm.app");
+    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo").await?; //TODO remove +beta arg once Rust 1.49 is released
+    fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
+    fs::copy("target/aarch64-apple-darwin/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
+    eprintln!("packing oottracker-mac-arm.dmg");
+    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-arm.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil").await?;
+    */
+
     Ok(())
 }
 
