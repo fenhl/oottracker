@@ -347,10 +347,11 @@ impl TrackerCellKind {
         }
     }
 
-    fn left_click(&self, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) {
+    #[must_use]
+    /// Returns `true` if the menu should be opened.
+    fn left_click(&self, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
-            self.right_click(state);
-            return
+            return self.right_click(state)
         }
         match self {
             Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
@@ -365,6 +366,7 @@ impl TrackerCellKind {
             Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
         }
+        false
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -395,7 +397,7 @@ impl TrackerCellKind {
                 if left { toggle_right(state) }
                 toggle_left(state);
             }
-            _ => self.left_click(KeyboardModifiers::default(), state),
+            _ => assert_eq!(self.left_click(KeyboardModifiers::default(), state), false),
         }
     }
 }
@@ -1113,7 +1115,9 @@ impl Application for State {
             #[cfg(not(target_arch = "wasm32"))]
             Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
             Message::LeftClick(cell) => {
-                #[cfg(not(target_arch = "wasm32"))] cell.kind().left_click(self.keyboard_modifiers, &mut self.model);
+                #[cfg(not(target_arch = "wasm32"))] if cell.kind().left_click(self.keyboard_modifiers, &mut self.model) {
+                    self.menu_state = Some(MenuState::default());
+                }
                 #[cfg(target_arch = "wasm32")] cell.kind().click(&mut self.model);
             }
             #[cfg(not(target_arch = "wasm32"))]
