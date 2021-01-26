@@ -4,7 +4,7 @@
 use {
     std::{
         io,
-        process::Output,
+        process::ExitStatus,
     },
     async_trait::async_trait,
     derive_more::From,
@@ -49,7 +49,7 @@ use {
 
 #[derive(Debug, From)]
 enum Error {
-    CommandExit(&'static str, Output),
+    CommandExit(&'static str, ExitStatus),
     #[cfg(windows)]
     DirLock(dir_lock::Error),
     #[cfg(windows)]
@@ -80,17 +80,17 @@ impl fmt::Display for Error {
 
 #[async_trait]
 trait CommandOutputExt {
-    async fn check(&mut self, name: &'static str) -> Result<Output, Error>;
+    async fn check(&mut self, name: &'static str) -> Result<ExitStatus, Error>;
 }
 
 #[async_trait]
 impl CommandOutputExt for Command {
-    async fn check(&mut self, name: &'static str) -> Result<Output, Error> {
-        let output = self.output().await?;
-        if output.status.success() {
-            Ok(output)
+    async fn check(&mut self, name: &'static str) -> Result<ExitStatus, Error> {
+        let status = self.status().await?;
+        if status.success() {
+            Ok(status)
         } else {
-            Err(Error::CommandExit(name, output))
+            Err(Error::CommandExit(name, status))
         }
     }
 }
