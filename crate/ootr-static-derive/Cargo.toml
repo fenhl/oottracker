@@ -30,7 +30,8 @@ path = "../ootr"
 path = "../ootr-dynamic"
 
 [dependencies.quote-value]
-path = "C:\\Users\\fenhl\\Desktop\\quote-value\\crate\\quote-value" #TODO upload/publish
+git = "https://github.com/fenhl/quote-value" #TODO publish
+branch = "main"
 
 [dependencies.reqwest]
 version = "0.11"

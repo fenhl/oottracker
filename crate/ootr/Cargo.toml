@@ -8,7 +8,8 @@ edition = "2018"
 semver = "0.11"
 
 [dependencies.quote-value]
-path = "C:\\Users\\fenhl\\Desktop\\quote-value\\crate\\quote-value" #TODO upload/publish
+git = "https://github.com/fenhl/quote-value" #TODO publish
+branch = "main"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.async-proto]
 version = "0.3"

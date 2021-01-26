@@ -113,7 +113,7 @@ dependencies = [
  "async-proto-derive",
  "byteorder",
  "derive_more",
- "tokio 1.1.0",
+ "tokio",
 ]
 
 [[package]]
@@ -273,12 +273,6 @@ name = "byteorder"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae44d1a3d5a19df61dd0c8beb138458ac2a53a7ac09eba97d55592540004306b"
-
-[[package]]
-name = "bytes"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
 name = "bytes"
@@ -757,7 +751,7 @@ checksum = "c7db59085d0504e05eb2bfdfe100faaab8d18bdd47f06cd0da1e1a3949fe8697"
 dependencies = [
  "derive_more",
  "heim",
- "tokio 1.1.0",
+ "tokio",
 ]
 
 [[package]]
@@ -1131,7 +1125,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.4",
+ "pin-project-lite",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1467,7 +1461,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b67e66362108efccd8ac053abafc8b7a8d86a37e6e48fc4f6f7485eb5e9e6a5"
 dependencies = [
- "bytes 1.0.1",
+ "bytes",
  "fnv",
  "futures-core",
  "futures-sink",
@@ -1475,7 +1469,7 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio 1.1.0",
+ "tokio",
  "tokio-util",
  "tracing",
  "tracing-futures",
@@ -1694,7 +1688,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7245cd7449cc792608c3c8a9eaf69bd4eabbabf802713748fd739c98b82f0747"
 dependencies = [
- "bytes 1.0.1",
+ "bytes",
  "fnv",
  "itoa",
 ]
@@ -1705,7 +1699,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2861bd27ee074e5ee891e8b539837a9430012e249d7f0ca2d795650f579c1994"
 dependencies = [
- "bytes 1.0.1",
+ "bytes",
  "http",
 ]
 
@@ -1727,7 +1721,7 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12219dc884514cb4a6a03737f4413c0e01c23a1b059b0156004b23f1e19dccbe"
 dependencies = [
- "bytes 1.0.1",
+ "bytes",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -1739,7 +1733,7 @@ dependencies = [
  "itoa",
  "pin-project 1.0.4",
  "socket2",
- "tokio 1.1.0",
+ "tokio",
  "tower-service",
  "tracing",
  "want",
@@ -1755,7 +1749,7 @@ dependencies = [
  "hyper",
  "log",
  "rustls",
- "tokio 1.1.0",
+ "tokio",
  "tokio-rustls",
  "webpki",
 ]
@@ -1785,7 +1779,7 @@ source = "git+https://github.com/hecrj/iced?rev=8d882d787e6b7fd7c2435f42f82933e2
 dependencies = [
  "futures",
  "log",
- "tokio 1.1.0",
+ "tokio",
  "wasm-bindgen-futures",
 ]
 
@@ -2579,7 +2573,7 @@ dependencies = [
  "pin-utils",
  "semver 0.11.0",
  "smart-default",
- "tokio 1.1.0",
+ "tokio",
 ]
 
 [[package]]
@@ -2633,7 +2627,7 @@ dependencies = [
  "serde_json",
  "smart-default",
  "structopt",
- "tokio 1.1.0",
+ "tokio",
  "tokio-stream",
  "wheel",
  "winres",
@@ -2659,7 +2653,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "tempfile",
- "tokio 1.1.0",
+ "tokio",
  "wheel",
  "zip",
 ]
@@ -2834,12 +2828,6 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
-
-[[package]]
-name = "pin-project-lite"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439697af366c49a6d0a010c56a0d97685bc140ce0d377b13a2ea2aa42d64a827"
@@ -2999,6 +2987,7 @@ dependencies = [
 [[package]]
 name = "quote-value"
 version = "0.1.0"
+source = "git+https://github.com/fenhl/quote-value?branch=main#e5871ca1153fb19f0e220188ed2a8cb2c56a8bf1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3009,6 +2998,7 @@ dependencies = [
 [[package]]
 name = "quote-value-derive"
 version = "0.1.0"
+source = "git+https://github.com/fenhl/quote-value?branch=main#e5871ca1153fb19f0e220188ed2a8cb2c56a8bf1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3207,7 +3197,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd281b1030aa675fb90aa994d07187645bb3c8fc756ca766e7c3070b439de9de"
 dependencies = [
  "base64",
- "bytes 1.0.1",
+ "bytes",
  "encoding_rs",
  "futures-core",
  "futures-util",
@@ -3221,12 +3211,12 @@ dependencies = [
  "log",
  "mime",
  "percent-encoding",
- "pin-project-lite 0.2.4",
+ "pin-project-lite",
  "rustls",
  "serde",
  "serde_json",
  "serde_urlencoded",
- "tokio 1.1.0",
+ "tokio",
  "tokio-rustls",
  "url",
  "wasm-bindgen",
@@ -3392,18 +3382,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.122"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "974ef1bd2ad8a507599b336595454081ff68a9599b4890af7643c0c0ed73a62c"
+checksum = "92d5161132722baa40d802cc70b15262b98258453e85e5d1d365c757c73869ae"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.122"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dee1f300f838c8ac340ecb0112b3ac472464fa67e87292bdb3dfc9c49128e17"
+checksum = "9391c295d64fc0abb2c556bad848f33cb8296276b1ad2677d1ae1ace4f258f31"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3745,45 +3735,21 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "0.2.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "099837d3464c16a808060bb3f02263b412f6fafcb5d01c533d309985fbeebe48"
-dependencies = [
- "bytes 0.5.6",
- "num_cpus",
- "pin-project-lite 0.1.11",
- "slab",
- "tokio-macros 0.2.6",
-]
-
-[[package]]
-name = "tokio"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8efab2086f17abcddb8f756117665c958feee6b2e39974c2f1600592ab3a4195"
 dependencies = [
  "autocfg",
- "bytes 1.0.1",
+ "bytes",
  "libc",
  "memchr",
  "mio 0.7.7",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.4",
+ "pin-project-lite",
  "signal-hook-registry",
- "tokio-macros 1.0.0",
+ "tokio-macros",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e44da00bfc73a25f814cd8d7e57a68a5c31b74b3152a0a1d1f590c97ed06265a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -3804,7 +3770,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6844de72e57df1980054b38be3a9f4702aba4858be64dd700181a8a6d0e1b6"
 dependencies = [
  "rustls",
- "tokio 1.1.0",
+ "tokio",
  "webpki",
 ]
 
@@ -3815,8 +3781,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76066865172052eb8796c686f0b441a93df8b08d40a950b062ffb9a426f00edd"
 dependencies = [
  "futures-core",
- "pin-project-lite 0.2.4",
- "tokio 1.1.0",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -3826,12 +3792,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "feb971a26599ffd28066d387f109746df178eff14d5ea1e235015c5601967a4b"
 dependencies = [
  "async-stream",
- "bytes 1.0.1",
+ "bytes",
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.2.4",
- "tokio 1.1.0",
+ "pin-project-lite",
+ "tokio",
  "tokio-stream",
 ]
 
@@ -3857,7 +3823,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f47026cdc4080c07e49b37087de021820269d996f581aac150ef9e5583eefe3"
 dependencies = [
  "cfg-if 1.0.0",
- "pin-project-lite 0.2.4",
+ "pin-project-lite",
  "tracing-core",
 ]
 
@@ -4307,18 +4273,18 @@ dependencies = [
 
 [[package]]
 name = "wheel"
-version = "0.1.3"
-source = "git+https://github.com/fenhl/wheel?branch=main#557ecbb22f86fb869a8df04f51119369a2314616"
+version = "0.2.0"
+source = "git+https://github.com/fenhl/wheel?branch=main#ffc15445348f39067dbd871a9242ce944847e4bb"
 dependencies = [
  "paw",
- "tokio 0.2.24",
+ "tokio",
  "wheel-derive",
 ]
 
 [[package]]
 name = "wheel-derive"
-version = "0.1.3"
-source = "git+https://github.com/fenhl/wheel?branch=main#557ecbb22f86fb869a8df04f51119369a2314616"
+version = "0.2.0"
+source = "git+https://github.com/fenhl/wheel?branch=main#ffc15445348f39067dbd871a9242ce944847e4bb"
 dependencies = [
  "proc-macro2",
  "quote",
