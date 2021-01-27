@@ -8,14 +8,17 @@ use {
         collections::HashMap,
         fmt,
         path::Path,
+        time::Duration,
     },
     derive_more::From,
+    enum_iterator::IntoEnumIterator as _,
     iced::{
         Application,
         Background,
         Color,
         Command,
         Element,
+        HorizontalAlignment,
         Length,
         Settings,
         widget::{
@@ -31,71 +34,59 @@ use {
                 self,
                 Container,
             },
+            pick_list::{
+                self,
+                PickList,
+            },
         },
-        window,
+        window::{
+            self,
+            Icon,
+        },
     },
     iced_futures::Subscription,
+    iced_native::keyboard::Modifiers as KeyboardModifiers,
+    image::DynamicImage,
     itertools::Itertools as _,
     smart_default::SmartDefault,
     structopt::StructOpt,
+    tokio::time::sleep,
     ootr::{
         check::Check,
         model::{
             DungeonReward,
             DungeonRewardLocation,
             MainDungeon,
-            Medallion,
             Stone,
         },
     },
     oottracker::{
         ModelState,
         checks::{
+            self,
             CheckExt as _,
             CheckStatus,
-        },
-        info_tables::*,
-        save::*,
-    },
-    crate::save::{
-        Config,
-        ElementOrder,
-    },
-};
-#[cfg(not(target_arch = "wasm32"))] use {
-    std::time::Duration,
-    enum_iterator::IntoEnumIterator as _,
-    iced::{
-        HorizontalAlignment,
-        pick_list::{
-            self,
-            PickList,
-        },
-        window::Icon,
-    },
-    iced_native::keyboard::Modifiers as KeyboardModifiers,
-    image::DynamicImage,
-    tokio::time::sleep,
-    oottracker::{
-        checks::{
-            self,
             CheckStatusError,
         },
         proto::{
             self,
             Packet,
         },
+        save::*,
+        ui::{
+            *,
+            TrackerCellKind::*,
+        },
     },
 };
 
 mod lang;
-mod save;
-#[cfg(not(target_arch = "wasm32"))] mod tcp_server;
+mod tcp_server;
 
 const CELL_SIZE: u16 = 50;
 const STONE_SIZE: u16 = 33;
 const MEDALLION_LOCATION_HEIGHT: u16 = 18;
-#[cfg(not(target_arch = "wasm32"))] const STONE_LOCATION_HEIGHT: u16 = 12;
+const STONE_LOCATION_HEIGHT: u16 = 12;
 const WIDTH: u32 = CELL_SIZE as u32 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
 const HEIGHT: u32 = MEDALLION_LOCATION_HEIGHT as u32 + CELL_SIZE as u32 * 7 + 9; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 1px spacing
 
@@ -104,18 +95,11 @@ pub trait FromEmbeddedImage {
 }
 
 impl FromEmbeddedImage for Image {
-    #[cfg(not(target_arch = "wasm32"))]
     fn from_embedded_image(_: &Path, contents: &[u8]) -> Image {
         Image::new(iced::image::Handle::from_memory(contents.to_vec()))
     }
-
-    #[cfg(target_arch = "wasm32")]
-    fn from_embedded_image(path: &Path, _: &[u8]) -> Image {
-        Image::new(iced::image::Handle::from_path(path))
-    }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl FromEmbeddedImage for DynamicImage {
     fn from_embedded_image(_: &Path, contents: &[u8]) -> DynamicImage {
         image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
@@ -125,18 +109,12 @@ impl FromEmbeddedImage for DynamicImage {
 mod images {
     use super::FromEmbeddedImage;
 
-    oottracker_derive::embed_images!("assets/xopar-images");
-    oottracker_derive::embed_images!("assets/xopar-images-count");
-    oottracker_derive::embed_images!("assets/xopar-images-dimmed");
-    oottracker_derive::embed_images!("assets/xopar-images-overlay");
-    oottracker_derive::embed_images!("assets/xopar-images-overlay-dimmed");
+    oottracker_derive::embed_images!("assets/img/xopar-images");
+    oottracker_derive::embed_images!("assets/img/xopar-images-count");
+    oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");
+    oottracker_derive::embed_images!("assets/img/xopar-images-overlay");
+    oottracker_derive::embed_images!("assets/img/xopar-images-overlay-dimmed");
     oottracker_derive::embed_image!("assets/icon.ico");
-}
-
-#[cfg(target_arch = "wasm32")]
-#[derive(Debug, Default)]
-struct KeyboardModifiers {
-    control: bool,
 }
 
 struct ContainerStyle;
@@ -150,102 +128,13 @@ impl container::StyleSheet for ContainerStyle {
     }
 }
 
-trait DungeonRewardLocationExt {
-    fn increment(&mut self, key: DungeonReward);
-    #[cfg(not(target_arch = "wasm32"))]
-    fn decrement(&mut self, key: DungeonReward);
+trait TrackerCellKindExt {
+    fn render(&self, state: &ModelState) -> Image;
+    #[must_use] fn left_click(&self, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool;
+    #[must_use] fn right_click(&self, state: &mut ModelState) -> bool;
 }
 
-impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> {
-    fn increment(&mut self, key: DungeonReward) {
-        match self.get(&key) {
-            None => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => self.insert(key, DungeonRewardLocation::LinksPocket),
-            Some(DungeonRewardLocation::LinksPocket) => self.remove(&key),
-        };
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn decrement(&mut self, key: DungeonReward) {
-        match self.get(&key) {
-            None => self.insert(key, DungeonRewardLocation::LinksPocket),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => self.remove(&key),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-            Some(DungeonRewardLocation::LinksPocket) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-        };
-    }
-}
-
-enum TrackerCellKind {
-    Composite {
-        left_img: &'static str,
-        right_img: &'static str,
-        both_img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_left: Box<dyn Fn(&mut ModelState)>,
-        toggle_right: Box<dyn Fn(&mut ModelState)>,
-    },
-    Count {
-        dimmed_img: &'static str,
-        img: &'static str,
-        get: Box<dyn Fn(&ModelState) -> u8>,
-        set: Box<dyn Fn(&mut ModelState, u8)>,
-        max: u8,
-    },
-    Medallion(Medallion),
-    MedallionLocation(Medallion),
-    OptionalOverlay {
-        main_img: &'static str,
-        overlay_img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState)>,
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
-    },
-    Overlay {
-        main_img: &'static str,
-        overlay_img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
-    },
-    Sequence {
-        img: Box<dyn Fn(&ModelState) -> (bool, &'static str)>,
-        increment: Box<dyn Fn(&mut ModelState)>,
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box<dyn Fn(&mut ModelState)>,
-    },
-    Simple {
-        img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> bool>,
-        toggle: Box<dyn Fn(&mut ModelState)>,
-    },
-    Song {
-        song: QuestItems,
-        check: &'static str,
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
-    },
-    Stone(Stone),
-    StoneLocation(Stone),
-}
-
-use TrackerCellKind::*;
-
-impl TrackerCellKind {
+impl TrackerCellKindExt for TrackerCellKind {
     fn render(&self, state: &ModelState) -> Image {
         match self {
             Composite { left_img, right_img, both_img, active, .. } => match active(state) {
@@ -369,7 +258,6 @@ impl TrackerCellKind {
         false
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     #[must_use]
     /// Returns `true` if the menu should be opened.
     fn right_click(&self, state: &mut ModelState) -> bool {
@@ -388,450 +276,34 @@ impl TrackerCellKind {
         }
         false
     }
-
-    #[cfg(target_arch = "wasm32")]
-    fn click(&self, state: &mut ModelState) {
-        match self {
-            Composite { active, toggle_left, toggle_right, .. } | Overlay { active, toggle_main: toggle_left, toggle_overlay: toggle_right, .. } => {
-                let (left, _) = active(state);
-                if left { toggle_right(state) }
-                toggle_left(state);
-            }
-            _ => assert_eq!(self.left_click(KeyboardModifiers::default(), state), false),
-        }
-    }
 }
 
-macro_rules! cells {
-    ($($cell:ident: $kind:expr,)*) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        enum TrackerCellId {
-            $(
-                $cell,
-            )*
-        }
-
-        impl TrackerCellId {
-            fn kind(&self) -> TrackerCellKind {
-                match self {
-                    $(TrackerCellId::$cell => $kind,)*
-                }
-            }
-        }
-    }
+trait TrackerCellIdExt {
+    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message>;
 }
 
-cells! {
-    LightMedallionLocation: MedallionLocation(Medallion::Light),
-    ForestMedallionLocation: MedallionLocation(Medallion::Forest),
-    FireMedallionLocation: MedallionLocation(Medallion::Fire),
-    WaterMedallionLocation: MedallionLocation(Medallion::Water),
-    ShadowMedallionLocation: MedallionLocation(Medallion::Shadow),
-    SpiritMedallionLocation: MedallionLocation(Medallion::Spirit),
-    LightMedallion: Medallion(Medallion::Light),
-    ForestMedallion: Medallion(Medallion::Forest),
-    FireMedallion: Medallion(Medallion::Fire),
-    WaterMedallion: Medallion(Medallion::Water),
-    ShadowMedallion: Medallion(Medallion::Shadow),
-    SpiritMedallion: Medallion(Medallion::Spirit),
-    AdultTrade: Sequence {
-        img: Box::new(|state| match state.ram.save.inv.adult_trade_item {
-            AdultTradeItem::None => (false, "blue_egg"),
-            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
-            AdultTradeItem::Cojiro => (true, "cojiro"),
-            AdultTradeItem::OddMushroom => (true, "odd_mushroom"),
-            AdultTradeItem::OddPotion => (true, "odd_poultice"),
-            AdultTradeItem::PoachersSaw => (true, "poachers_saw"),
-            AdultTradeItem::BrokenSword => (true, "broken_sword"),
-            AdultTradeItem::Prescription => (true, "prescription"),
-            AdultTradeItem::EyeballFrog => (true, "eyeball_frog"),
-            AdultTradeItem::Eyedrops => (true, "eye_drops"),
-            AdultTradeItem::ClaimCheck => (true, "claim_check"),
-        }),
-        increment: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
-            AdultTradeItem::None => AdultTradeItem::PocketEgg,
-            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::Cojiro,
-            AdultTradeItem::Cojiro => AdultTradeItem::OddMushroom,
-            AdultTradeItem::OddMushroom => AdultTradeItem::OddPotion,
-            AdultTradeItem::OddPotion => AdultTradeItem::PoachersSaw,
-            AdultTradeItem::PoachersSaw => AdultTradeItem::BrokenSword,
-            AdultTradeItem::BrokenSword => AdultTradeItem::Prescription,
-            AdultTradeItem::Prescription => AdultTradeItem::EyeballFrog,
-            AdultTradeItem::EyeballFrog => AdultTradeItem::Eyedrops,
-            AdultTradeItem::Eyedrops => AdultTradeItem::ClaimCheck,
-            AdultTradeItem::ClaimCheck => AdultTradeItem::None,
-        }),
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
-            AdultTradeItem::None => AdultTradeItem::ClaimCheck,
-            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::None,
-            AdultTradeItem::Cojiro => AdultTradeItem::PocketEgg,
-            AdultTradeItem::OddMushroom => AdultTradeItem::Cojiro,
-            AdultTradeItem::OddPotion => AdultTradeItem::OddMushroom,
-            AdultTradeItem::PoachersSaw => AdultTradeItem::OddPotion,
-            AdultTradeItem::BrokenSword => AdultTradeItem::PoachersSaw,
-            AdultTradeItem::Prescription => AdultTradeItem::BrokenSword,
-            AdultTradeItem::EyeballFrog => AdultTradeItem::Prescription,
-            AdultTradeItem::Eyedrops => AdultTradeItem::EyeballFrog,
-            AdultTradeItem::ClaimCheck => AdultTradeItem::Eyedrops,
-        }),
-    },
-    Skulltula: Count {
-        dimmed_img: "golden_skulltula",
-        img: "skulls",
-        get: Box::new(|state| state.ram.save.skull_tokens),
-        set: Box::new(|state, value| state.ram.save.skull_tokens = value),
-        max: 100,
-    },
-    KokiriEmeraldLocation: StoneLocation(Stone::KokiriEmerald),
-    KokiriEmerald: Stone(Stone::KokiriEmerald),
-    GoronRubyLocation: StoneLocation(Stone::GoronRuby),
-    GoronRuby: Stone(Stone::GoronRuby),
-    ZoraSapphireLocation: StoneLocation(Stone::ZoraSapphire),
-    ZoraSapphire: Stone(Stone::ZoraSapphire),
-    Bottle: OptionalOverlay {
-        main_img: "bottle",
-        overlay_img: "letter",
-        active: Box::new(|state| (state.ram.save.inv.has_emptiable_bottle(), state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
-        toggle_main: Box::new(|state| state.ram.save.inv.toggle_emptiable_bottle()),
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
-    },
-    Scale: Sequence {
-        img: Box::new(|state| match state.ram.save.upgrades.scale() {
-            Upgrades::SILVER_SCALE => (true, "silver_scale"),
-            Upgrades::GOLD_SCALE => (true, "gold_scale"),
-            _ => (false, "silver_scale"),
-        }),
-        increment: Box::new(|state| state.ram.save.upgrades.set_scale(match state.ram.save.upgrades.scale() {
-            Upgrades::SILVER_SCALE => Upgrades::GOLD_SCALE,
-            Upgrades::GOLD_SCALE => Upgrades::NONE,
-            _ => Upgrades::SILVER_SCALE,
-        })),
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box::new(|state| state.ram.save.upgrades.set_scale(match state.ram.save.upgrades.scale() {
-            Upgrades::SILVER_SCALE => Upgrades::NONE,
-            Upgrades::GOLD_SCALE => Upgrades::SILVER_SCALE,
-            _ => Upgrades::GOLD_SCALE,
-        })),
-    },
-    Slingshot: Simple {
-        img: "slingshot",
-        active: Box::new(|state| state.ram.save.inv.slingshot),
-        toggle: Box::new(|state| state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot),
-    },
-    Bombs: Overlay {
-        main_img: "bomb_bag",
-        overlay_img: "bombchu",
-        active: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, state.ram.save.inv.bombchus)),
-        toggle_main: Box::new(|state| if state.ram.save.upgrades.bomb_bag() == Upgrades::NONE {
-            state.ram.save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG);
-        } else {
-            state.ram.save.upgrades.set_bomb_bag(Upgrades::NONE)
-        }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.bombchus = !state.ram.save.inv.bombchus),
-    },
-    Boomerang: Simple {
-        img: "boomerang",
-        active: Box::new(|state| state.ram.save.inv.boomerang),
-        toggle: Box::new(|state| state.ram.save.inv.boomerang = !state.ram.save.inv.boomerang),
-    },
-    Strength: Sequence {
-        img: Box::new(|state| match state.ram.save.upgrades.strength() {
-            Upgrades::GORON_BRACELET => (true, "goron_bracelet"),
-            Upgrades::SILVER_GAUNTLETS => (true, "silver_gauntlets"),
-            Upgrades::GOLD_GAUNTLETS => (true, "gold_gauntlets"),
-            _ => (false, "goron_bracelet"),
-        }),
-        increment: Box::new(|state| state.ram.save.upgrades.set_strength(match state.ram.save.upgrades.strength() {
-            Upgrades::GORON_BRACELET => Upgrades::SILVER_GAUNTLETS,
-            Upgrades::SILVER_GAUNTLETS => Upgrades::GOLD_GAUNTLETS,
-            Upgrades::GOLD_GAUNTLETS => Upgrades::NONE,
-            _ => Upgrades::GORON_BRACELET,
-        })),
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box::new(|state| state.ram.save.upgrades.set_strength(match state.ram.save.upgrades.strength() {
-            Upgrades::GORON_BRACELET => Upgrades::NONE,
-            Upgrades::SILVER_GAUNTLETS => Upgrades::GORON_BRACELET,
-            Upgrades::GOLD_GAUNTLETS => Upgrades::SILVER_GAUNTLETS,
-            _ => Upgrades::GOLD_GAUNTLETS,
-        })),
-    },
-    Magic: Overlay {
-        main_img: "magic",
-        overlay_img: "lens",
-        active: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, state.ram.save.inv.lens)),
-        toggle_main: Box::new(|state| if state.ram.save.magic == MagicCapacity::None {
-            state.ram.save.magic = MagicCapacity::Small;
-        } else {
-            state.ram.save.magic = MagicCapacity::None;
-        }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
-    },
-    Spells: Composite {
-        left_img: "dins_fire",
-        right_img: "faores_wind",
-        both_img: "composite_magic",
-        active: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
-        toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
-        toggle_right: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
-    },
-    Hookshot: Sequence {
-        img: Box::new(|state| match state.ram.save.inv.hookshot {
-            Hookshot::None => (false, "hookshot"),
-            Hookshot::Hookshot => (true, "hookshot_accessible"),
-            Hookshot::Longshot => (true, "longshot_accessible"),
-        }),
-        increment: Box::new(|state| state.ram.save.inv.hookshot = match state.ram.save.inv.hookshot {
-            Hookshot::None => Hookshot::Hookshot,
-            Hookshot::Hookshot => Hookshot::Longshot,
-            Hookshot::Longshot => Hookshot::None,
-        }),
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box::new(|state| state.ram.save.inv.hookshot = match state.ram.save.inv.hookshot {
-            Hookshot::None => Hookshot::Longshot,
-            Hookshot::Hookshot => Hookshot::None,
-            Hookshot::Longshot => Hookshot::Hookshot,
-        }),
-    },
-    Bow: OptionalOverlay {
-        main_img: "bow",
-        overlay_img: "ice_arrows",
-        active: Box::new(|state| (state.ram.save.inv.bow, state.ram.save.inv.ice_arrows)),
-        toggle_main: Box::new(|state| state.ram.save.inv.bow = !state.ram.save.inv.bow),
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
-    },
-    Arrows: Composite {
-        left_img: "fire_arrows",
-        right_img: "light_arrows",
-        both_img: "composite_arrows",
-        active: Box::new(|state| (state.ram.save.inv.fire_arrows, state.ram.save.inv.light_arrows)),
-        toggle_left: Box::new(|state| state.ram.save.inv.fire_arrows = !state.ram.save.inv.fire_arrows),
-        toggle_right: Box::new(|state| state.ram.save.inv.light_arrows = !state.ram.save.inv.light_arrows),
-    },
-    Hammer: Simple {
-        img: "hammer",
-        active: Box::new(|state| state.ram.save.inv.hammer),
-        toggle: Box::new(|state| state.ram.save.inv.hammer = !state.ram.save.inv.hammer),
-    },
-    Boots: Composite {
-        left_img: "iron_boots",
-        right_img: "hover_boots",
-        both_img: "composite_boots",
-        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::IRON_BOOTS), state.ram.save.equipment.contains(Equipment::HOVER_BOOTS))),
-        toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::IRON_BOOTS)),
-        toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::HOVER_BOOTS)),
-    },
-    MirrorShield: Simple {
-        img: "mirror_shield",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::MIRROR_SHIELD)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::MIRROR_SHIELD)),
-    },
-    ChildTrade: Sequence {
-        img: Box::new(|state| match state.ram.save.inv.child_trade_item {
-            ChildTradeItem::None => (false, "white_egg"),
-            ChildTradeItem::WeirdEgg => (true, "white_egg"),
-            ChildTradeItem::Chicken => (true, "white_chicken"),
-            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
-            ChildTradeItem::KeatonMask => (true, "keaton_mask"),
-            ChildTradeItem::SkullMask => (true, "skull_mask"),
-            ChildTradeItem::SpookyMask => (true, "spooky_mask"),
-            ChildTradeItem::BunnyHood => (true, "bunny_hood"),
-            ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
-        }),
-        increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
-            ChildTradeItem::None => ChildTradeItem::WeirdEgg,
-            ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
-            ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
-            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::KeatonMask, //TODO for SOLD OUT, check trade quest progress
-            ChildTradeItem::KeatonMask => ChildTradeItem::SkullMask,
-            ChildTradeItem::SkullMask => ChildTradeItem::SpookyMask,
-            ChildTradeItem::SpookyMask => ChildTradeItem::BunnyHood,
-            ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
-            ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
-        }),
-        #[cfg(not(target_arch = "wasm32"))]
-        decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
-            ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
-            ChildTradeItem::WeirdEgg => ChildTradeItem::None,
-            ChildTradeItem::Chicken => ChildTradeItem::WeirdEgg,
-            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::Chicken, //TODO for SOLD OUT, check trade quest progress
-            ChildTradeItem::KeatonMask => ChildTradeItem::ZeldasLetter,
-            ChildTradeItem::SkullMask => ChildTradeItem::KeatonMask,
-            ChildTradeItem::SpookyMask => ChildTradeItem::SkullMask,
-            ChildTradeItem::BunnyHood => ChildTradeItem::SpookyMask,
-            ChildTradeItem::MaskOfTruth => ChildTradeItem::BunnyHood,
-        }),
-    },
-    Ocarina: Overlay {
-        main_img: "ocarina",
-        overlay_img: "scarecrow",
-        active: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
-        toggle_main: Box::new(|state| state.ram.save.inv.ocarina = !state.ram.save.inv.ocarina),
-        toggle_overlay: Box::new(|state| state.ram.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)), //TODO make sure free scarecrow knowledge is toggled off properly
-    },
-    Beans: Simple { //TODO overlay with number bought if autotracker is on & shuffle beans is off
-        img: "beans",
-        active: Box::new(|state| state.ram.save.inv.beans),
-        toggle: Box::new(|state| state.ram.save.inv.beans = !state.ram.save.inv.beans),
-    },
-    SwordCard: Composite {
-        left_img: "kokiri_sword",
-        right_img: "gerudo_card",
-        both_img: "composite_ksword_gcard",
-        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD))),
-        toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
-        toggle_right: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
-    },
-    Tunics: Composite {
-        left_img: "goron_tunic",
-        right_img: "zora_tunic",
-        both_img: "composite_tunics",
-        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::GORON_TUNIC), state.ram.save.equipment.contains(Equipment::ZORA_TUNIC))),
-        toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::GORON_TUNIC)),
-        toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
-    },
-    Triforce: Count { //TODO if triforce hunt is off and autotracker is on, replace with something else (big poes?)
-        dimmed_img: "triforce",
-        img: "force",
-        get: Box::new(|state| state.ram.save.triforce_pieces()),
-        set: Box::new(|state, value| state.ram.save.set_triforce_pieces(value)),
-        max: 100,
-    },
-    ZeldasLullaby: Song {
-        song: QuestItems::ZELDAS_LULLABY,
-        check: "Song from Impa",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_IMPA)),
-    },
-    EponasSong: Song {
-        song: QuestItems::EPONAS_SONG,
-        check: "Song from Malon",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_MALON)),
-    },
-    SariasSong: Song {
-        song: QuestItems::SARIAS_SONG,
-        check: "Song from Saria",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
-    },
-    SunsSong: Song {
-        song: QuestItems::SUNS_SONG,
-        check: "Song from Composers Grave",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
-    },
-    SongOfTime: Song {
-        song: QuestItems::SONG_OF_TIME,
-        check: "Song from Ocarina of Time",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SONG_FROM_OCARINA_OF_TIME)),
-    },
-    SongOfStorms: Song {
-        song: QuestItems::SONG_OF_STORMS,
-        check: "Song from Windmill",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_WINDMILL)),
-    },
-    Minuet: Song {
-        song: QuestItems::MINUET_OF_FOREST,
-        check: "Sheik in Forest",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_FOREST)),
-    },
-    Bolero: Song {
-        song: QuestItems::BOLERO_OF_FIRE,
-        check: "Sheik in Crater",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_CRATER)),
-    },
-    Serenade: Song {
-        song: QuestItems::SERENADE_OF_WATER,
-        check: "Sheik in Ice Cavern",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_ICE_CAVERN)),
-    },
-    Requiem: Song {
-        song: QuestItems::REQUIEM_OF_SPIRIT,
-        check: "Sheik at Colossus",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SHEIK_AT_COLOSSUS)),
-    },
-    Nocturne: Song {
-        song: QuestItems::NOCTURNE_OF_SHADOW,
-        check: "Sheik in Kakariko",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_KAKARIKO)),
-    },
-    Prelude: Song {
-        song: QuestItems::PRELUDE_OF_LIGHT,
-        check: "Sheik at Temple",
-        #[cfg(not(target_arch = "wasm32"))]
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
-    },
-}
-
-impl TrackerCellId {
-    fn med_location(med: Medallion) -> TrackerCellId {
-        match med {
-            Medallion::Light => TrackerCellId::LightMedallionLocation,
-            Medallion::Forest => TrackerCellId::ForestMedallionLocation,
-            Medallion::Fire => TrackerCellId::FireMedallionLocation,
-            Medallion::Water => TrackerCellId::WaterMedallionLocation,
-            Medallion::Shadow => TrackerCellId::ShadowMedallionLocation,
-            Medallion::Spirit => TrackerCellId::SpiritMedallionLocation,
-        }
-    }
-
-    fn warp_song(med: Medallion) -> TrackerCellId {
-        match med {
-            Medallion::Light => TrackerCellId::Prelude,
-            Medallion::Forest => TrackerCellId::Minuet,
-            Medallion::Fire => TrackerCellId::Bolero,
-            Medallion::Water => TrackerCellId::Serenade,
-            Medallion::Shadow => TrackerCellId::Nocturne,
-            Medallion::Spirit => TrackerCellId::Requiem,
-        }
-    }
-
+impl TrackerCellIdExt for TrackerCellId {
     fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> {
         let content = self.kind().render(state);
         if let Some(cell_button) = cell_button {
-            Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(*self).into()
+            Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(DefaultButtonStyle).into()
         } else {
             content.into()
         }
     }
 }
 
-impl From<Medallion> for TrackerCellId {
-    fn from(med: Medallion) -> TrackerCellId {
-        match med {
-            Medallion::Light => TrackerCellId::LightMedallion,
-            Medallion::Forest => TrackerCellId::ForestMedallion,
-            Medallion::Fire => TrackerCellId::FireMedallion,
-            Medallion::Water => TrackerCellId::WaterMedallion,
-            Medallion::Shadow => TrackerCellId::ShadowMedallion,
-            Medallion::Spirit => TrackerCellId::SpiritMedallion,
-        }
-    }
-}
+struct DefaultButtonStyle;
 
-impl button::StyleSheet for TrackerCellId {
+impl button::StyleSheet for DefaultButtonStyle {
     fn active(&self) -> button::Style { button::Style::default() }
 }
 
-struct TrackerLayout {
-    meds: ElementOrder,
-    row2: [TrackerCellId; 4],
-    rest: [[TrackerCellId; 6]; 4],
-    warp_songs: ElementOrder,
+trait TrackerLayoutExt {
+    fn cell_at(&self, pos: [f32; 2], include_songs: bool) -> Option<TrackerCellId>;
 }
 
-impl TrackerLayout {
-    #[cfg(not(target_arch = "wasm32"))]
+impl TrackerLayoutExt for TrackerLayout {
     fn cell_at(&self, [x, y]: [f32; 2], include_songs: bool) -> Option<TrackerCellId> {
         if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + 1.0 {
             for (i, med) in self.meds.into_iter().enumerate() {
@@ -896,89 +368,43 @@ impl TrackerLayout {
     }
 }
 
-impl Default for TrackerLayout {
-    fn default() -> TrackerLayout { TrackerLayout::from(&Config::default()) }
-}
-
-impl<'a> From<&'a Config> for TrackerLayout {
-    fn from(config: &Config) -> TrackerLayout {
-        use self::TrackerCellId::*;
-
-        TrackerLayout {
-            meds: config.med_order,
-            row2: [AdultTrade, Skulltula, Bottle, Scale],
-            rest: [
-                [Slingshot, Bombs, Boomerang, Strength, Magic, Spells],
-                [Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield],
-                [ChildTrade, Ocarina, Beans, SwordCard, Tunics, Triforce],
-                [ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms],
-            ],
-            warp_songs: config.warp_song_order,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 enum Message {
-    #[cfg(not(target_arch = "wasm32"))]
     AutoDismissNotification,
-    #[cfg(not(target_arch = "wasm32"))]
     CheckStatusErrorStatic(CheckStatusError<ootr_static::Rando>),
-    #[cfg(not(target_arch = "wasm32"))]
     ClientConnected,
-    #[cfg(not(target_arch = "wasm32"))]
     ClientDisconnected,
-    #[cfg(not(target_arch = "wasm32"))]
     CloseMenu,
-    #[cfg(not(target_arch = "wasm32"))]
-    ConfigError(save::Error),
+    ConfigError(oottracker::ui::Error),
     DismissNotification,
-    #[cfg(not(target_arch = "wasm32"))]
     DismissWelcomeScreen,
-    #[cfg(not(target_arch = "wasm32"))]
     KeyboardModifiers(KeyboardModifiers),
     LeftClick(TrackerCellId),
-    #[cfg(not(target_arch = "wasm32"))]
     LoadConfig(Config),
-    #[cfg(not(target_arch = "wasm32"))]
     MissingConfig,
-    #[cfg(not(target_arch = "wasm32"))]
     MouseMoved([f32; 2]),
-    #[cfg(not(target_arch = "wasm32"))]
     NetworkError(proto::ReadError),
-    #[cfg(not(target_arch = "wasm32"))]
     Nop,
-    #[cfg(not(target_arch = "wasm32"))]
     Packet(Packet),
-    #[cfg(not(target_arch = "wasm32"))]
     RightClick,
-    #[cfg(not(target_arch = "wasm32"))]
     SetMedOrder(ElementOrder),
-    #[cfg(not(target_arch = "wasm32"))]
     SetWarpSongOrder(ElementOrder),
-    #[cfg(not(target_arch = "wasm32"))]
     UpdateAvailableChecks(HashMap<Check, CheckStatus>),
 }
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            #[cfg(not(target_arch = "wasm32"))]
             Message::CheckStatusErrorStatic(e) => write!(f, "error calculating checks: {}", e),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => write!(f, "auto-tracker connected"),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientDisconnected => write!(f, "auto-tracker disconnected"),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::ConfigError(e) => write!(f, "error loading/saving preferences: {}", e),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::NetworkError(e) => write!(f, "network error: {}", e),
             _ => write!(f, "{:?}", self), // these messages are not notifications so just fall back to Debug
         }
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Default)]
 struct MenuState {
     med_order: pick_list::State<ElementOrder>,
@@ -989,7 +415,6 @@ struct MenuState {
 #[derive(Debug, SmartDefault)]
 struct State {
     flags: bool,
-    #[cfg(not(target_arch = "wasm32"))]
     config: Config,
     client_connected: bool,
     keyboard_modifiers: KeyboardModifiers,
@@ -1001,7 +426,6 @@ struct State {
     checks: HashMap<Check, CheckStatus>,
     notification: Option<(bool, Message)>,
     dismiss_notification_button: button::State,
-    #[cfg(not(target_arch = "wasm32"))]
     menu_state: Option<MenuState>,
 }
 
@@ -1020,25 +444,21 @@ fn default_cell_buttons() -> [button::State; 52] {
 
 impl State {
     fn layout(&self) -> TrackerLayout {
-        #[cfg(not(target_arch = "wasm32"))] { TrackerLayout::from(&self.config) }
-        #[cfg(target_arch = "wasm32")] { TrackerLayout::default() }
+        TrackerLayout::from(&self.config)
     }
 
     /// Adds a visible notification/alert/log message.
     ///
     /// Implemented as a separate method in case the way this is displayed is changed later, e.g. to allow multiple notifications.
-    #[cfg(not(target_arch = "wasm32"))]
     fn notify(&mut self, message: Message) {
         self.notification = Some((false, message));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn notify_temp(&mut self, message: Message) -> Command<Message> {
         self.notification = Some((true, message));
         async { sleep(Duration::from_secs(10)).await; Message::AutoDismissNotification }.into()
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn save_config(&self) -> Command<Message> {
         let config = self.config.clone();
         async move {
@@ -1065,15 +485,13 @@ impl Application for State {
     type Flags = bool;
 
     fn new(flags: bool) -> (State, Command<Message>) {
-        #[cfg(not(target_arch = "wasm32"))] let command = async {
+        (State::from(flags), async {
             match Config::new().await {
                 Ok(Some(config)) => Message::LoadConfig(config),
                 Ok(None) => Message::MissingConfig,
                 Err(e) => Message::ConfigError(e),
             }
-        }.into();
-        #[cfg(target_arch = "wasm32")] let command = Command::none();
-        (State::from(flags), command)
+        }.into())
     }
 
     fn title(&self) -> String {
@@ -1086,54 +504,37 @@ impl Application for State {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            #[cfg(not(target_arch = "wasm32"))]
             Message::AutoDismissNotification => if let Some((true, _)) = self.notification {
                 self.notification = None;
             },
-            #[cfg(not(target_arch = "wasm32"))]
             Message::CheckStatusErrorStatic(_) => self.notify(message),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientConnected => {
                 self.client_connected = true;
                 return self.notify_temp(message)
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::ClientDisconnected => {
                 self.client_connected = false;
                 self.notify(message);
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::CloseMenu => self.menu_state = None,
-            #[cfg(not(target_arch = "wasm32"))]
             Message::ConfigError(_) => self.notify(message),
             Message::DismissNotification => self.notification = None,
-            #[cfg(not(target_arch = "wasm32"))]
             Message::DismissWelcomeScreen => {
                 self.dismiss_welcome_screen_button = None;
                 return self.save_config()
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
-            Message::LeftClick(cell) => {
-                #[cfg(not(target_arch = "wasm32"))] if cell.kind().left_click(self.keyboard_modifiers, &mut self.model) {
-                    self.menu_state = Some(MenuState::default());
-                }
-                #[cfg(target_arch = "wasm32")] cell.kind().click(&mut self.model);
-            }
-            #[cfg(not(target_arch = "wasm32"))]
+            Message::LeftClick(cell) => if cell.kind().left_click(self.keyboard_modifiers, &mut self.model) {
+                self.menu_state = Some(MenuState::default());
+            },
             Message::LoadConfig(config) => match config.version {
                 0 => self.config = config,
                 v => unimplemented!("config version from the future: {}", v),
             },
-            #[cfg(not(target_arch = "wasm32"))]
             Message::MissingConfig => self.dismiss_welcome_screen_button = Some(button::State::default()),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::MouseMoved(pos) => self.last_cursor_pos = pos,
-            #[cfg(not(target_arch = "wasm32"))]
             Message::NetworkError(_) => self.notify(message),
-            #[cfg(not(target_arch = "wasm32"))]
             Message::Nop => {}
-            #[cfg(not(target_arch = "wasm32"))]
             Message::Packet(packet) => {
                 match packet {
                     Packet::Goodbye => unreachable!(), // Goodbye is not yielded from proto::read
@@ -1145,7 +546,7 @@ impl Application for State {
                     let model = self.model.clone();
                     return async move {
                         tokio::task::spawn_blocking(move || {
-                            let rando = ootr_static::Rando; //TODO use precompiled data by default, allow specifying dynamic Rando path in settings
+                            let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
                             match checks::status(&rando, &model) {
                                 Ok(status) => Message::UpdateAvailableChecks(status),
                                 Err(e) => Message::CheckStatusErrorStatic(e),
@@ -1154,7 +555,6 @@ impl Application for State {
                     }.into()
                 }
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::RightClick => {
                 if self.menu_state.is_none() {
                     if let Some(cell) = self.layout().cell_at(self.last_cursor_pos, self.notification.is_none()) {
@@ -1164,17 +564,14 @@ impl Application for State {
                     }
                 }
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::SetMedOrder(med_order) => {
                 self.config.med_order = med_order;
                 return self.save_config()
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::SetWarpSongOrder(warp_song_order) => {
                 self.config.warp_song_order = warp_song_order;
                 return self.save_config()
             }
-            #[cfg(not(target_arch = "wasm32"))]
             Message::UpdateAvailableChecks(checks) => self.checks = checks,
         }
         Command::none()
@@ -1190,7 +587,7 @@ impl Application for State {
             }}
         }
 
-        #[cfg(not(target_arch = "wasm32"))] if let Some(ref mut menu_state) = self.menu_state {
+        if let Some(ref mut menu_state) = self.menu_state {
             return Column::new()
                 .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
                 .push(Text::new("Medallion order:"))
@@ -1209,16 +606,13 @@ impl Application for State {
         let view = Column::new()
             .push(med_locations.spacing(1))
             .push(meds.spacing(1));
-        #[cfg_attr(target_arch = "wasm32", allow(unused))] let view = if let Some(ref mut dismiss_button) = self.dismiss_welcome_screen_button {
-            #[cfg(not(target_arch = "wasm32"))] {
-                view.push(Text::new("Welcome to the OoT tracker!\nTo change settings, right-click a Medallion.")
-                        .color([1.0, 1.0, 1.0])
-                        .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                    )
-                    .push(Button::new(dismiss_button, Text::new("OK")).on_press(Message::DismissWelcomeScreen))
-            }
-            #[cfg(target_arch = "wasm32")] { unreachable!("welcome screen should not be shown on web") }
+        let view = if let Some(ref mut dismiss_button) = self.dismiss_welcome_screen_button {
+            view.push(Text::new("Welcome to the OoT tracker!\nTo change settings, right-click a Medallion.")
+                    .color([1.0, 1.0, 1.0])
+                    .width(Length::Fill)
+                    .horizontal_alignment(HorizontalAlignment::Center)
+                )
+                .push(Button::new(dismiss_button, Text::new("OK")).on_press(Message::DismissWelcomeScreen))
         } else {
             let mut view = view.push(Row::new()
                     .push(cell!(layout.row2[0]))
@@ -1294,20 +688,15 @@ impl Application for State {
     }
 
     fn subscription(&self) -> iced::Subscription<Message> {
-        #[cfg(not(target_arch = "wasm32"))] {
-            Subscription::batch(vec![
-                iced_native::subscription::events_with(|event, status| match (event, status) {
-                    (iced_native::Event::Keyboard(iced_native::keyboard::Event::ModifiersChanged(modifiers)), _) => Some(Message::KeyboardModifiers(modifiers)),
-                    (iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { position }), _) => Some(Message::MouseMoved(position.into())),
-                    (iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Right)), iced_native::event::Status::Ignored) => Some(Message::RightClick),
-                    _ => None,
-                }),
-                Subscription::from_recipe(tcp_server::Subscription),
-            ])
-        }
-        #[cfg(target_arch = "wasm32")] {
-            Subscription::none()
-        }
+        Subscription::batch(vec![
+            iced_native::subscription::events_with(|event, status| match (event, status) {
+                (iced_native::Event::Keyboard(iced_native::keyboard::Event::ModifiersChanged(modifiers)), _) => Some(Message::KeyboardModifiers(modifiers)),
+                (iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { position }), _) => Some(Message::MouseMoved(position.into())),
+                (iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Right)), iced_native::event::Status::Ignored) => Some(Message::RightClick),
+                _ => None,
+            }),
+            Subscription::from_recipe(tcp_server::Subscription),
+        ])
     }
 }
 
@@ -1320,7 +709,6 @@ struct Args {
 #[derive(From)]
 enum Error {
     Iced(iced::Error),
-    #[cfg(not(target_arch = "wasm32"))]
     Icon(iced::window::icon::Error),
 }
 
@@ -1328,7 +716,6 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Iced(e) => e.fmt(f),
-            #[cfg(not(target_arch = "wasm32"))]
             Error::Icon(e) => write!(f, "failed to set app icon: {}", e),
         }
     }
@@ -1336,7 +723,6 @@ impl fmt::Display for Error {
 
 #[wheel::main]
 fn main(Args { show_available_checks }: Args) -> Result<(), Error> {
-    #[cfg(not(target_arch = "wasm32"))]
     let icon = images::icon::<DynamicImage>().to_rgba8();
     State::run(Settings {
         window: window::Settings {
@@ -1344,7 +730,6 @@ fn main(Args { show_available_checks }: Args) -> Result<(), Error> {
             min_size: Some((WIDTH, HEIGHT)),
             max_size: if show_available_checks { Some((WIDTH, u32::MAX)) } else { Some((WIDTH, HEIGHT)) },
             resizable: show_available_checks,
-            #[cfg(not(target_arch = "wasm32"))]
             icon: Some(Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height())?),
             ..window::Settings::default()
         },

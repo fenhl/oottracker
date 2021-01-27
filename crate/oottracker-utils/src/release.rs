@@ -28,7 +28,6 @@ use {
         Version,
     },
     serde::Deserialize,
-    structopt::StructOpt,
     tempfile::NamedTempFile,
     ::tokio::{
         fs::File,
@@ -111,13 +110,6 @@ impl IoResultExt for io::Result<()> {
 }
 
 #[cfg(windows)]
-#[derive(StructOpt)]
-struct Args {
-    #[structopt(long = "web-dev-only")]
-    web_dev_only: bool,
-}
-
-#[cfg(windows)]
 async fn release_client() -> Result<reqwest::Client, Error> {
     let mut headers = reqwest::header::HeaderMap::new();
     let mut token = String::default();
@@ -135,6 +127,14 @@ struct Plist {
 }
 
 #[cfg(windows)]
+async fn check_cli_version(package: &str, version: &Version) {
+    let cli_output = String::from_utf8(Command::new("cargo").arg("run").arg(format!("--package={}", package)).arg("--").arg("--version").stdout(Stdio::piped()).output().await.expect("failed to run CLI with --version").stdout).expect("CLI version output is invalid UTF-8");
+    let (cli_name, cli_version) = cli_output.split(' ').collect_tuple().expect("no space in CLI version output");
+    assert_eq!(cli_name, package);
+    assert_eq!(*version, cli_version.parse().expect("failed to parse CLI version"));
+}
+
+#[cfg(windows)]
 async fn version() -> Version {
     let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
     assert_eq!(version, plist::from_file::<_, Plist>("assets/macos/OoT Tracker.app/Contents/Info.plist").expect("failed to read plist for version check").bundle_short_version_string);
@@ -144,10 +144,8 @@ async fn version() -> Version {
     assert_eq!(version, oottracker::version()); // also checks oottracker-derive
     assert_eq!(version, oottracker_bizhawk::version());
     //assert_eq!(version, oottracker_csharp::version()); //TODO
-    let gui_output = String::from_utf8(Command::new("cargo").arg("run").arg("--package=oottracker-gui").arg("--").arg("--version").stdout(Stdio::piped()).output().await.expect("failed to run GUI with --version").stdout).expect("gui version output is invalid UTF-8");
-    let (gui_name, gui_version) = gui_output.split(' ').collect_tuple().expect("no space in gui version output");
-    assert_eq!(gui_name, "oottracker-gui");
-    assert_eq!(version, gui_version.parse().expect("failed to parse GUI version"));
+    check_cli_version("oottracker-gui", &version).await;
+    check_cli_version("oottracker-web", &version).await;
     version
 }
 
@@ -230,15 +228,8 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release) -
 }
 
 #[cfg(windows)]
-async fn build_web(dev: bool) -> Result<(), Error> {
-    let www_path = if dev { "/var/www/oottracker-dev.fenhl.net" } else { "/var/www/oottracker.fenhl.net" };
-    eprintln!("building for wasm");
-    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").arg("--target=wasm32-unknown-unknown").check("cargo build --target=wasm32-unknown-unknown").await?;
-    Command::new("wasm-bindgen").arg("target/wasm32-unknown-unknown/release/oottracker-gui.wasm").arg("--out-dir=assets/wasm").arg("--target=web").check("wasm-bindgen").await?;
-    eprintln!("uploading web app");
-    Command::new("scp").arg("-r").arg("assets/wasm/*").arg(format!("mercredi:{}", www_path)).check("scp").await?;
-    Command::new("scp").arg("assets/icon.ico").arg(format!("mercredi:{}/favicon.ico", www_path)).check("scp").await?;
-    Command::new("scp").arg("-r").arg("assets/xopar-*").arg(format!("mercredi:{}/assets", www_path)).check("scp").await?;
+async fn build_web() -> Result<(), Error> {
+    Command::new("ssh").arg("mercredi").arg("sudo").arg("systemctl").arg("restart").arg("oottracker-web").check("ssh").await?;
     Ok(())
 }
 
@@ -280,30 +271,26 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(windows)]
 #[wheel::main]
-async fn main(Args { web_dev_only }: Args) -> Result<(), Error> {
-    if web_dev_only {
-        build_web(true).await?;
-    } else {
-        let (setup_res, release_notes) = tokio::join!(
-            setup(),
-            write_release_notes(),
-        );
-        let (client, repo) = setup_res?;
-        let release_notes = release_notes?;
-        eprintln!("creating release");
-        let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
-        let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
-            build_bizhawk(&client, &repo, &release),
-            build_gui(&client, &repo, &release),
-            build_macos(&client, &repo, &release),
-            build_web(false),
-        );
-        let () = build_bizhawk_res?;
-        let () = build_gui_res?;
-        let () = build_macos_res?;
-        let () = build_web_res?;
-        eprintln!("publishing release");
-        repo.publish_release(&client, release).await?;
-    }
+async fn main() -> Result<(), Error> {
+    let (setup_res, release_notes) = tokio::join!(
+        setup(),
+        write_release_notes(),
+    );
+    let (client, repo) = setup_res?;
+    let release_notes = release_notes?;
+    eprintln!("creating release");
+    let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
+    let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
+        build_bizhawk(&client, &repo, &release),
+        build_gui(&client, &repo, &release),
+        build_macos(&client, &repo, &release),
+        build_web(),
+    );
+    let () = build_bizhawk_res?;
+    let () = build_gui_res?;
+    let () = build_macos_res?;
+    let () = build_web_res?;
+    eprintln!("publishing release");
+    repo.publish_release(&client, release).await?;
     Ok(())
 }

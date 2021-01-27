@@ -9,6 +9,8 @@ winres = "0.1"
 
 [dependencies]
 enum-iterator = "0.6"
+futures = "0.3"
+image = "0.23"
 itertools = "0.10"
 lazy_static = "1"
 num-traits = "0.2"
@@ -28,8 +30,15 @@ features = ["image", "tokio"]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
 rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
 
+[dependencies.iced_native]
+git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
+rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
+
 [dependencies.ootr]
 path = "../ootr"
+
+[dependencies.ootr-static]
+path = "../ootr-static"
 
 [dependencies.oottracker]
 path = "../oottracker"
@@ -41,32 +50,15 @@ path = "../oottracker-derive"
 version = "0.3"
 features = ["paw"]
 
+[dependencies.tokio]
+version = "1"
+features = ["fs", "io-util", "net", "time"]
+
+[dependencies.tokio-stream]
+version = "0.1"
+features = ["net"]
+
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
 default-features = false
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-directories = "3"
-futures = "0.3"
-image = "0.23"
-serde_json = "1"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.iced_native]
-git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.ootr-static]
-path = "../ootr-static"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.serde]
-version = "1"
-features = ["derive"]
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
-version = "1"
-features = ["fs", "io-util", "net", "time"]
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio-stream]
-version = "0.1"
-features = ["net"]

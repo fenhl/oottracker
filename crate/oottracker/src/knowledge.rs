@@ -1,11 +1,6 @@
 use {
-    std::collections::HashMap,
-    collect_mac::collect,
-    smart_default::SmartDefault,
-    ootr::model::*,
-};
-#[cfg(not(target_arch = "wasm32"))] use {
     std::{
+        collections::HashMap,
         fmt,
         future::Future,
         io::{
@@ -19,13 +14,15 @@ use {
         Protocol,
         impls::MapReadError,
     },
+    collect_mac::collect,
+    smart_default::SmartDefault,
     tokio::io::{
         AsyncRead,
         AsyncWrite,
     },
+    ootr::model::*,
 };
 
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
 pub enum KnowledgeReadError {
     ActiveTrials(Arc<MapReadError<Medallion, bool>>),
@@ -37,49 +34,42 @@ pub enum KnowledgeReadError {
     UnknownPreset(u8),
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl From<MapReadError<Medallion, bool>> for KnowledgeReadError {
     fn from(e: MapReadError<Medallion, bool>) -> KnowledgeReadError {
         KnowledgeReadError::ActiveTrials(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl From<MapReadError<String, bool>> for KnowledgeReadError {
     fn from(e: MapReadError<String, bool>) -> KnowledgeReadError {
         KnowledgeReadError::BoolSettings(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl From<MapReadError<DungeonReward, DungeonRewardLocation>> for KnowledgeReadError {
     fn from(e: MapReadError<DungeonReward, DungeonRewardLocation>) -> KnowledgeReadError {
         KnowledgeReadError::DungeonRewardLocations(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl From<MapReadError<String, HashMap<String, String>>> for KnowledgeReadError {
     fn from(e: MapReadError<String, HashMap<String, String>>) -> KnowledgeReadError {
         KnowledgeReadError::Exits(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl From<io::Error> for KnowledgeReadError {
     fn from(e: io::Error) -> KnowledgeReadError {
         KnowledgeReadError::Io(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl From<MapReadError<Dungeon, bool>> for KnowledgeReadError {
     fn from(e: MapReadError<Dungeon, bool>) -> KnowledgeReadError {
         KnowledgeReadError::Mq(Arc::new(e))
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl fmt::Display for KnowledgeReadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -195,7 +185,6 @@ impl Knowledge {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl Protocol for Knowledge {
     type ReadError = KnowledgeReadError;
 

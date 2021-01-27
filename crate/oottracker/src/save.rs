@@ -5,14 +5,20 @@ use {
             TryInto as _,
         },
         fmt,
-        io,
+        future::Future,
+        io::{
+            self,
+            prelude::*,
+        },
         num::TryFromIntError,
         ops::{
             Add,
             Sub,
         },
+        pin::Pin,
         sync::Arc,
     },
+    async_proto::Protocol,
     bitflags::bitflags,
     byteorder::{
         BigEndian,
@@ -20,6 +26,12 @@ use {
     },
     derive_more::From,
     smart_default::SmartDefault,
+    tokio::io::{
+        AsyncRead,
+        AsyncReadExt as _,
+        AsyncWrite,
+        AsyncWriteExt as _,
+    },
     ootr::{
         item::Item,
         model::{
@@ -37,20 +49,6 @@ use {
         },
         item_ids,
         scene::SceneFlags,
-    },
-};
-#[cfg(not(target_arch = "wasm32"))] use {
-    std::{
-        future::Future,
-        io::prelude::*,
-        pin::Pin,
-    },
-    async_proto::Protocol,
-    tokio::io::{
-        AsyncRead,
-        AsyncReadExt as _,
-        AsyncWrite,
-        AsyncWriteExt as _,
     },
 };
 
@@ -1010,7 +1008,6 @@ impl fmt::Display for SaveDataReadError {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl Protocol for Save {
     type ReadError = SaveDataReadError;
 
@@ -1076,6 +1073,5 @@ impl<'a, 'b> Sub<&'b Save> for &'a Save {
 }
 
 /// The difference between two save states.
-#[derive(Debug, Clone)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Protocol)]
 pub struct Delta(Vec<(u16, u8)>);

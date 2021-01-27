@@ -2,7 +2,6 @@ use {
     std::borrow::Cow,
     quote_value::QuoteValue,
     crate::{
-        Rando,
         check::Check,
         item::Item,
         model::{
@@ -11,12 +10,6 @@ use {
         },
     },
 };
-
-pub enum ModelState {} //TODO move from oottracker repo
-
-trait RandoWrap {}
-
-impl<R: Rando> RandoWrap for R {}
 
 #[derive(Debug, Clone, PartialEq, Eq, QuoteValue)]
 pub enum ForAge {

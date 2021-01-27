@@ -23,11 +23,12 @@ pub mod checks;
 pub mod info_tables;
 mod item_ids;
 pub mod knowledge;
-#[cfg(not(target_arch = "wasm32"))] pub mod proto;
+pub mod proto;
 pub mod ram;
 pub mod region;
 pub mod save;
 mod scene;
+pub mod ui;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ModelState {

@@ -1,0 +1,89 @@
+html,
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+}
+
+.items {
+    display: grid;
+    grid-template-columns: 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px;
+    gap: 1px;
+    padding: 1px;
+    background-color: rgba(0, 0, 0, 0.65);
+}
+
+.items > a {
+    position: relative;
+    text-decoration: none;
+}
+
+.items > a > img {
+    position: absolute;
+}
+
+.dimmed {
+    opacity: 15%;
+}
+
+.cols2 {
+    grid-column-end: span 2;
+    grid-row-end: span 2;
+}
+
+.cols2,
+.cols2 img {
+    width: 33px;
+    height: 33px;
+}
+
+.cols2.loc {
+    grid-row-end: span 1;
+}
+
+.cols2.loc,
+.cols2.loc img {
+    height: 12px;
+}
+
+.cols3 {
+    grid-column-end: span 3;
+    grid-row-end: span 3;
+}
+
+.cols3,
+.cols3 img {
+    width: 50px;
+    height: 50px;
+}
+
+.cols3.loc {
+    grid-row-end: span 1;
+}
+
+.cols3.loc,
+.cols3.loc img {
+    height: 18px;
+}
+
+.count {
+    color: white;
+    background-color: rgba(0, 0, 0, 0.65);
+    padding: 2pt;
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+}
+
+footer {
+    margin-top: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: black;
+        color: #bbb;
+    }
+}

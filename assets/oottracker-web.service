@@ -1,0 +1,14 @@
+[Unit]
+Description=Web server for oottracker.fenhl.net
+After=network.target
+
+[Service]
+Restart=always
+ExecStartPre=/usr/bin/git pull
+ExecStart=/home/fenhl/.cargo/bin/cargo run --release --package=oottracker-web
+User=fenhl
+Group=fenhl
+WorkingDirectory=/opt/git/github.com/fenhl/oottracker/master
+
+[Install]
+WantedBy=multi-user.target

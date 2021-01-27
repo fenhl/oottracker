@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 semver = "0.11"
 
+[dependencies.async-proto]
+version = "0.3"
+features = ["blocking"]
+
 [dependencies.quote-value]
 git = "https://github.com/fenhl/quote-value" #TODO publish
 branch = "main"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.async-proto]
-version = "0.3"
-features = ["blocking"]

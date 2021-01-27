@@ -1,0 +1,22 @@
+server {
+    server_name oottracker.fenhl.net;
+
+    listen 80;
+    listen [::]:80;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    server_name oottracker.fenhl.net;
+
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    ssl_certificate /etc/letsencrypt/live/inwx/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/inwx/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:24807;
+    }
+}

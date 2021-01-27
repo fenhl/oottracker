@@ -9,11 +9,9 @@ name = "oottracker"
 crate-type = ["cdylib"]
 
 [dependencies]
+async-proto = "0.3"
 libc = "0.2"
 semver = "0.11"
 
 [dependencies.oottracker]
 path = "../oottracker"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-async-proto = "0.3"

@@ -3,12 +3,11 @@ use {
         fmt,
         str::FromStr,
     },
+    async_proto::Protocol,
     quote_value::QuoteValue,
 };
-#[cfg(not(target_arch = "wasm32"))] use async_proto::Protocol;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
 pub enum Dungeon {
     Main(MainDungeon),
     IceCavern,
@@ -43,22 +42,19 @@ impl fmt::Display for Dungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
 pub enum DungeonReward {
     Medallion(Medallion),
     Stone(Stone),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
 pub enum DungeonRewardLocation {
     LinksPocket,
     Dungeon(MainDungeon),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
 pub enum MainDungeon {
     DekuTree,
     DodongosCavern,
@@ -103,8 +99,7 @@ impl fmt::Display for MainDungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
 pub enum Medallion {
     Light,
     Forest,
@@ -128,8 +123,7 @@ impl Medallion {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Protocol))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
 pub enum Stone {
     KokiriEmerald,
     GoronRuby,
