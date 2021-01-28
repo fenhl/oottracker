@@ -5,6 +5,7 @@ use std::{
     process::Command,
 };
 
+#[cfg(windows)]
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=nonexistent.foo"); // check a nonexistent file to make sure build script is always run (see https://github.com/rust-lang/cargo/issues/4213 and https://github.com/rust-lang/cargo/issues/5663)
     let is_release = match &env::var("PROFILE").expect("missing PROFILE envar")[..] {
@@ -30,3 +31,6 @@ fn main() -> io::Result<()> {
     assert!(dotnet_command.status()?.success());
     Ok(())
 }
+
+#[cfg(not(windows))]
+fn main() {} // BizHawk is currently only available on Windows
