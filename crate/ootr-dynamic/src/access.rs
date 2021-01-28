@@ -266,6 +266,14 @@ impl ExprExtPrivate for Expr {
             else {
                 unimplemented!("converting name expression {} into Expr", name)
             }
+        } else if ast.get("NameConstant")?.downcast::<PyType>()?.is_instance(expr)? {
+            // Python 3.7 compat TODO remove when Debian bullseye is released
+            let constant = expr.getattr("value")?;
+            if constant.downcast::<PyBool>().map_or(false, |b| b == PyBool::new(rando.py, true)) {
+                Expr::True
+            } else {
+                unimplemented!("converting name constant expression {} into Expr", display_expr(ast, expr))
+            }
         } else if ast.get("Str")?.downcast::<PyType>()?.is_instance(expr)? {
             // Python 3.7 compat TODO remove when Debian bullseye is released
             let name = expr.getattr("s")?.extract::<String>()?;
