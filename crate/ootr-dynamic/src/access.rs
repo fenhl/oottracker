@@ -284,7 +284,9 @@ impl ExprExtPrivate for Expr {
             }
         } else if ast.get("Subscript")?.downcast::<PyType>()?.is_instance(expr)? {
             let value = expr.getattr("value")?.getattr("id")?.extract::<String>()?;
-            let slice = expr.getattr("slice")?.getattr("id")?.extract::<String>()?;
+            let slice = expr.getattr("slice")?;
+            // “value” is Python 3.7 compat TODO remove when Debian bullseye is released
+            let slice = slice.getattr("id").or_else(|_| PyResult::Ok(slice.getattr("value")?.getattr("id")?))?.extract::<String>()?;
             if value == "skipped_trials" {
                 Expr::Not(Box::new(Expr::TrialActive(match &slice[..] {
                     "Light" => Medallion::Light,
