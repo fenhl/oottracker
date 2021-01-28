@@ -266,6 +266,14 @@ impl ExprExtPrivate for Expr {
             else {
                 unimplemented!("converting name expression {} into Expr", name)
             }
+        } else if ast.get("Str")?.downcast::<PyType>()?.is_instance(expr)? {
+            // Python 3.7 compat TODO remove when Debian bullseye is released
+            let name = expr.getattr("s")?.extract::<String>()?;
+            if let Ok(item) = Item::from_str(rando, &name) {
+                Expr::Item(item, Box::new(Expr::LitInt(1)))
+            } else {
+                Expr::LitStr(name) //TODO distinguish between events and other strings by going through world files?
+            }
         } else if ast.get("Subscript")?.downcast::<PyType>()?.is_instance(expr)? {
             let value = expr.getattr("value")?.getattr("id")?.extract::<String>()?;
             let slice = expr.getattr("slice")?.getattr("id")?.extract::<String>()?;
