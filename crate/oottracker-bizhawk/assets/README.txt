@@ -7,8 +7,8 @@ HOW TO INSTALL/UPDATE
 HOW TO USE
 
 1. Open the main oottracker app
-2. Open EmuHawk.exe
-3. In BizHawk, go to Tools menu > External Tool > OoT OotAutoTracker
+2. Open BizHawk (EmuHawk.exe)
+3. In BizHawk, go to Tools menu > External Tool > OoT autotracker
 4. A window will open. You can minimize it, but closing it will stop the auto-tracker.
 5. Open the ROM. The main oottracker app should now automatically update based on your item status.
 

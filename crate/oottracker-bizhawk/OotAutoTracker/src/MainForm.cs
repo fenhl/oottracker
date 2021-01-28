@@ -483,54 +483,31 @@ namespace Net.Fenhl.OotAutoTracker
 		public void Restart() {
             if (this.stream != null) this.stream.Disconnect().Dispose();
             this.stream = null;
-            label_Connection.Text = "Connection: waiting for game";
-            this.connectionOk = false;
-            UpdateHelpLabel();
+            UpdateConnection(false, "Connection: waiting for game");
             if (this.prevSave != null) this.prevSave.Dispose();
             this.prevSave = null;
-            label_Save.Text = "Save: waiting for game";
-            this.saveOk = false;
-            UpdateHelpLabel();
-            if (GlobalWin.Game.Name == "Null")
-            {
-                label_Game.Text = "Not playing anything";
-                this.gameOk = false;
-                UpdateHelpLabel();
-            }
+            UpdateSave(false, "Save: waiting for game");
+            if (GlobalWin.Game.Name == "Null") UpdateGame(false, "Not playing anything");
             else
             {
                 var rom_ident = _memAPI.ReadByteRange(0x20, 0x18, "ROM");
                 if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0"))))
                 {
-                    label_Game.Text = $"Game: Expected OoT or OoTR, found {GlobalWin.Game.Name} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})";
-                    this.gameOk = false;
-                    UpdateHelpLabel();
+                    UpdateGame(false, $"Game: Expected OoT or OoTR, found {GlobalWin.Game.Name} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})");
                 }
                 else
                 {
                     var version = rom_ident.GetRange(0x15, 3);
                     this.isVanilla = Enumerable.SequenceEqual(version, new List<byte>(new byte[] { 0, 0, 0 }));
-                    if (this.isVanilla)
-                    {
-                        label_Game.Text = "Playing OoT (vanilla)";
-                        this.gameOk = true;
-                        UpdateHelpLabel();
-                    }
-                    else
-                    {
-                        label_Game.Text = $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}";
-                        this.gameOk = true;
-                        UpdateHelpLabel();
-                    }
+                    if (this.isVanilla) UpdateGame(true, "Playing OoT (vanilla)");
+                    else UpdateGame(true, $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}");
                     using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback))
                     {
                         if (stream_res.IsOk())
                         {
                             if (this.stream != null) this.stream.Disconnect().Dispose();
                             this.stream = new TcpStream(stream_res);
-                            label_Connection.Text = "Connected";
-                            this.connectionOk = true;
-                            UpdateHelpLabel();
+                            UpdateConnection(true, "Connected");
                             if (this.isVanilla)
                             {
                                 using (var knowledge = new Knowledge(true))
@@ -543,9 +520,7 @@ namespace Net.Fenhl.OotAutoTracker
                         {
                             using (StringHandle err = stream_res.DebugErr())
                             {
-                                label_Connection.Text = $"Failed to connect: {err.AsString()}";
-                                this.connectionOk = false;
-                                UpdateHelpLabel();
+                                UpdateConnection(false, $"Failed to connect: {err.AsString()}");
                             }
                         }
                     }
@@ -570,9 +545,7 @@ namespace Net.Fenhl.OotAutoTracker
                         {
                             using (StringHandle debug = save.Debug())
                             {
-                                label_Save.Text = $"Save data ok, last checked {DateTime.Now}";
-                                this.saveOk = true;
-                                UpdateHelpLabel();
+                                UpdateSave(true, $"Save data ok, last checked {DateTime.Now}");
                             }
                             if (prevSave == null)
                             {
@@ -586,17 +559,10 @@ namespace Net.Fenhl.OotAutoTracker
                                             this.stream = null;
                                             using (StringHandle err = io_res.DebugErr())
                                             {
-                                                label_Connection.Text = $"Failed to send save data: {err.AsString()}";
-                                                this.connectionOk = false;
-                                                UpdateHelpLabel();
+                                                UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                                             }
                                         }
-                                        else
-                                        {
-                                            label_Connection.Text = $"Connected, initial save data sent {DateTime.Now}";
-                                            this.connectionOk = true;
-                                            UpdateHelpLabel();
-                                        }
+                                        else UpdateConnection(true, $"Connected, initial save data sent {DateTime.Now}");
                                     }
                                 }
                                 prevSave = save;
@@ -615,17 +581,10 @@ namespace Net.Fenhl.OotAutoTracker
                                                 this.stream = null;
                                                 using (StringHandle err = io_res.DebugErr())
                                                 {
-                                                    label_Connection.Text = $"Failed to send save data: {err.AsString()}";
-                                                    this.connectionOk = false;
-                                                    UpdateHelpLabel();
+                                                    UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                                                 }
                                             }
-                                            else
-                                            {
-                                                label_Connection.Text = $"Connected, save data last sent {DateTime.Now}";
-                                                this.connectionOk = false;
-                                                UpdateHelpLabel();
-                                            }
+                                            else UpdateConnection(true, $"Connected, save data last sent {DateTime.Now}");
                                         }
                                     }
                                 }
@@ -642,13 +601,32 @@ namespace Net.Fenhl.OotAutoTracker
                     {
                         using (StringHandle err = state_res.DebugErr())
                         {
-                            label_Save.Text = $"Error reading save data: {err.AsString()}";
-                            this.saveOk = false;
-                            UpdateHelpLabel();
+                            UpdateSave(false, $"Error reading save data: {err.AsString()}");
                         }
                     }
                 }
             }
+        }
+
+        private void UpdateGame(bool ok, String msg)
+        {
+            label_Game.Text = msg;
+            this.gameOk = ok;
+            UpdateHelpLabel();
+        }
+
+        private void UpdateConnection(bool ok, String msg)
+        {
+            label_Connection.Text = msg;
+            this.connectionOk = ok;
+            UpdateHelpLabel();
+        }
+
+        private void UpdateSave(bool ok, String msg)
+        {
+            label_Save.Text = msg;
+            this.saveOk = ok;
+            UpdateHelpLabel();
         }
 
         private void UpdateHelpLabel()
