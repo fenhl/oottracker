@@ -309,6 +309,9 @@ impl ExprExtPrivate for Expr {
                 Expr::LitInt(count.getattr("value")?.extract::<u8>().at("count.value as u8")?)
             } else if ast.get("Name")?.downcast::<PyType>()?.is_instance(count)? {
                 Expr::Setting(count.getattr("id")?.extract::<String>().at("count.id as String")?)
+            } else if ast.get("Num")?.downcast::<PyType>()?.is_instance(count)? {
+                // Python 3.7 compat TODO remove when Debian bullseye is released
+                Expr::LitInt(count.getattr("n")?.extract::<u8>().at("count.n as u8")?)
             } else {
                 unimplemented!("converting {} into item count", display_expr(ast, count))
             };
