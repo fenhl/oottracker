@@ -37,6 +37,8 @@ use {
     },
 };
 
+include!("../../../assets/firebase-api-keys.rs");
+
 trait TrackerCellKindExt {
     fn render(&self, state: &ModelState) -> Json;
 }
@@ -148,7 +150,7 @@ pub struct RestreamTracker;
 
 impl App for RestreamTracker {
     fn base_url(&self) -> &'static str { "https://ootr-tracker.firebaseio.com" }
-    fn api_key(&self) -> &'static str { "AIzaSyDsnur0ixzqAx9uO8Ej_Rc7zhLRHlHPGRE" }
+    fn api_key(&self) -> &'static str { RESTREAM_API_KEY }
 
     fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
         //TODO medallions, chestsopened
@@ -219,7 +221,7 @@ pub struct RslItemTracker;
 
 impl App for RslItemTracker {
     fn base_url(&self) -> &'static str { "https://ootr-random-settings-tracker.firebaseio.com" }
-    fn api_key(&self) -> &'static str { "AIzaSyB9qoaU5aFkIxNUy473FsgU0Oe7SssJDhs" }
+    fn api_key(&self) -> &'static str { RSL_API_KEY }
 
     fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
         cells!(state, {
