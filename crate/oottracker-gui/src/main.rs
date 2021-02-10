@@ -8,6 +8,7 @@ use {
         collections::HashMap,
         fmt,
         path::Path,
+        sync::Arc,
         time::Duration,
     },
     derive_more::From,
@@ -38,6 +39,10 @@ use {
                 self,
                 PickList,
             },
+            text_input::{
+                self,
+                TextInput,
+            },
         },
         window::{
             self,
@@ -51,6 +56,7 @@ use {
     smart_default::SmartDefault,
     structopt::StructOpt,
     tokio::time::sleep,
+    url::Url,
     ootr::{
         check::Check,
         model::{
@@ -68,6 +74,7 @@ use {
             CheckStatus,
             CheckStatusError,
         },
+        firebase,
         proto::{
             self,
             Packet,
@@ -130,8 +137,8 @@ impl container::StyleSheet for ContainerStyle {
 
 trait TrackerCellKindExt {
     fn render(&self, state: &ModelState) -> Image;
-    #[must_use] fn left_click(&self, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool;
-    #[must_use] fn right_click(&self, state: &mut ModelState) -> bool;
+    #[must_use] fn left_click(&self, client_connected: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool;
+    #[must_use] fn right_click(&self, client_connected: bool, state: &mut ModelState) -> bool;
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
@@ -233,46 +240,54 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text", "png"),
                 Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text", "png"),
             }.width(Length::Units(STONE_SIZE)),
+            BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
 
     #[must_use]
     /// Returns `true` if the menu should be opened.
-    fn left_click(&self, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
+    fn left_click(&self, client_connected: bool, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
-            return self.right_click(state)
+            return self.right_click(client_connected, state)
         }
-        match self {
-            Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
-            Count { get, set, max, .. } => {
-                let current = get(state);
-                if current == *max { set(state, 0) } else { set(state, current + 1) }
+        if !client_connected {
+            match self {
+                Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
+                Count { get, set, max, step, .. } => {
+                    let current = get(state);
+                    if current == *max { set(state, 0) } else { set(state, current + step) }
+                }
+                Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
+                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
+                Sequence { increment, .. } => increment(state),
+                Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
+                Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
+                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+                BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
             }
-            Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
-            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
-            Sequence { increment, .. } => increment(state),
-            Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
-            Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
-            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
         }
         false
     }
 
     #[must_use]
     /// Returns `true` if the menu should be opened.
-    fn right_click(&self, state: &mut ModelState) -> bool {
-        match self {
-            Composite { toggle_right: toggle, .. } | OptionalOverlay { toggle_overlay: toggle, .. } | Overlay { toggle_overlay: toggle, .. } => toggle(state),
-            Count { get, set, max, .. } => {
-                let current = get(state);
-                if current == 0 { set(state, *max) } else { set(state, current - 1) }
+    fn right_click(&self, client_connected: bool, state: &mut ModelState) -> bool {
+        if let Medallion(_) = self { return true }
+        if !client_connected {
+            match self {
+                Composite { toggle_right: toggle, .. } | OptionalOverlay { toggle_overlay: toggle, .. } | Overlay { toggle_overlay: toggle, .. } => toggle(state),
+                Count { get, set, max, step, .. } => {
+                    let current = get(state);
+                    if current == 0 { set(state, *max) } else { set(state, current - step) }
+                }
+                Medallion(_) => unreachable!("already handled above"),
+                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
+                Sequence { decrement, .. } => decrement(state),
+                Simple { .. } | Stone(_) => {}
+                Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
+                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
+                BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
             }
-            Medallion(_) => return true,
-            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
-            Sequence { decrement, .. } => decrement(state),
-            Simple { .. } | Stone(_) => {}
-            Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
-            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
         }
         false
     }
@@ -376,6 +391,8 @@ enum Message {
     ClientDisconnected,
     CloseMenu,
     ConfigError(oottracker::ui::Error),
+    Connect,
+    ConnectError(ConnectError),
     DismissNotification,
     DismissWelcomeScreen,
     KeyboardModifiers(KeyboardModifiers),
@@ -387,7 +404,11 @@ enum Message {
     Nop,
     Packet(Packet),
     RightClick,
+    RoomError(firebase::Error),
     SetMedOrder(ElementOrder),
+    SetPasscode(String),
+    SetRoom(firebase::DynRoom),
+    SetUrl(String),
     SetWarpSongOrder(ElementOrder),
     UpdateAvailableChecks(HashMap<Check, CheckStatus>),
 }
@@ -399,7 +420,9 @@ impl fmt::Display for Message {
             Message::ClientConnected => write!(f, "auto-tracker connected"),
             Message::ClientDisconnected => write!(f, "auto-tracker disconnected"),
             Message::ConfigError(e) => write!(f, "error loading/saving preferences: {}", e),
+            Message::ConnectError(e) => write!(f, "error connecting: {}", e),
             Message::NetworkError(e) => write!(f, "network error: {}", e),
+            Message::RoomError(e) => write!(f, "room error: {}", e),
             _ => write!(f, "{:?}", self), // these messages are not notifications so just fall back to Debug
         }
     }
@@ -407,9 +430,14 @@ impl fmt::Display for Message {
 
 #[derive(Debug, Default)]
 struct MenuState {
+    dismiss_btn: button::State,
     med_order: pick_list::State<ElementOrder>,
     warp_song_order: pick_list::State<ElementOrder>,
-    dismiss_button: button::State,
+    url: String,
+    url_state: text_input::State,
+    passcode: String,
+    passcode_state: text_input::State,
+    connect_btn: button::State,
 }
 
 #[derive(Debug, SmartDefault)]
@@ -417,6 +445,7 @@ struct State {
     flags: bool,
     config: Config,
     client_connected: bool,
+    room: Option<firebase::DynRoom>,
     keyboard_modifiers: KeyboardModifiers,
     last_cursor_pos: [f32; 2],
     dismiss_welcome_screen_button: Option<button::State>,
@@ -450,10 +479,13 @@ impl State {
     /// Adds a visible notification/alert/log message.
     ///
     /// Implemented as a separate method in case the way this is displayed is changed later, e.g. to allow multiple notifications.
-    fn notify(&mut self, message: Message) {
+    #[must_use]
+    fn notify(&mut self, message: Message) -> Command<Message> {
         self.notification = Some((false, message));
+        Command::none()
     }
 
+    #[must_use]
     fn notify_temp(&mut self, message: Message) -> Command<Message> {
         self.notification = Some((true, message));
         async { sleep(Duration::from_secs(10)).await; Message::AutoDismissNotification }.into()
@@ -507,25 +539,52 @@ impl Application for State {
             Message::AutoDismissNotification => if let Some((true, _)) = self.notification {
                 self.notification = None;
             },
-            Message::CheckStatusErrorStatic(_) => self.notify(message),
+            Message::CheckStatusErrorStatic(_) => return self.notify(message),
             Message::ClientConnected => {
                 self.client_connected = true;
                 return self.notify_temp(message)
             }
             Message::ClientDisconnected => {
                 self.client_connected = false;
-                self.notify(message);
+                return self.notify(message)
             }
             Message::CloseMenu => self.menu_state = None,
-            Message::ConfigError(_) => self.notify(message),
+            Message::ConfigError(_) => return self.notify(message),
+            Message::Connect => if self.room.is_some() {
+                self.room = None;
+            } else {
+                if let Some(ref menu_state) = self.menu_state {
+                    let url = menu_state.url.clone();
+                    let passcode = menu_state.passcode.clone();
+                    let model = self.model.clone();
+                    return async move {
+                        match connect(url, passcode, model).await {
+                            Ok(room) => Message::SetRoom(room),
+                            Err(e) => Message::ConnectError(e),
+                        }
+                    }.into()
+                }
+            },
+            Message::ConnectError(_) => return self.notify(message),
             Message::DismissNotification => self.notification = None,
             Message::DismissWelcomeScreen => {
                 self.dismiss_welcome_screen_button = None;
                 return self.save_config()
             }
             Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
-            Message::LeftClick(cell) => if cell.kind().left_click(self.keyboard_modifiers, &mut self.model) {
+            Message::LeftClick(cell) => if cell.kind().left_click(self.client_connected, self.keyboard_modifiers, &mut self.model) {
                 self.menu_state = Some(MenuState::default());
+            } else {
+                if let Some(ref mut room) = self.room {
+                    let room = room.clone();
+                    let model = self.model.clone();
+                    return async move {
+                        match room.set_state(&model).await {
+                            Ok(()) => Message::Nop,
+                            Err(e) => Message::RoomError(e),
+                        }
+                    }.into()
+                }
             },
             Message::LoadConfig(config) => match config.version {
                 0 => self.config = config,
@@ -533,7 +592,7 @@ impl Application for State {
             },
             Message::MissingConfig => self.dismiss_welcome_screen_button = Some(button::State::default()),
             Message::MouseMoved(pos) => self.last_cursor_pos = pos,
-            Message::NetworkError(_) => self.notify(message),
+            Message::NetworkError(_) => return self.notify(message),
             Message::Nop => {}
             Message::Packet(packet) => {
                 match packet {
@@ -542,32 +601,60 @@ impl Application for State {
                     Packet::SaveInit(save) => self.model.ram.save = save,
                     Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
                 }
-                if self.flags { // show available checks
-                    let model = self.model.clone();
-                    return async move {
-                        tokio::task::spawn_blocking(move || {
-                            let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
-                            match checks::status(&rando, &model) {
-                                Ok(status) => Message::UpdateAvailableChecks(status),
-                                Err(e) => Message::CheckStatusErrorStatic(e),
-                            }
-                        }).await.expect("status checks task panicked")
-                    }.into()
-                }
+                let room = self.room.clone();
+                let model = self.model.clone();
+                let show_available_checks = self.flags;
+                return async move {
+                    if let Some(room) = room {
+                        if let Err(e) = room.set_state(&model).await { return Message::RoomError(e) }
+                        if show_available_checks {
+                            return tokio::task::spawn_blocking(move || {
+                                let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
+                                match checks::status(&rando, &model) {
+                                    Ok(status) => Message::UpdateAvailableChecks(status),
+                                    Err(e) => Message::CheckStatusErrorStatic(e),
+                                }
+                            }).await.expect("status checks task panicked")
+                        }
+                    }
+                    Message::Nop
+                }.into()
             }
             Message::RightClick => {
                 if self.menu_state.is_none() {
                     if let Some(cell) = self.layout().cell_at(self.last_cursor_pos, self.notification.is_none()) {
-                        if cell.kind().right_click(&mut self.model) {
+                        if cell.kind().right_click(self.client_connected, &mut self.model) {
                             self.menu_state = Some(MenuState::default());
+                        } else {
+                            if let Some(ref room) = self.room {
+                                let room = room.clone();
+                                let model = self.model.clone();
+                                return async move {
+                                    match room.set_state(&model).await {
+                                        Ok(()) => Message::Nop,
+                                        Err(e) => Message::RoomError(e),
+                                    }
+                                }.into()
+                            }
                         }
                     }
                 }
+            }
+            Message::RoomError(ref e) => {
+                eprintln!("room error: {}", e);
+                return self.notify(message)
             }
             Message::SetMedOrder(med_order) => {
                 self.config.med_order = med_order;
                 return self.save_config()
             }
+            Message::SetPasscode(passcode) => if let Some(ref mut menu_state) = self.menu_state {
+                menu_state.passcode = passcode;
+            },
+            Message::SetRoom(room) => self.room = Some(room),
+            Message::SetUrl(url) => if let Some(ref mut menu_state) = self.menu_state {
+                menu_state.url = url;
+            },
             Message::SetWarpSongOrder(warp_song_order) => {
                 self.config.warp_song_order = warp_song_order;
                 return self.save_config()
@@ -589,12 +676,16 @@ impl Application for State {
 
         if let Some(ref mut menu_state) = self.menu_state {
             return Column::new()
+                .push(Button::new(&mut menu_state.dismiss_btn, Text::new("Back")).on_press(Message::CloseMenu))
                 .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
                 .push(Text::new("Medallion order:"))
                 .push(PickList::new(&mut menu_state.med_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.med_order), Message::SetMedOrder))
                 .push(Text::new("Warp song order:"))
                 .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.warp_song_order), Message::SetWarpSongOrder))
-                .push(Button::new(&mut menu_state.dismiss_button, Text::new("Done")).on_press(Message::CloseMenu))
+                .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(TextInput::new(&mut menu_state.url_state, "URL", &menu_state.url, Message::SetUrl))
+                .push(TextInput::new(&mut menu_state.passcode_state, "passcode", &menu_state.passcode, Message::SetPasscode).password())
+                .push(Button::new(&mut menu_state.connect_btn, Text::new(if self.room.is_some() { "Disconnect" } else { "Connect" })).on_press(Message::Connect))
                 .into()
         }
         let mut med_locations = Row::new();
@@ -646,7 +737,7 @@ impl Application for State {
             }
             if let Some((is_temp, ref notification)) = self.notification {
                 let mut row = Row::new()
-                    .push(Text::new(format!("{}", notification)).color([1.0, 1.0, 1.0]));
+                    .push(Text::new(format!("{}", notification)).color([1.0, 1.0, 1.0]).width(Length::Fill));
                 if !is_temp {
                     row = row.push(Button::new(&mut self.dismiss_notification_button, Text::new("X").color([1.0, 0.0, 0.0])).on_press(Message::DismissNotification));
                 }
@@ -698,6 +789,73 @@ impl Application for State {
             Subscription::from_recipe(tcp_server::Subscription),
         ])
     }
+}
+
+#[derive(Debug, From, Clone)]
+enum ConnectError {
+    ExtraPathSegments,
+    #[from]
+    Firebase(firebase::Error),
+    MissingRoomName,
+    Reqwest(Arc<reqwest::Error>),
+    UnsupportedHost(Option<url::Host<String>>),
+    #[from]
+    UrlParse(url::ParseError),
+}
+
+impl From<reqwest::Error> for ConnectError {
+    fn from(e: reqwest::Error) -> ConnectError {
+        ConnectError::Reqwest(Arc::new(e))
+    }
+}
+
+impl fmt::Display for ConnectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConnectError::ExtraPathSegments => write!(f, "too many path segments in URL"),
+            ConnectError::Firebase(e) => e.fmt(f),
+            ConnectError::MissingRoomName => write!(f, "missing room name"),
+            ConnectError::Reqwest(e) => if let Some(url) = e.url() {
+                write!(f, "HTTP error at {}: {}", url, e)
+            } else {
+                write!(f, "HTTP error: {}", e)
+            },
+            ConnectError::UnsupportedHost(Some(host)) => write!(f, "the tracker at {} is not (yet) supported", host),
+            ConnectError::UnsupportedHost(None) => write!(f, "this kind of connection is not supported"),
+            ConnectError::UrlParse(e) => e.fmt(f),
+        }
+    }
+}
+
+async fn connect(url: String, passcode: String, state: ModelState) -> Result<firebase::DynRoom, ConnectError> {
+    let url = url.parse::<Url>()?;
+    let room = match url.host() {
+        Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => {
+            let mut path_segments = url.path_segments().into_iter().flatten().fuse();
+            let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
+                (None, _, _) => return Err(ConnectError::MissingRoomName),
+                (Some(room_name), None, _) |
+                (Some(_), Some(room_name), None) => room_name.to_owned(),
+                (Some(_), Some(_), Some(_)) => return Err(ConnectError::ExtraPathSegments),
+            };
+            let session = firebase::Session::new(firebase::RestreamTracker).await?;
+            firebase::Room { session, name, passcode }.to_dyn()
+        }
+        Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => {
+            let mut path_segments = url.path_segments().into_iter().flatten().fuse();
+            let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
+                (None, _, _) => return Err(ConnectError::MissingRoomName),
+                (Some(room_name), None, _) |
+                (Some(_), Some(room_name), None) => room_name.to_owned(),
+                (Some(_), Some(_), Some(_)) => return Err(ConnectError::ExtraPathSegments),
+            };
+            let session = firebase::Session::new(firebase::RslItemTracker).await?;
+            firebase::Room { session, name, passcode }.to_dyn()
+        }
+        host => return Err(ConnectError::UnsupportedHost(host.map(|host| host.to_owned()))),
+    };
+    room.set_state(&state).await?;
+    Ok(room)
 }
 
 #[derive(StructOpt)]

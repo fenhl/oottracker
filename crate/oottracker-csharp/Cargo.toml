@@ -9,7 +9,7 @@ name = "oottracker"
 crate-type = ["cdylib"]
 
 [dependencies]
-async-proto = "0.3"
+async-proto = "0.4"
 libc = "0.2"
 semver = "0.11"
 

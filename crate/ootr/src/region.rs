@@ -7,6 +7,7 @@ use {
             Hasher,
         },
     },
+    async_proto::Protocol,
     quote_value::QuoteValue,
     crate::{
         access,
@@ -14,7 +15,7 @@ use {
     },
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
 pub enum Mq {
     Vanilla,
     Mq,

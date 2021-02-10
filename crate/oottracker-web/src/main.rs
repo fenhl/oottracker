@@ -181,6 +181,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 let css_classes = if location.is_some() { "" } else { "dimmed" };
                 format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
             }
+            BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
 
@@ -202,6 +203,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
             Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
 }

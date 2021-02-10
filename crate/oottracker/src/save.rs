@@ -363,32 +363,45 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn has_emptiable_bottle(&self) -> bool {
-        self.bottles.iter().any(Bottle::emptiable)
+    pub fn emptiable_bottles(&self) -> u8 {
+        self.bottles.iter().filter(|bottle| bottle.emptiable()).count().try_into().expect("there are only 4 bottles")
     }
 
     pub fn has_rutos_letter(&self) -> bool {
         self.bottles.iter().any(|bottle| *bottle == Bottle::RutosLetter)
     }
 
-    pub fn toggle_emptiable_bottle(&mut self) {
-        if self.has_emptiable_bottle() {
-            self.bottles.iter_mut().for_each(|bottle| if bottle.emptiable() { *bottle = Bottle::None });
-        } else {
-            // First, simply try to add an empty bottle.
+    pub fn set_emptiable_bottles(&mut self, amount: u8) {
+        assert!(amount <= 4);
+        'increment: while self.emptiable_bottles() < amount {
             for bottle in &mut self.bottles {
                 if *bottle == Bottle::None {
                     *bottle = Bottle::Empty;
-                    return
+                    continue 'increment
                 }
             }
-            // All 4 bottles have either Ruto's letter or a big poe. Replace one of the 3+ big poes with an empty bottle.
             for bottle in &mut self.bottles {
                 if *bottle == Bottle::BigPoe {
                     *bottle = Bottle::Empty;
-                    return
+                    continue 'increment
                 }
             }
+            for bottle in &mut self.bottles {
+                if *bottle == Bottle::RutosLetter {
+                    *bottle = Bottle::Empty;
+                    continue 'increment
+                }
+            }
+            unreachable!("could not increment emptiable bottles")
+        }
+        'decrement: while self.emptiable_bottles() > amount {
+            for bottle in &mut self.bottles {
+                if bottle.emptiable() {
+                    *bottle = Bottle::None;
+                    continue 'decrement
+                }
+            }
+            unreachable!("could not decrement emptiable bottles")
         }
     }
 
@@ -559,7 +572,14 @@ impl<'a> From<&'a Equipment> for Vec<u8> {
 bitflags! {
     #[derive(Default)]
     pub struct Upgrades: u32 {
-        //TODO bullet bag for parity with slingshot
+        const BULLET_BAG_MASK = 0x0001_c000;
+        const BULLET_BAG_50 = 0x0001_8000;
+        const BULLET_BAG_40 = 0x0001_0000;
+        const BULLET_BAG_30 = 0x0000_8000; //TODO check for parity with slingshot
+        const WALLET_MASK = 0x0000_3000;
+        const ADULTS_WALLET = 0x0000_1000;
+        const GIANTS_WALLET = 0x0000_2000;
+        const TYCOONS_WALLET = 0x0000_3000;
         const SCALE_MASK = 0x0000_0e00;
         const GOLD_SCALE = 0x0000_0400;
         const SILVER_SCALE = 0x0000_0200;
@@ -568,15 +588,32 @@ bitflags! {
         const SILVER_GAUNTLETS = 0x0000_0080;
         const GORON_BRACELET = 0x0000_0040;
         const BOMB_BAG_MASK = 0x0000_0038;
-        const BIGGEST_BOMB_BAG = 0x0000_0018;
-        const BIG_BOMB_BAG = 0x0000_0010;
-        const BOMB_BAG = 0x0000_0008;
-        //TODO quiver for parity with bow
+        const BOMB_BAG_40 = 0x0000_0018;
+        const BOMB_BAG_30 = 0x0000_0010;
+        const BOMB_BAG_20 = 0x0000_0008;
+        const QUIVER_MASK = 0x0000_0007;
+        const QUIVER_50 = 0x0000_0003;
+        const QUIVER_40 = 0x0000_0002;
+        const QUIVER_30 = 0x0000_0001; //TODO check for parity with bow
         const NONE = 0x0000_0000;
     }
 }
 
 impl Upgrades {
+    pub fn bullet_bag(&self) -> Upgrades { *self & Upgrades::BULLET_BAG_MASK }
+
+    pub fn set_bullet_bag(&mut self, bullet_bag: Upgrades) {
+        self.remove(Upgrades::BULLET_BAG_MASK);
+        self.insert(bullet_bag & Upgrades::BULLET_BAG_MASK);
+    }
+
+    pub fn wallet(&self) -> Upgrades { *self & Upgrades::WALLET_MASK }
+
+    pub fn set_wallet(&mut self, wallet: Upgrades) {
+        self.remove(Upgrades::WALLET_MASK);
+        self.insert(wallet & Upgrades::WALLET_MASK);
+    }
+
     pub fn scale(&self) -> Upgrades { *self & Upgrades::SCALE_MASK }
 
     pub fn set_scale(&mut self, scale: Upgrades) {
@@ -596,6 +633,13 @@ impl Upgrades {
     pub fn set_bomb_bag(&mut self, bomb_bag: Upgrades) {
         self.remove(Upgrades::BOMB_BAG_MASK);
         self.insert(bomb_bag & Upgrades::BOMB_BAG_MASK);
+    }
+
+    pub fn quiver(&self) -> Upgrades { *self & Upgrades::QUIVER_MASK }
+
+    pub fn set_quiver(&mut self, quiver: Upgrades) {
+        self.remove(Upgrades::QUIVER_MASK);
+        self.insert(quiver & Upgrades::QUIVER_MASK);
     }
 }
 
@@ -624,6 +668,7 @@ bitflags! {
     #[derive(Default)]
     pub struct QuestItems: u32 {
         const GERUDO_CARD = 0x0040_0000;
+        const STONE_OF_AGONY = 0x0020_0000;
         const ZORA_SAPPHIRE = 0x0010_0000;
         const GORON_RUBY = 0x0008_0000;
         const KOKIRI_EMERALD = 0x0004_0000;
@@ -705,6 +750,56 @@ impl<'a> From<&'a QuestItems> for [u8; 4] {
 impl<'a> From<&'a QuestItems> for Vec<u8> {
     fn from(quest_items: &QuestItems) -> Vec<u8> {
         <[u8; 4]>::from(quest_items).into()
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct BossKeys {
+    pub forest_temple: bool,
+    pub fire_temple: bool,
+    pub water_temple: bool,
+    pub spirit_temple: bool,
+    pub shadow_temple: bool,
+    pub ganons_castle: bool,
+}
+
+impl TryFrom<Vec<u8>> for BossKeys {
+    type Error = Vec<u8>;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<BossKeys, Vec<u8>> {
+        macro_rules! get {
+            ($idx:expr) => {{
+                raw_data[$idx] & 0x01 == 0x01
+            }};
+        }
+
+        if raw_data.len() != 0x14 { return Err(raw_data) }
+        Ok(BossKeys {
+            forest_temple: get!(0x03),
+            fire_temple: get!(0x04),
+            water_temple: get!(0x05),
+            spirit_temple: get!(0x06),
+            shadow_temple: get!(0x07),
+            ganons_castle: get!(0x0a),
+        })
+    }
+}
+
+impl<'a> From<&'a BossKeys> for [u8; 0x14] {
+    fn from(boss_keys: &BossKeys) -> [u8; 0x14] {
+        [
+            0, 0, 0, if boss_keys.forest_temple { 1 } else { 0 },
+            if boss_keys.fire_temple { 1 } else { 0 }, if boss_keys.water_temple { 1 } else { 0 }, if boss_keys.spirit_temple { 1 } else { 0 }, if boss_keys.shadow_temple { 1 } else { 0 },
+            0, 0, if boss_keys.ganons_castle { 1 } else { 0 }, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]
+    }
+}
+
+impl<'a> From<&'a BossKeys> for Vec<u8> {
+    fn from(boss_keys: &BossKeys) -> Vec<u8> {
+        <[u8; 0x14]>::from(boss_keys).into()
     }
 }
 
@@ -804,11 +899,13 @@ pub struct Save {
     pub time_of_day: TimeOfDay,
     pub is_adult: bool,
     pub magic: MagicCapacity,
+    pub biggoron_sword: bool,
     pub inv: Inventory,
     pub inv_amounts: InvAmounts,
     pub equipment: Equipment,
     pub upgrades: Upgrades,
     pub quest_items: QuestItems,
+    pub boss_keys: BossKeys,
     pub small_keys: SmallKeys,
     pub skull_tokens: u8,
     pub scene_flags: SceneFlags,
@@ -878,11 +975,17 @@ impl Save {
                 });
                 magic
             },
+            biggoron_sword: match get_offset!("biggoron_sword", 0x003e) {
+                0 => false,
+                1 => true,
+                value => return Err(DecodeError::UnexpectedValue { value, offset: 0x003e, field: "biggoron_sword" }),
+            },
             inv: try_get_offset!("inv", 0x0074, 0x18),
             inv_amounts: try_get_offset!("inv_amounts", 0x008c, 0xf),
             equipment: try_get_offset!("equipment", 0x009c, 0x2),
             upgrades: try_get_offset!("upgrades", 0x00a0, 0x4),
             quest_items: try_get_offset!("quest_items", 0x00a4, 0x4),
+            boss_keys: try_get_offset!("boss_keys", 0x00a8, 0x14),
             small_keys: try_get_offset!("small_keys", 0x00bc, 0x13),
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
@@ -894,7 +997,7 @@ impl Save {
 
     fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { is_adult, time_of_day, magic, inv, inv_amounts, equipment, upgrades, quest_items, small_keys, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table } = self;
+        let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
@@ -907,11 +1010,13 @@ impl Save {
             MagicCapacity::None | MagicCapacity::Small => 0,
             MagicCapacity::Large => 1,
         };
+        buf[0x003e] = if *biggoron_sword { 1 } else { 0 };
         buf.splice(0x0074..0x008c, Vec::from(inv));
         buf.splice(0x008c..0x009b, Vec::from(inv_amounts));
         buf.splice(0x009c..0x009e, Vec::from(equipment));
         buf.splice(0x00a0..0x00a4, Vec::from(upgrades));
         buf.splice(0x00a4..0x00a8, Vec::from(quest_items));
+        buf.splice(0x00a8..0x00bc, Vec::from(boss_keys));
         buf.splice(0x00bc..0x00cf, Vec::from(small_keys));
         buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
@@ -933,9 +1038,9 @@ impl Save {
         match item.name() {
             "Blue Fire" | "Buy Blue Fire" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),
             "Bomb Bag" => match self.upgrades.bomb_bag() {
-                Upgrades::BIGGEST_BOMB_BAG => 3,
-                Upgrades::BIG_BOMB_BAG => 2,
-                Upgrades::BOMB_BAG => 1,
+                Upgrades::BOMB_BAG_40 => 3,
+                Upgrades::BOMB_BAG_30 => 2,
+                Upgrades::BOMB_BAG_20 => 1,
                 _ => 0,
             },
             "Bombchus" | "Bombchu Drop" | "Bombchus (5)" | "Bombchus (10)" | "Bombchus (20)" | "Buy Bombchu (5)" | "Buy Bombchu (10)" | "Buy Bombchu (20)" => self.inv_amounts.bombchus,

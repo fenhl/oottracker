@@ -259,7 +259,7 @@ async fn main() -> Result<(), Error> {
 
     /*
     eprintln!("building oottracker-mac-arm.app");
-    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo").await?; //TODO remove +beta arg once Rust 1.49 is released
+    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo").await?;
     fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     fs::copy("target/aarch64-apple-darwin/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
     eprintln!("packing oottracker-mac-arm.dmg");

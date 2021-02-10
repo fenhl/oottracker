@@ -1,6 +1,9 @@
 use {
     std::{
-        collections::HashMap,
+        collections::{
+            HashMap,
+            HashSet,
+        },
         fmt,
         future::Future,
         io::{
@@ -20,7 +23,10 @@ use {
         AsyncRead,
         AsyncWrite,
     },
-    ootr::model::*,
+    ootr::{
+        model::*,
+        region::Mq,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -30,7 +36,8 @@ pub enum KnowledgeReadError {
     DungeonRewardLocations(Arc<MapReadError<DungeonReward, DungeonRewardLocation>>),
     Exits(Arc<MapReadError<String, HashMap<String, String>>>),
     Io(Arc<io::Error>),
-    Mq(Arc<MapReadError<Dungeon, bool>>),
+    Mq(Arc<MapReadError<Dungeon, Mq>>),
+    StringSettings(Arc<MapReadError<String, HashSet<String>>>),
     UnknownPreset(u8),
 }
 
@@ -64,9 +71,15 @@ impl From<io::Error> for KnowledgeReadError {
     }
 }
 
-impl From<MapReadError<Dungeon, bool>> for KnowledgeReadError {
-    fn from(e: MapReadError<Dungeon, bool>) -> KnowledgeReadError {
+impl From<MapReadError<Dungeon, Mq>> for KnowledgeReadError {
+    fn from(e: MapReadError<Dungeon, Mq>) -> KnowledgeReadError {
         KnowledgeReadError::Mq(Arc::new(e))
+    }
+}
+
+impl From<MapReadError<String, HashSet<String>>> for KnowledgeReadError {
+    fn from(e: MapReadError<String, HashSet<String>>) -> KnowledgeReadError {
+        KnowledgeReadError::StringSettings(Arc::new(e))
     }
 }
 
@@ -79,6 +92,7 @@ impl fmt::Display for KnowledgeReadError {
             KnowledgeReadError::Exits(e) => write!(f, "failed to decode entrance knowledge: {}", e),
             KnowledgeReadError::Io(e) => write!(f, "I/O error: {}", e),
             KnowledgeReadError::Mq(e) => write!(f, "failed to decode MQ knowledge: {}", e),
+            KnowledgeReadError::StringSettings(e) => write!(f, "failed to decode settings knowledge: {}", e),
             KnowledgeReadError::UnknownPreset(id) => write!(f, "unknown knowledge preset: {}", id),
         }
     }
@@ -87,13 +101,14 @@ impl fmt::Display for KnowledgeReadError {
 #[derive(Debug, SmartDefault, Clone, PartialEq, Eq)]
 pub struct Knowledge {
     pub bool_settings: HashMap<String, bool>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
+    pub string_settings: HashMap<String, HashSet<String>>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
     #[default(Some(Default::default()))]
     pub tricks: Option<HashMap<String, bool>>, //TODO remove option wrapping
+    pub mq: HashMap<Dungeon, Mq>,
+    pub active_trials: HashMap<Medallion, bool>,
     pub dungeon_reward_locations: HashMap<DungeonReward, DungeonRewardLocation>,
-    pub mq: HashMap<Dungeon, bool>,
     #[default(Some(Default::default()))] //TODO include exits that are never shuffled
     pub exits: Option<HashMap<String, HashMap<String, String>>>, //TODO remove option wrapping
-    pub active_trials: HashMap<Medallion, bool>,
 }
 
 impl Knowledge {
@@ -142,6 +157,35 @@ impl Knowledge {
                 format!("correct_chest_sizes") => false,
                 format!("no_collectible_hearts") => false,
             ],
+            string_settings: collect![
+                format!("open_forest") => collect![format!("closed")],
+                format!("open_kakariko") => collect![format!("closed")],
+                format!("zora_fountain") => collect![format!("closed")],
+                format!("gerudo_fortress") => collect![format!("normal")],
+                format!("bridge") => collect![format!("vanilla")],
+                format!("logic_rules") => collect![format!("glitchless")],
+                format!("shuffle_song_items") => collect![format!("song")],
+                format!("shuffle_interior_entrances") => collect![format!("off")],
+                format!("mix_entrance_pools") => collect![format!("off")],
+                format!("shuffle_scrubs") => collect![format!("off")],
+                format!("shopsanity") => collect![format!("off")],
+                format!("tokensanity") => collect![format!("off")],
+                format!("shuffle_mapcompass") => collect![format!("vanilla")],
+                format!("shuffle_smallkeys") => collect![format!("vanilla")],
+                format!("shuffle_fortresskeys") => collect![format!("vanilla")],
+                format!("shuffle_bosskeys") => collect![format!("vanilla")],
+                format!("shuffle_ganon_bosskey") => collect![format!("vanilla")],
+                format!("logic_earliest_adult_trade") => collect![format!("pocket_egg")],
+                format!("logic_latest_adult_trade") => collect![format!("pocket_egg")],
+                format!("hints") => collect![format!("none")],
+                format!("hint_dist") => collect![format!("useless")],
+                format!("text_shuffle") => collect![format!("none")],
+                format!("ice_trap_appearance") => collect![format!("junk_only")],
+                format!("junk_ice_traps") => collect![format!("normal")],
+                format!("item_pool_value") => collect![format!("balanced")],
+                format!("damage_multiplier") => collect![format!("normal")],
+                format!("starting_tod") => collect![format!("default")],
+            ],
             tricks: None, //TODO properly initialize with all tricks set to false
             dungeon_reward_locations: collect![
                 DungeonReward::Stone(Stone::KokiriEmerald) => DungeonRewardLocation::Dungeon(MainDungeon::DekuTree),
@@ -155,18 +199,18 @@ impl Knowledge {
                 DungeonReward::Medallion(Medallion::Light) => DungeonRewardLocation::LinksPocket,
             ],
             mq: collect![
-                Dungeon::Main(MainDungeon::DekuTree) => false,
-                Dungeon::Main(MainDungeon::DodongosCavern) => false,
-                Dungeon::Main(MainDungeon::JabuJabu) => false,
-                Dungeon::Main(MainDungeon::ForestTemple) => false,
-                Dungeon::Main(MainDungeon::FireTemple) => false,
-                Dungeon::Main(MainDungeon::WaterTemple) => false,
-                Dungeon::Main(MainDungeon::ShadowTemple) => false,
-                Dungeon::Main(MainDungeon::SpiritTemple) => false,
-                Dungeon::IceCavern => false,
-                Dungeon::BottomOfTheWell => false,
-                Dungeon::GerudoTrainingGrounds => false,
-                Dungeon::GanonsCastle => false,
+                Dungeon::Main(MainDungeon::DekuTree) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::DodongosCavern) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::JabuJabu) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::ForestTemple) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::FireTemple) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::WaterTemple) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::ShadowTemple) => Mq::Vanilla,
+                Dungeon::Main(MainDungeon::SpiritTemple) => Mq::Vanilla,
+                Dungeon::IceCavern => Mq::Vanilla,
+                Dungeon::BottomOfTheWell => Mq::Vanilla,
+                Dungeon::GerudoTrainingGrounds => Mq::Vanilla,
+                Dungeon::GanonsCastle => Mq::Vanilla,
             ],
             exits: None, //TODO properly initialize with all exits
             active_trials: collect![
@@ -197,7 +241,8 @@ impl Protocol for Knowledge {
                     dungeon_reward_locations: HashMap::read(&mut stream).await?,
                     mq: HashMap::read(&mut stream).await?,
                     exits: Some(HashMap::read(&mut stream).await?),
-                    active_trials: HashMap::read(stream).await?,
+                    active_trials: HashMap::read(&mut stream).await?,
+                    string_settings: HashMap::read(stream).await?,
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
@@ -219,7 +264,8 @@ impl Protocol for Knowledge {
                 self.dungeon_reward_locations.write(&mut sink).await?;
                 self.mq.write(&mut sink).await?;
                 self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(&mut sink).await?;
-                self.active_trials.write(sink).await?;
+                self.active_trials.write(&mut sink).await?;
+                self.string_settings.write(sink).await?;
             }
             Ok(())
         })
@@ -233,7 +279,8 @@ impl Protocol for Knowledge {
                 dungeon_reward_locations: HashMap::read_sync(&mut stream)?,
                 mq: HashMap::read_sync(&mut stream)?,
                 exits: Some(HashMap::read_sync(&mut stream)?),
-                active_trials: HashMap::read_sync(stream)?,
+                active_trials: HashMap::read_sync(&mut stream)?,
+                string_settings: HashMap::read_sync(stream)?,
             },
             1 => Knowledge::default(),
             2 => Knowledge::vanilla(),
@@ -253,7 +300,8 @@ impl Protocol for Knowledge {
             self.dungeon_reward_locations.write_sync(&mut sink)?;
             self.mq.write_sync(&mut sink)?;
             self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write_sync(&mut sink)?;
-            self.active_trials.write_sync(sink)?;
+            self.active_trials.write_sync(&mut sink)?;
+            self.string_settings.write_sync(sink)?;
         }
         Ok(())
     }

@@ -24,6 +24,7 @@ use {
         },
     },
     ootr::model::{
+        Dungeon,
         DungeonReward,
         DungeonRewardLocation,
         MainDungeon,
@@ -179,6 +180,10 @@ impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> 
 }
 
 pub enum TrackerCellKind {
+    BossKey {
+        active: Box<dyn Fn(&BossKeys) -> bool>,
+        toggle: Box<dyn Fn(&mut BossKeys)>,
+    },
     Composite {
         left_img: &'static str,
         right_img: &'static str,
@@ -193,9 +198,12 @@ pub enum TrackerCellKind {
         get: Box<dyn Fn(&ModelState) -> u8>,
         set: Box<dyn Fn(&mut ModelState, u8)>,
         max: u8,
+        step: u8,
     },
+    FortressMq, // a cell kind used on Xopar's tracker to show whether Gerudo Fortress has 4 carpenters
     Medallion(Medallion),
     MedallionLocation(Medallion),
+    Mq(Dungeon),
     OptionalOverlay {
         main_img: &'static str,
         overlay_img: &'static str,
@@ -211,6 +219,7 @@ pub enum TrackerCellKind {
         toggle_overlay: Box<dyn Fn(&mut ModelState)>,
     },
     Sequence {
+        idx: Box<dyn Fn(&ModelState) -> u8>,
         img: Box<dyn Fn(&ModelState) -> (bool, &'static str)>,
         increment: Box<dyn Fn(&mut ModelState)>,
         decrement: Box<dyn Fn(&mut ModelState)>,
@@ -220,8 +229,18 @@ pub enum TrackerCellKind {
         active: Box<dyn Fn(&ModelState) -> bool>,
         toggle: Box<dyn Fn(&mut ModelState)>,
     },
+    SmallKeys {
+        get: Box<dyn Fn(&crate::save::SmallKeys) -> u8>,
+        set: Box<dyn Fn(&mut crate::save::SmallKeys, u8)>,
+        max_vanilla: u8,
+        max_mq: u8,
+    },
     Song {
         song: QuestItems,
+        check: &'static str,
+        toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
+    },
+    SongCheck {
         check: &'static str,
         toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
     },
@@ -242,6 +261,7 @@ macro_rules! cells {
 
         impl TrackerCellId {
             pub fn kind(&self) -> TrackerCellKind {
+                #[allow(unused_qualifications)]
                 match self {
                     $(TrackerCellId::$cell => $kind,)*
                 }
@@ -251,6 +271,11 @@ macro_rules! cells {
 }
 
 cells! {
+    GoMode: Simple {
+        img: "UNIMPLEMENTED",
+        active: Box::new(|_| false), //TODO
+        toggle: Box::new(|_| ()), //TODO
+    },
     LightMedallionLocation: MedallionLocation(Medallion::Light),
     ForestMedallionLocation: MedallionLocation(Medallion::Forest),
     FireMedallionLocation: MedallionLocation(Medallion::Fire),
@@ -264,6 +289,76 @@ cells! {
     ShadowMedallion: Medallion(Medallion::Shadow),
     SpiritMedallion: Medallion(Medallion::Spirit),
     AdultTrade: Sequence {
+        idx: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+            AdultTradeItem::None => 0,
+            AdultTradeItem::PocketEgg => 1,
+            AdultTradeItem::PocketCucco => 2,
+            AdultTradeItem::Cojiro => 3,
+            AdultTradeItem::OddMushroom => 4,
+            AdultTradeItem::OddPotion => 5,
+            AdultTradeItem::PoachersSaw => 6,
+            AdultTradeItem::BrokenSword => 7,
+            AdultTradeItem::Prescription => 8,
+            AdultTradeItem::EyeballFrog => 9,
+            AdultTradeItem::Eyedrops => 10,
+            AdultTradeItem::ClaimCheck => 11,
+        }),
+        img: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+            AdultTradeItem::None => (false, "blue_egg"),
+            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
+            AdultTradeItem::Cojiro => (true, "cojiro"),
+            AdultTradeItem::OddMushroom => (true, "odd_mushroom"),
+            AdultTradeItem::OddPotion => (true, "odd_poultice"),
+            AdultTradeItem::PoachersSaw => (true, "poachers_saw"),
+            AdultTradeItem::BrokenSword => (true, "broken_sword"),
+            AdultTradeItem::Prescription => (true, "prescription"),
+            AdultTradeItem::EyeballFrog => (true, "eyeball_frog"),
+            AdultTradeItem::Eyedrops => (true, "eye_drops"),
+            AdultTradeItem::ClaimCheck => (true, "claim_check"),
+        }),
+        increment: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
+            AdultTradeItem::None => AdultTradeItem::PocketEgg,
+            AdultTradeItem::PocketEgg => AdultTradeItem::PocketCucco,
+            AdultTradeItem::PocketCucco => AdultTradeItem::Cojiro,
+            AdultTradeItem::Cojiro => AdultTradeItem::OddMushroom,
+            AdultTradeItem::OddMushroom => AdultTradeItem::OddPotion,
+            AdultTradeItem::OddPotion => AdultTradeItem::PoachersSaw,
+            AdultTradeItem::PoachersSaw => AdultTradeItem::BrokenSword,
+            AdultTradeItem::BrokenSword => AdultTradeItem::Prescription,
+            AdultTradeItem::Prescription => AdultTradeItem::EyeballFrog,
+            AdultTradeItem::EyeballFrog => AdultTradeItem::Eyedrops,
+            AdultTradeItem::Eyedrops => AdultTradeItem::ClaimCheck,
+            AdultTradeItem::ClaimCheck => AdultTradeItem::None,
+        }),
+        decrement: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
+            AdultTradeItem::None => AdultTradeItem::ClaimCheck,
+            AdultTradeItem::PocketEgg => AdultTradeItem::None,
+            AdultTradeItem::PocketCucco => AdultTradeItem::PocketEgg,
+            AdultTradeItem::Cojiro => AdultTradeItem::PocketEgg,
+            AdultTradeItem::OddMushroom => AdultTradeItem::Cojiro,
+            AdultTradeItem::OddPotion => AdultTradeItem::OddMushroom,
+            AdultTradeItem::PoachersSaw => AdultTradeItem::OddPotion,
+            AdultTradeItem::BrokenSword => AdultTradeItem::PoachersSaw,
+            AdultTradeItem::Prescription => AdultTradeItem::BrokenSword,
+            AdultTradeItem::EyeballFrog => AdultTradeItem::Prescription,
+            AdultTradeItem::Eyedrops => AdultTradeItem::EyeballFrog,
+            AdultTradeItem::ClaimCheck => AdultTradeItem::Eyedrops,
+        }),
+    },
+    AdultTradeNoChicken: Sequence {
+        idx: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+            AdultTradeItem::None => 0,
+            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => 1,
+            AdultTradeItem::Cojiro => 2,
+            AdultTradeItem::OddMushroom => 3,
+            AdultTradeItem::OddPotion => 4,
+            AdultTradeItem::PoachersSaw => 5,
+            AdultTradeItem::BrokenSword => 6,
+            AdultTradeItem::Prescription => 7,
+            AdultTradeItem::EyeballFrog => 8,
+            AdultTradeItem::Eyedrops => 9,
+            AdultTradeItem::ClaimCheck => 10,
+        }),
         img: Box::new(|state| match state.ram.save.inv.adult_trade_item {
             AdultTradeItem::None => (false, "blue_egg"),
             AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
@@ -310,6 +405,15 @@ cells! {
         get: Box::new(|state| state.ram.save.skull_tokens),
         set: Box::new(|state, value| state.ram.save.skull_tokens = value),
         max: 100,
+        step: 1,
+    },
+    SkulltulaTens: Count {
+        dimmed_img: "golden_skulltula",
+        img: "skulls",
+        get: Box::new(|state| state.ram.save.skull_tokens),
+        set: Box::new(|state, value| state.ram.save.skull_tokens = value),
+        max: 50,
+        step: 10,
     },
     KokiriEmeraldLocation: StoneLocation(Stone::KokiriEmerald),
     KokiriEmerald: Stone(Stone::KokiriEmerald),
@@ -320,11 +424,29 @@ cells! {
     Bottle: OptionalOverlay {
         main_img: "bottle",
         overlay_img: "letter",
-        active: Box::new(|state| (state.ram.save.inv.has_emptiable_bottle(), state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
-        toggle_main: Box::new(|state| state.ram.save.inv.toggle_emptiable_bottle()),
+        active: Box::new(|state| (state.ram.save.inv.emptiable_bottles() > 0, state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
+        toggle_main: Box::new(|state| state.ram.save.inv.set_emptiable_bottles(if state.ram.save.inv.emptiable_bottles() > 0 { 0 } else { 1 })),
         toggle_overlay: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
     },
+    NumBottles: Count {
+        dimmed_img: "bottle",
+        img: "UNIMPLEMENTED",
+        get: Box::new(|state| state.ram.save.inv.emptiable_bottles()),
+        set: Box::new(|state, value| state.ram.save.inv.set_emptiable_bottles(value)),
+        max: 4,
+        step: 1,
+    },
+    RutosLetter: Simple {
+        img: "UNIMPLEMENTED",
+        active: Box::new(|state| state.ram.save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered
+        toggle: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
+    },
     Scale: Sequence {
+        idx: Box::new(|state| match state.ram.save.upgrades.scale() {
+            Upgrades::SILVER_SCALE => 1,
+            Upgrades::GOLD_SCALE => 2,
+            _ => 0,
+        }),
         img: Box::new(|state| match state.ram.save.upgrades.scale() {
             Upgrades::SILVER_SCALE => (true, "silver_scale"),
             Upgrades::GOLD_SCALE => (true, "gold_scale"),
@@ -346,16 +468,63 @@ cells! {
         active: Box::new(|state| state.ram.save.inv.slingshot),
         toggle: Box::new(|state| state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot),
     },
+    BulletBag: Sequence {
+        idx: Box::new(|state| match state.ram.save.upgrades.bullet_bag() {
+            Upgrades::BULLET_BAG_30 => 1,
+            Upgrades::BULLET_BAG_40 => 2,
+            Upgrades::BULLET_BAG_50 => 3,
+            _ => 0,
+        }),
+        img: Box::new(|state| (state.ram.save.inv.slingshot, "slingshot")),
+        increment: Box::new(|state| state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
+            Upgrades::BULLET_BAG_30 => Upgrades::BULLET_BAG_40,
+            Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_50,
+            Upgrades::BULLET_BAG_50 => Upgrades::NONE,
+            _ => Upgrades::BULLET_BAG_30,
+        })),
+        decrement: Box::new(|state| state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
+            Upgrades::BULLET_BAG_30 => Upgrades::NONE,
+            Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_30,
+            Upgrades::BULLET_BAG_50 => Upgrades::BULLET_BAG_40,
+            _ => Upgrades::BULLET_BAG_50,
+        })),
+    },
     Bombs: Overlay {
         main_img: "bomb_bag",
         overlay_img: "bombchu",
         active: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, state.ram.save.inv.bombchus)),
         toggle_main: Box::new(|state| if state.ram.save.upgrades.bomb_bag() == Upgrades::NONE {
-            state.ram.save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG);
+            state.ram.save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG_20);
         } else {
             state.ram.save.upgrades.set_bomb_bag(Upgrades::NONE)
         }),
         toggle_overlay: Box::new(|state| state.ram.save.inv.bombchus = !state.ram.save.inv.bombchus),
+    },
+    BombBag: Sequence {
+        idx: Box::new(|state| match state.ram.save.upgrades.bomb_bag() {
+            Upgrades::BOMB_BAG_20 => 1,
+            Upgrades::BOMB_BAG_30 => 2,
+            Upgrades::BOMB_BAG_40 => 3,
+            _ => 0,
+        }),
+        img: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, "bomb_bag")),
+        increment: Box::new(|state| state.ram.save.upgrades.set_bomb_bag(match state.ram.save.upgrades.bomb_bag() {
+            Upgrades::BOMB_BAG_20 => Upgrades::BOMB_BAG_30,
+            Upgrades::BOMB_BAG_30 => Upgrades::BOMB_BAG_40,
+            Upgrades::BOMB_BAG_40 => Upgrades::NONE,
+            _ => Upgrades::BOMB_BAG_20,
+        })),
+        decrement: Box::new(|state| state.ram.save.upgrades.set_bomb_bag(match state.ram.save.upgrades.bomb_bag() {
+            Upgrades::BOMB_BAG_20 => Upgrades::NONE,
+            Upgrades::BOMB_BAG_30 => Upgrades::BOMB_BAG_20,
+            Upgrades::BOMB_BAG_40 => Upgrades::BOMB_BAG_30,
+            _ => Upgrades::BOMB_BAG_40,
+        })),
+    },
+    Bombchus: Simple {
+        img: "UNIMPLEMENTED",
+        active: Box::new(|state| state.ram.save.inv.bombchus),
+        toggle: Box::new(|state| state.ram.save.inv.bombchus = !state.ram.save.inv.bombchus),
     },
     Boomerang: Simple {
         img: "boomerang",
@@ -363,6 +532,12 @@ cells! {
         toggle: Box::new(|state| state.ram.save.inv.boomerang = !state.ram.save.inv.boomerang),
     },
     Strength: Sequence {
+        idx: Box::new(|state| match state.ram.save.upgrades.strength() {
+            Upgrades::GORON_BRACELET => 1,
+            Upgrades::SILVER_GAUNTLETS => 2,
+            Upgrades::GOLD_GAUNTLETS => 3,
+            _ => 0,
+        }),
         img: Box::new(|state| match state.ram.save.upgrades.strength() {
             Upgrades::GORON_BRACELET => (true, "goron_bracelet"),
             Upgrades::SILVER_GAUNTLETS => (true, "silver_gauntlets"),
@@ -393,6 +568,29 @@ cells! {
         }),
         toggle_overlay: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
     },
+    MagicCapacity: Sequence {
+        idx: Box::new(|state| match state.ram.save.magic {
+            MagicCapacity::None => 0,
+            MagicCapacity::Small => 1,
+            MagicCapacity::Large => 2,
+        }),
+        img: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, "magic")),
+        increment: Box::new(|state| state.ram.save.magic = match state.ram.save.magic {
+            MagicCapacity::None => MagicCapacity::Small,
+            MagicCapacity::Small => MagicCapacity::Large,
+            MagicCapacity::Large => MagicCapacity::None,
+        }),
+        decrement: Box::new(|state| state.ram.save.magic = match state.ram.save.magic {
+            MagicCapacity::None => MagicCapacity::Large,
+            MagicCapacity::Small => MagicCapacity::None,
+            MagicCapacity::Large => MagicCapacity::Small,
+        }),
+    },
+    Lens: Simple {
+        img: "lens",
+        active: Box::new(|state| state.ram.save.inv.lens),
+        toggle: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
+    },
     Spells: Composite {
         left_img: "dins_fire",
         right_img: "faores_wind",
@@ -401,7 +599,27 @@ cells! {
         toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
         toggle_right: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
     },
+    DinsFire: Simple {
+        img: "dins_fire",
+        active: Box::new(|state| state.ram.save.inv.dins_fire),
+        toggle: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
+    },
+    FaroresWind: Simple {
+        img: "faores_wind",
+        active: Box::new(|state| state.ram.save.inv.farores_wind),
+        toggle: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
+    },
+    NayrusLove: Simple {
+        img: "UNIMPLEMENTED", //TODO
+        active: Box::new(|state| state.ram.save.inv.nayrus_love),
+        toggle: Box::new(|state| state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love),
+    },
     Hookshot: Sequence {
+        idx: Box::new(|state| match state.ram.save.inv.hookshot {
+            Hookshot::None => 0,
+            Hookshot::Hookshot => 1,
+            Hookshot::Longshot => 2,
+        }),
         img: Box::new(|state| match state.ram.save.inv.hookshot {
             Hookshot::None => (false, "hookshot"),
             Hookshot::Hookshot => (true, "hookshot_accessible"),
@@ -425,6 +643,32 @@ cells! {
         toggle_main: Box::new(|state| state.ram.save.inv.bow = !state.ram.save.inv.bow),
         toggle_overlay: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
     },
+    IceArrows: Simple {
+        img: "ice_trap",
+        active: Box::new(|state| state.ram.save.inv.ice_arrows),
+        toggle: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
+    },
+    Quiver: Sequence {
+        idx: Box::new(|state| match state.ram.save.upgrades.quiver() {
+            Upgrades::QUIVER_30 => 1,
+            Upgrades::QUIVER_40 => 2,
+            Upgrades::QUIVER_50 => 3,
+            _ => 0,
+        }),
+        img: Box::new(|state| (state.ram.save.inv.bow, "bow")),
+        increment: Box::new(|state| state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
+            Upgrades::QUIVER_30 => Upgrades::QUIVER_40,
+            Upgrades::QUIVER_40 => Upgrades::QUIVER_50,
+            Upgrades::QUIVER_50 => Upgrades::NONE,
+            _ => Upgrades::QUIVER_30,
+        })),
+        decrement: Box::new(|state| state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
+            Upgrades::QUIVER_30 => Upgrades::NONE,
+            Upgrades::QUIVER_40 => Upgrades::QUIVER_30,
+            Upgrades::QUIVER_50 => Upgrades::QUIVER_40,
+            _ => Upgrades::QUIVER_50,
+        })),
+    },
     Arrows: Composite {
         left_img: "fire_arrows",
         right_img: "light_arrows",
@@ -432,6 +676,16 @@ cells! {
         active: Box::new(|state| (state.ram.save.inv.fire_arrows, state.ram.save.inv.light_arrows)),
         toggle_left: Box::new(|state| state.ram.save.inv.fire_arrows = !state.ram.save.inv.fire_arrows),
         toggle_right: Box::new(|state| state.ram.save.inv.light_arrows = !state.ram.save.inv.light_arrows),
+    },
+    FireArrows: Simple {
+        img: "fire_arrows",
+        active: Box::new(|state| state.ram.save.inv.fire_arrows),
+        toggle: Box::new(|state| state.ram.save.inv.fire_arrows = !state.ram.save.inv.fire_arrows),
+    },
+    LightArrows: Simple {
+        img: "light_arrows",
+        active: Box::new(|state| state.ram.save.inv.light_arrows),
+        toggle: Box::new(|state| state.ram.save.inv.light_arrows = !state.ram.save.inv.light_arrows),
     },
     Hammer: Simple {
         img: "hammer",
@@ -446,12 +700,33 @@ cells! {
         toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::IRON_BOOTS)),
         toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::HOVER_BOOTS)),
     },
+    IronBoots: Simple {
+        img: "iron_boots",
+        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::IRON_BOOTS)),
+        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::IRON_BOOTS)),
+    },
+    HoverBoots: Simple {
+        img: "hover_boots",
+        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::HOVER_BOOTS)),
+        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::HOVER_BOOTS)),
+    },
     MirrorShield: Simple {
         img: "mirror_shield",
         active: Box::new(|state| state.ram.save.equipment.contains(Equipment::MIRROR_SHIELD)),
         toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::MIRROR_SHIELD)),
     },
     ChildTrade: Sequence {
+        idx: Box::new(|state| match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => 0,
+            ChildTradeItem::WeirdEgg => 1,
+            ChildTradeItem::Chicken => 2,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => 3, //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => 4,
+            ChildTradeItem::SkullMask => 5,
+            ChildTradeItem::SpookyMask => 6,
+            ChildTradeItem::BunnyHood => 7,
+            ChildTradeItem::MaskOfTruth => 8,
+        }),
         img: Box::new(|state| match state.ram.save.inv.child_trade_item {
             ChildTradeItem::None => (false, "white_egg"),
             ChildTradeItem::WeirdEgg => (true, "white_egg"),
@@ -486,6 +761,106 @@ cells! {
             ChildTradeItem::MaskOfTruth => ChildTradeItem::BunnyHood,
         }),
     },
+    ChildTradeNoChicken: Sequence {
+        idx: Box::new(|state| match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => 0,
+            ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => 1,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => 2, //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => 3,
+            ChildTradeItem::SkullMask => 4,
+            ChildTradeItem::SpookyMask => 5,
+            ChildTradeItem::BunnyHood => 6,
+            ChildTradeItem::MaskOfTruth => 7,
+        }),
+        img: Box::new(|state| match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => (false, "white_egg"),
+            ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => (true, "white_egg"),
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => (true, "keaton_mask"),
+            ChildTradeItem::SkullMask => (true, "skull_mask"),
+            ChildTradeItem::SpookyMask => (true, "spooky_mask"),
+            ChildTradeItem::BunnyHood => (true, "bunny_hood"),
+            ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
+        }),
+        increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => ChildTradeItem::WeirdEgg,
+            ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::KeatonMask, //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => ChildTradeItem::SkullMask,
+            ChildTradeItem::SkullMask => ChildTradeItem::SpookyMask,
+            ChildTradeItem::SpookyMask => ChildTradeItem::BunnyHood,
+            ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
+            ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
+        }),
+        decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
+            ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => ChildTradeItem::None,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::WeirdEgg, //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => ChildTradeItem::ZeldasLetter,
+            ChildTradeItem::SkullMask => ChildTradeItem::KeatonMask,
+            ChildTradeItem::SpookyMask => ChildTradeItem::SkullMask,
+            ChildTradeItem::BunnyHood => ChildTradeItem::SpookyMask,
+            ChildTradeItem::MaskOfTruth => ChildTradeItem::BunnyHood,
+        }),
+    },
+    ChildTradeSoldOut: Sequence {
+        idx: Box::new(|state| match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => 0,
+            ChildTradeItem::WeirdEgg => 1,
+            ChildTradeItem::Chicken => 2,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => 3, //TODO for SOLD OUT, check trade quest progress
+            //TODO Zelda's letter turned in => 4
+            ChildTradeItem::KeatonMask => 5,
+            //TODO Keaton mask sold => 6
+            ChildTradeItem::SkullMask => 7,
+            //TODO skull mask sold => 8
+            ChildTradeItem::SpookyMask => 9,
+            //TODO spooky mask sold => 10
+            ChildTradeItem::BunnyHood => 11,
+            //TODO bunny hood sold => 12
+            ChildTradeItem::MaskOfTruth => 13,
+        }),
+        img: Box::new(|state| match state.ram.save.inv.child_trade_item {
+            ChildTradeItem::None => (false, "white_egg"),
+            ChildTradeItem::WeirdEgg => (true, "white_egg"),
+            ChildTradeItem::Chicken => (true, "white_chicken"),
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
+            //TODO Zelda's letter turned in => SOLD OUT
+            ChildTradeItem::KeatonMask => (true, "keaton_mask"),
+            //TODO Keaton mask sold => SOLD OUT
+            ChildTradeItem::SkullMask => (true, "skull_mask"),
+            //TODO skull mask sold => SOLD OUT
+            ChildTradeItem::SpookyMask => (true, "spooky_mask"),
+            //TODO spooky mask sold => SOLD OUT
+            ChildTradeItem::BunnyHood => (true, "bunny_hood"),
+            //TODO bunny hood sold => SOLD OUT
+            ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
+        }),
+        increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+            //TODO consider sold-out states
+            ChildTradeItem::None => ChildTradeItem::WeirdEgg,
+            ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
+            ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::KeatonMask, //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => ChildTradeItem::SkullMask,
+            ChildTradeItem::SkullMask => ChildTradeItem::SpookyMask,
+            ChildTradeItem::SpookyMask => ChildTradeItem::BunnyHood,
+            ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
+            ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
+        }),
+        decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+            //TODO consider sold-out states
+            ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
+            ChildTradeItem::WeirdEgg => ChildTradeItem::None,
+            ChildTradeItem::Chicken => ChildTradeItem::WeirdEgg,
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::Chicken, //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => ChildTradeItem::ZeldasLetter,
+            ChildTradeItem::SkullMask => ChildTradeItem::KeatonMask,
+            ChildTradeItem::SpookyMask => ChildTradeItem::SkullMask,
+            ChildTradeItem::BunnyHood => ChildTradeItem::SpookyMask,
+            ChildTradeItem::MaskOfTruth => ChildTradeItem::BunnyHood,
+        }),
+    },
     Ocarina: Overlay {
         main_img: "ocarina",
         overlay_img: "scarecrow",
@@ -506,6 +881,11 @@ cells! {
         toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
         toggle_right: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
     },
+    KokiriSword: Simple {
+        img: "kokiri_sword",
+        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD)),
+        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
+    },
     Tunics: Composite {
         left_img: "goron_tunic",
         right_img: "zora_tunic",
@@ -514,15 +894,81 @@ cells! {
         toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::GORON_TUNIC)),
         toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
     },
+    GoronTunic: Simple {
+        img: "goron_tunic",
+        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::GORON_TUNIC)),
+        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::GORON_TUNIC)),
+    },
+    ZoraTunic: Simple {
+        img: "zora_tunic",
+        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::ZORA_TUNIC)),
+        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
+    },
     Triforce: Count { //TODO if triforce hunt is off and autotracker is on, replace with something else (big poes?)
         dimmed_img: "triforce",
         img: "force",
         get: Box::new(|state| state.ram.save.triforce_pieces()),
         set: Box::new(|state, value| state.ram.save.set_triforce_pieces(value)),
         max: 100,
+        step: 1,
+    },
+    TriforceOneAndFives: Sequence {
+        idx: Box::new(|state| match state.ram.save.triforce_pieces() {
+            0 => 0,
+            1..=4 => 1,
+            5..=9 => 2,
+            10..=14 => 3,
+            15..=19 => 4,
+            20..=24 => 5,
+            25..=29 => 6,
+            30..=34 => 7,
+            35..=39 => 8,
+            40..=44 => 9,
+            45..=49 => 10,
+            50..=54 => 11,
+            55..=59 => 12,
+            _ => 13,
+        }),
+        img: Box::new(|state| (state.ram.save.triforce_pieces() > 0, "triforce")), //TODO images from count?
+        increment: Box::new(|state| state.ram.save.set_triforce_pieces(match state.ram.save.triforce_pieces() {
+            0 => 1,
+            1..=4 => 5,
+            5..=9 => 10,
+            10..=14 => 15,
+            15..=19 => 20,
+            20..=24 => 25,
+            25..=29 => 30,
+            30..=34 => 35,
+            35..=39 => 40,
+            40..=44 => 45,
+            45..=49 => 50,
+            50..=54 => 55,
+            55..=59 => 60,
+            _ => 0,
+        })),
+        decrement: Box::new(|state| state.ram.save.set_triforce_pieces(match state.ram.save.triforce_pieces() {
+            0 => 60,
+            1..=4 => 0,
+            5..=9 => 1,
+            10..=14 => 5,
+            15..=19 => 10,
+            20..=24 => 15,
+            25..=29 => 20,
+            30..=34 => 25,
+            35..=39 => 30,
+            40..=44 => 35,
+            45..=49 => 40,
+            50..=54 => 45,
+            55..=59 => 50,
+            _ => 55,
+        })),
     },
     ZeldasLullaby: Song {
         song: QuestItems::ZELDAS_LULLABY,
+        check: "Song from Impa",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_IMPA)),
+    },
+    ZeldasLullabyCheck: SongCheck {
         check: "Song from Impa",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_IMPA)),
     },
@@ -531,8 +977,16 @@ cells! {
         check: "Song from Malon",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_MALON)),
     },
+    EponasSongCheck: SongCheck {
+        check: "Song from Malon",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_MALON)),
+    },
     SariasSong: Song {
         song: QuestItems::SARIAS_SONG,
+        check: "Song from Saria",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
+    },
+    SariasSongCheck: SongCheck {
         check: "Song from Saria",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
     },
@@ -541,8 +995,16 @@ cells! {
         check: "Song from Composers Grave",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
     },
+    SunsSongCheck: SongCheck {
+        check: "Song from Composers Grave",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
+    },
     SongOfTime: Song {
         song: QuestItems::SONG_OF_TIME,
+        check: "Song from Ocarina of Time",
+        toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SONG_FROM_OCARINA_OF_TIME)),
+    },
+    SongOfTimeCheck: SongCheck {
         check: "Song from Ocarina of Time",
         toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SONG_FROM_OCARINA_OF_TIME)),
     },
@@ -551,8 +1013,16 @@ cells! {
         check: "Song from Windmill",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_WINDMILL)),
     },
+    SongOfStormsCheck: SongCheck {
+        check: "Song from Windmill",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_WINDMILL)),
+    },
     Minuet: Song {
         song: QuestItems::MINUET_OF_FOREST,
+        check: "Sheik in Forest",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_FOREST)),
+    },
+    MinuetCheck: SongCheck {
         check: "Sheik in Forest",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_FOREST)),
     },
@@ -561,8 +1031,16 @@ cells! {
         check: "Sheik in Crater",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_CRATER)),
     },
+    BoleroCheck: SongCheck {
+        check: "Sheik in Crater",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_CRATER)),
+    },
     Serenade: Song {
         song: QuestItems::SERENADE_OF_WATER,
+        check: "Sheik in Ice Cavern",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_ICE_CAVERN)),
+    },
+    SerenadeCheck: SongCheck {
         check: "Sheik in Ice Cavern",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_ICE_CAVERN)),
     },
@@ -571,8 +1049,16 @@ cells! {
         check: "Sheik at Colossus",
         toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SHEIK_AT_COLOSSUS)),
     },
+    RequiemCheck: SongCheck {
+        check: "Sheik at Colossus",
+        toggle_overlay: Box::new(|eci| eci.10.toggle(EventChkInf10::SHEIK_AT_COLOSSUS)),
+    },
     Nocturne: Song {
         song: QuestItems::NOCTURNE_OF_SHADOW,
+        check: "Sheik in Kakariko",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_KAKARIKO)),
+    },
+    NocturneCheck: SongCheck {
         check: "Sheik in Kakariko",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_IN_KAKARIKO)),
     },
@@ -580,6 +1066,134 @@ cells! {
         song: QuestItems::PRELUDE_OF_LIGHT,
         check: "Sheik at Temple",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
+    },
+    PreludeCheck: SongCheck {
+        check: "Sheik at Temple",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
+    },
+    DekuMq: Mq(Dungeon::Main(MainDungeon::DekuTree)),
+    DcMq: Mq(Dungeon::Main(MainDungeon::DodongosCavern)),
+    JabuMq: Mq(Dungeon::Main(MainDungeon::JabuJabu)),
+    ForestMq: Mq(Dungeon::Main(MainDungeon::ForestTemple)),
+    ForestSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.forest_temple),
+        set: Box::new(|keys, value| keys.forest_temple = value),
+        max_vanilla: 5,
+        max_mq: 6,
+    },
+    ForestBossKey: BossKey {
+        active: Box::new(|keys| keys.forest_temple),
+        toggle: Box::new(|keys| keys.forest_temple = !keys.forest_temple),
+    },
+    ShadowMq: Mq(Dungeon::Main(MainDungeon::ShadowTemple)),
+    ShadowSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.shadow_temple),
+        set: Box::new(|keys, value| keys.shadow_temple = value),
+        max_vanilla: 5,
+        max_mq: 6,
+    },
+    ShadowBossKey: BossKey {
+        active: Box::new(|keys| keys.shadow_temple),
+        toggle: Box::new(|keys| keys.shadow_temple = !keys.shadow_temple),
+    },
+    WellMq: Mq(Dungeon::BottomOfTheWell),
+    WellSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.bottom_of_the_well),
+        set: Box::new(|keys, value| keys.bottom_of_the_well = value),
+        max_vanilla: 3,
+        max_mq: 2,
+    },
+    FireMq: Mq(Dungeon::Main(MainDungeon::FireTemple)),
+    FireSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.fire_temple),
+        set: Box::new(|keys, value| keys.fire_temple = value),
+        max_vanilla: 8,
+        max_mq: 5,
+    },
+    FireBossKey: BossKey {
+        active: Box::new(|keys| keys.fire_temple),
+        toggle: Box::new(|keys| keys.fire_temple = !keys.fire_temple),
+    },
+    SpiritMq: Mq(Dungeon::Main(MainDungeon::SpiritTemple)),
+    SpiritSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.spirit_temple),
+        set: Box::new(|keys, value| keys.spirit_temple = value),
+        max_vanilla: 5,
+        max_mq: 7,
+    },
+    SpiritBossKey: BossKey {
+        active: Box::new(|keys| keys.spirit_temple),
+        toggle: Box::new(|keys| keys.spirit_temple = !keys.spirit_temple),
+    },
+    FortressMq: FortressMq,
+    FortressSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.thieves_hideout),
+        set: Box::new(|keys, value| keys.thieves_hideout = value),
+        max_vanilla: 4,
+        max_mq: 4,
+    },
+    WaterMq: Mq(Dungeon::Main(MainDungeon::WaterTemple)),
+    WaterSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.water_temple),
+        set: Box::new(|keys, value| keys.water_temple = value),
+        max_vanilla: 6,
+        max_mq: 2,
+    },
+    WaterBossKey: BossKey {
+        active: Box::new(|keys| keys.water_temple),
+        toggle: Box::new(|keys| keys.water_temple = !keys.water_temple),
+    },
+    GanonMq: Mq(Dungeon::GanonsCastle),
+    GanonSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.ganons_castle),
+        set: Box::new(|keys, value| keys.ganons_castle = value),
+        max_vanilla: 2,
+        max_mq: 3,
+    },
+    GanonBossKey: BossKey {
+        active: Box::new(|keys| keys.ganons_castle),
+        toggle: Box::new(|keys| keys.ganons_castle = !keys.ganons_castle),
+    },
+    GtgMq: Mq(Dungeon::GerudoTrainingGrounds),
+    GtgSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.gerudo_training_grounds),
+        set: Box::new(|keys, value| keys.gerudo_training_grounds = value),
+        max_vanilla: 9,
+        max_mq: 3,
+    },
+    BiggoronSword: Simple {
+        img: "UNIMPLEMENTED",
+        active: Box::new(|state| state.ram.save.biggoron_sword && state.ram.save.equipment.contains(Equipment::GIANTS_KNIFE)),
+        toggle: Box::new(|state| if state.ram.save.biggoron_sword && state.ram.save.equipment.contains(Equipment::GIANTS_KNIFE) {
+            state.ram.save.biggoron_sword = false;
+            state.ram.save.equipment.remove(Equipment::GIANTS_KNIFE);
+        } else {
+            state.ram.save.biggoron_sword = true;
+            state.ram.save.equipment.remove(Equipment::GIANTS_KNIFE);
+        }),
+    },
+    WalletNoTycoon: Sequence {
+        idx: Box::new(|state| match state.ram.save.upgrades.wallet() {
+            Upgrades::ADULTS_WALLET => 1,
+            Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => 2,
+            _ => 0,
+        }),
+        img: Box::new(|state| (state.ram.save.upgrades.wallet() != Upgrades::NONE, "UNIMPLEMENTED")),
+        increment: Box::new(|state| state.ram.save.upgrades.set_wallet(match state.ram.save.upgrades.wallet() {
+            Upgrades::ADULTS_WALLET => Upgrades::GIANTS_WALLET,
+            Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::NONE,
+            _ => Upgrades::ADULTS_WALLET,
+        })),
+        decrement: Box::new(|state| state.ram.save.upgrades.set_wallet(match state.ram.save.upgrades.wallet() {
+            Upgrades::ADULTS_WALLET => Upgrades::NONE,
+            Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::ADULTS_WALLET,
+            _ => Upgrades::GIANTS_WALLET,
+        })),
+    },
+    StoneOfAgony: Simple {
+        img: "UNIMPLEMENTED",
+        active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::STONE_OF_AGONY)),
+        toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::STONE_OF_AGONY)),
     },
 }
 
@@ -638,7 +1252,7 @@ impl<'a> From<&'a Config> for TrackerLayout {
 
         TrackerLayout {
             meds: config.med_order,
-            row2: [AdultTrade, Skulltula, Bottle, Scale],
+            row2: [AdultTradeNoChicken, Skulltula, Bottle, Scale],
             rest: [
                 [Slingshot, Bombs, Boomerang, Strength, Magic, Spells],
                 [Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield],

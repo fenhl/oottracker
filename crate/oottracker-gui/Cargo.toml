@@ -15,6 +15,7 @@ itertools = "0.10"
 lazy_static = "1"
 num-traits = "0.2"
 smart-default = "0.6"
+url = "2"
 
 [dependencies.derive_more]
 version = "0.99"
@@ -45,6 +46,11 @@ path = "../oottracker"
 
 [dependencies.oottracker-derive]
 path = "../oottracker-derive"
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["rustls-tls"]
 
 [dependencies.structopt]
 version = "0.3"

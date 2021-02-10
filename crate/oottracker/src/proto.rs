@@ -17,7 +17,7 @@ use {
 };
 
 pub const TCP_PORT: u16 = 24801;
-pub const VERSION: u8 = 1;
+pub const VERSION: u8 = 2;
 
 #[derive(Debug, Clone, Protocol)]
 pub enum Packet {

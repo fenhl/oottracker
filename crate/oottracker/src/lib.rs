@@ -1,4 +1,4 @@
-#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_qualifications, warnings)]
 #![forbid(unsafe_code)]
 
 use {
@@ -20,6 +20,7 @@ pub use crate::{
 };
 
 pub mod checks;
+pub mod firebase;
 pub mod info_tables;
 mod item_ids;
 pub mod knowledge;

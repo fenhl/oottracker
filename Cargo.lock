@@ -106,9 +106,9 @@ dependencies = [
 
 [[package]]
 name = "async-proto"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a66be3d62b4585820d7607ed759e48b80984338b459481aa56c374ff0ae1ee"
+checksum = "2a1ead88e7daac437c262564f027ff97b0b310972959eb2f6e2568e6446b8a56"
 dependencies = [
  "async-proto-derive",
  "byteorder",
@@ -118,9 +118,9 @@ dependencies = [
 
 [[package]]
 name = "async-proto-derive"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70ea253fe0601d83f89e296900feca13ff152a163c57eb5fcee1c45e574f5b5b"
+checksum = "20b3c0ebdc33e35944d92b8fe0171a637136a9537e0ff960a137d7eba6b4481f"
 dependencies = [
  "convert_case",
  "itertools",
@@ -2665,6 +2665,7 @@ dependencies = [
  "ootr-static",
  "oottracker-derive",
  "pin-utils",
+ "reqwest",
  "semver 0.11.0",
  "serde",
  "serde_json",
@@ -2718,10 +2719,12 @@ dependencies = [
  "ootr-static",
  "oottracker",
  "oottracker-derive",
+ "reqwest",
  "smart-default",
  "structopt",
  "tokio",
  "tokio-stream",
+ "url",
  "wheel",
  "winres",
 ]

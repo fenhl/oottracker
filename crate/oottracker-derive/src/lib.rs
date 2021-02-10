@@ -43,6 +43,14 @@ use {
 };
 
 #[proc_macro]
+pub fn version(_: TokenStream) -> TokenStream {
+    let version = env!("CARGO_PKG_VERSION");
+    TokenStream::from(quote! {
+        ::semver::Version::parse(#version).expect("failed to parse current version")
+    })
+}
+
+#[proc_macro]
 pub fn embed_image(input: TokenStream) -> TokenStream {
     let img_path = parse_macro_input!(input as LitStr).value();
     let img_path = Path::new(&img_path);
@@ -87,14 +95,6 @@ pub fn embed_images(input: TokenStream) -> TokenStream {
 
             T::from_embedded_image(&::std::path::Path::new(#path_lit).join(format!("{}.{}", name, ext)), IMG_CONSTS[name])
         }
-    })
-}
-
-#[proc_macro]
-pub fn version(_: TokenStream) -> TokenStream {
-    let version = env!("CARGO_PKG_VERSION");
-    TokenStream::from(quote! {
-        ::semver::Version::parse(#version).expect("failed to parse current version")
     })
 }
 
