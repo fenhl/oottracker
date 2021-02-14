@@ -3,11 +3,16 @@ use {
         collections::HashMap,
         fmt,
         io,
+        path::{
+            Path,
+            PathBuf,
+        },
         sync::Arc,
         vec,
     },
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
+    image::DynamicImage,
     serde::{
         Deserialize,
         Serialize,
@@ -1267,6 +1272,44 @@ impl<'a> From<&'a Config> for TrackerLayout {
 fn default_med_order() -> ElementOrder { ElementOrder::LightShadowSpirit }
 fn default_warp_song_order() -> ElementOrder { ElementOrder::SpiritShadowLight }
 
-fn dirs() -> Result<ProjectDirs, Error> {
+pub fn dirs() -> Result<ProjectDirs, Error> {
     ProjectDirs::from("net", "Fenhl", "OoT Tracker").ok_or(Error::MissingHomeDir)
+}
+
+pub struct EmbeddedImage {
+    pub path: PathBuf,
+    pub contents: &'static [u8],
+}
+
+pub trait FromEmbeddedImage {
+    fn from_embedded_image(name: &Path, contents: &'static [u8]) -> Self;
+}
+
+impl FromEmbeddedImage for EmbeddedImage {
+    fn from_embedded_image(name: &Path, contents: &'static [u8]) -> EmbeddedImage {
+        EmbeddedImage { path: name.to_owned(), contents }
+    }
+}
+
+impl FromEmbeddedImage for iced::widget::Image {
+    fn from_embedded_image(_: &Path, contents: &'static [u8]) -> iced::widget::Image {
+        iced::widget::Image::new(iced::image::Handle::from_memory(contents.to_vec()))
+    }
+}
+
+impl FromEmbeddedImage for DynamicImage {
+    fn from_embedded_image(_: &Path, contents: &'static [u8]) -> DynamicImage {
+        image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
+    }
+}
+
+pub mod images {
+    use super::FromEmbeddedImage;
+
+    oottracker_derive::embed_images!("assets/img/xopar-images");
+    oottracker_derive::embed_images!("assets/img/xopar-images-count");
+    oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");
+    oottracker_derive::embed_images!("assets/img/xopar-images-overlay");
+    oottracker_derive::embed_images!("assets/img/xopar-images-overlay-dimmed");
+    oottracker_derive::embed_image!("assets/icon.ico");
 }

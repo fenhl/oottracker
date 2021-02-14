@@ -7,7 +7,6 @@ use {
     std::{
         collections::HashMap,
         fmt,
-        path::Path,
         sync::Arc,
         time::Duration,
     },
@@ -96,33 +95,6 @@ const MEDALLION_LOCATION_HEIGHT: u16 = 18;
 const STONE_LOCATION_HEIGHT: u16 = 12;
 const WIDTH: u32 = CELL_SIZE as u32 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
 const HEIGHT: u32 = MEDALLION_LOCATION_HEIGHT as u32 + CELL_SIZE as u32 * 7 + 9; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 1px spacing
-
-pub trait FromEmbeddedImage {
-    fn from_embedded_image(name: &Path, contents: &[u8]) -> Self;
-}
-
-impl FromEmbeddedImage for Image {
-    fn from_embedded_image(_: &Path, contents: &[u8]) -> Image {
-        Image::new(iced::image::Handle::from_memory(contents.to_vec()))
-    }
-}
-
-impl FromEmbeddedImage for DynamicImage {
-    fn from_embedded_image(_: &Path, contents: &[u8]) -> DynamicImage {
-        image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
-    }
-}
-
-mod images {
-    use super::FromEmbeddedImage;
-
-    oottracker_derive::embed_images!("assets/img/xopar-images");
-    oottracker_derive::embed_images!("assets/img/xopar-images-count");
-    oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");
-    oottracker_derive::embed_images!("assets/img/xopar-images-overlay");
-    oottracker_derive::embed_images!("assets/img/xopar-images-overlay-dimmed");
-    oottracker_derive::embed_image!("assets/icon.ico");
-}
 
 struct ContainerStyle;
 

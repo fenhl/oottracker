@@ -56,6 +56,22 @@ pub struct Ram {
 }
 
 impl Ram {
+    pub fn from_ranges(
+        save: &[u8],
+        current_scene_id: u8,
+        current_scene_switch_flags: &[u8],
+        current_scene_chest_flags: &[u8],
+        current_scene_room_clear_flags: &[u8],
+    ) -> Result<Ram, DecodeError> {
+        Ok(Ram {
+            save: Save::from_save_data(save)?,
+            current_scene_id,
+            current_scene_switch_flags: BigEndian::read_u32(current_scene_switch_flags),
+            current_scene_chest_flags: BigEndian::read_u32(current_scene_chest_flags),
+            current_scene_room_clear_flags: BigEndian::read_u32(current_scene_room_clear_flags),
+        })
+    }
+
     /// Converts an *Ocarina of Time* RAM dump into a `Ram`.
     ///
     /// # Panics
@@ -63,25 +79,13 @@ impl Ram {
     /// This method may panic if `ram_data`'s size is less than `0x80_0000` bytes, or if it doesn't contain a valid OoT RAM dump.
     pub fn from_bytes(ram_data: &[u8]) -> Result<Ram, DecodeError> {
         if ram_data.len() != SIZE { return Err(DecodeError::Size(ram_data.len())) }
-        Ok(Ram {
-            save: {
-                let raw = ram_data.get(0x11a5d0..0x11a5d0 + 0x1450).ok_or(DecodeError::IndexRange { start: 0x11a5d0, end: 0x11a5d0 + 0x1450 })?;
-                Save::from_save_data(raw)?
-            },
-            current_scene_id: *ram_data.get(0x1c8545).ok_or(DecodeError::Index(0x1c8545))?,
-            current_scene_switch_flags: {
-                let raw = ram_data.get(0x1ca1c8..0x1ca1cc).ok_or(DecodeError::IndexRange { start: 0x1ca1c8, end: 0x1ca1cc })?;
-                BigEndian::read_u32(raw)
-            },
-            current_scene_chest_flags: {
-                let raw = ram_data.get(0x1ca1d8..0x1ca1dc).ok_or(DecodeError::IndexRange { start: 0x1ca1d8, end: 0x1ca1dc })?;
-                BigEndian::read_u32(raw)
-            },
-            current_scene_room_clear_flags: {
-                let raw = ram_data.get(0x1ca1dc..0x1ca1e0).ok_or(DecodeError::IndexRange { start: 0x1ca1dc, end: 0x1ca1e0 })?;
-                BigEndian::read_u32(raw)
-            },
-        })
+        Ram::from_ranges(
+            ram_data.get(0x11a5d0..0x11a5d0 + 0x1450).ok_or(DecodeError::IndexRange { start: 0x11a5d0, end: 0x11a5d0 + 0x1450 })?,
+            *ram_data.get(0x1c8545).ok_or(DecodeError::Index(0x1c8545))?,
+            ram_data.get(0x1ca1c8..0x1ca1cc).ok_or(DecodeError::IndexRange { start: 0x1ca1c8, end: 0x1ca1cc })?,
+            ram_data.get(0x1ca1d8..0x1ca1dc).ok_or(DecodeError::IndexRange { start: 0x1ca1d8, end: 0x1ca1dc })?,
+            ram_data.get(0x1ca1dc..0x1ca1e0).ok_or(DecodeError::IndexRange { start: 0x1ca1dc, end: 0x1ca1e0 })?,
+        )
     }
 
     pub(crate) fn current_region<R: Rando>(&self, rando: &R) -> Result<RegionLookup, RegionLookupError<R>> { //TODO disambiguate MQ-ness
@@ -112,5 +116,11 @@ impl Ram {
             //TODO set visited floors (if used)
         }
         flags
+    }
+}
+
+impl From<Save> for Ram {
+    fn from(save: Save) -> Ram {
+        Ram { save, ..Ram::default() }
     }
 }

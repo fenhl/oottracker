@@ -13,5 +13,8 @@ async-proto = "0.4"
 libc = "0.2"
 semver = "0.11"
 
+[dependencies.ootr]
+path = "../ootr"
+
 [dependencies.oottracker]
 path = "../oottracker"

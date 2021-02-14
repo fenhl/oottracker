@@ -12,7 +12,6 @@ enum-iterator = "0.6"
 futures = "0.3"
 image = "0.23"
 itertools = "0.10"
-lazy_static = "1"
 num-traits = "0.2"
 smart-default = "0.6"
 url = "2"
@@ -43,9 +42,6 @@ path = "../ootr-static"
 
 [dependencies.oottracker]
 path = "../oottracker"
-
-[dependencies.oottracker-derive]
-path = "../oottracker-derive"
 
 [dependencies.reqwest]
 version = "0.11"

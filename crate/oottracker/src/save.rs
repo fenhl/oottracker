@@ -52,6 +52,7 @@ use {
     },
 };
 
+pub const ADDR: u32 = 0x11a5d0;
 pub const SIZE: usize = 0x1450;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

@@ -24,6 +24,7 @@ pub mod firebase;
 pub mod info_tables;
 mod item_ids;
 pub mod knowledge;
+pub mod net;
 pub mod proto;
 pub mod ram;
 pub mod region;

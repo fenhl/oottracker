@@ -71,6 +71,7 @@ pub fn embed_images(input: TokenStream) -> TokenStream {
     let dir_path = parse_macro_input!(input as LitStr).value();
     let dir_path = Path::new(&dir_path);
     let name = Ident::new(&dir_path.file_name().expect("empty filename").to_string_lossy().to_case(Case::Snake), Span::call_site());
+    let name_all = Ident::new(&format!("{}_all", name), Span::call_site());
     let path_lit = dir_path.to_str().expect("filename is not valid UTF-8");
     let img_consts = fs::read_dir(dir_path).expect("failed to open images dir") //TODO compile error instead of panic
         .map(|img_path| img_path.and_then(|img_path| Ok({
@@ -94,6 +95,18 @@ pub fn embed_images(input: TokenStream) -> TokenStream {
             }
 
             T::from_embedded_image(&::std::path::Path::new(#path_lit).join(format!("{}.{}", name, ext)), IMG_CONSTS[name])
+        }
+
+        pub fn #name_all<T: FromEmbeddedImage>(ext: &'static str) -> impl Iterator<Item = T> {
+            ::lazy_static::lazy_static! {
+                static ref IMG_CONSTS: ::std::collections::HashMap<&'static str, &'static [u8]> = {
+                    let mut consts = ::std::collections::HashMap::<&'static str, &'static [u8]>::default();
+                    #(#img_consts)*
+                    consts
+                };
+            }
+
+            IMG_CONSTS.iter().map(move |(name, contents)| T::from_embedded_image(&::std::path::Path::new(#path_lit).join(format!("{}.{}", name, ext)), contents))
         }
     })
 }

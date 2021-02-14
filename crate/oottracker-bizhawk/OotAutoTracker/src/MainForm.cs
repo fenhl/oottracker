@@ -9,7 +9,6 @@ using System.Text;
 using System.Windows.Forms;
 
 using BizHawk.Client.Common;
-using BizHawk.Client.EmuHawk;
 
 namespace Net.Fenhl.OotAutoTracker
 {
@@ -17,6 +16,16 @@ namespace Net.Fenhl.OotAutoTracker
     {
         [DllImport("oottracker")]
         internal static extern StringHandle version_string();
+        [DllImport("oottracker")]
+        internal static extern TrackerLayoutHandle layout_default();
+        [DllImport("oottracker")]
+        internal static extern void layout_free(IntPtr layout);
+        [DllImport("oottracker")]
+        internal static extern TrackerCellHandle layout_cell(TrackerLayoutHandle layout, byte idx);
+        [DllImport("oottracker")]
+        internal static extern void cell_free(IntPtr layout);
+        [DllImport("oottracker")]
+        internal static extern StringHandle cell_image(ModelStateHandle model, TrackerCellHandle cell);
         [DllImport("oottracker")]
         internal static extern TcpStreamResultHandle connect_ipv4(byte[] addr);
         [DllImport("oottracker")]
@@ -50,6 +59,8 @@ namespace Net.Fenhl.OotAutoTracker
         [DllImport("oottracker")]
         internal static extern SaveHandle save_result_unwrap(IntPtr save_res);
         [DllImport("oottracker")]
+        internal static extern SaveHandle save_default();
+        [DllImport("oottracker")]
         internal static extern void save_free(IntPtr save);
         [DllImport("oottracker")]
         internal static extern StringHandle save_debug(SaveHandle save);
@@ -73,6 +84,102 @@ namespace Net.Fenhl.OotAutoTracker
         internal static extern void knowledge_free(IntPtr knowledge);
         [DllImport("oottracker")]
         internal static extern IoResultHandle knowledge_send(TcpStreamHandle tcp_stream, KnowledgeHandle knowledge);
+        [DllImport("oottracker")]
+        internal static extern ModelStateHandle model_new(IntPtr save, IntPtr knowledge);
+        [DllImport("oottracker")]
+        internal static extern void model_free(IntPtr model);
+        [DllImport("oottracker")]
+        internal static extern byte ram_num_ranges();
+        [DllImport("oottracker")]
+        internal static extern IntPtr ram_ranges();
+        [DllImport("oottracker")]
+        internal static extern RamResultHandle ram_from_ranges(IntPtr[] ranges);
+        [DllImport("oottracker")]
+        internal static extern void ram_result_free(IntPtr ram_res);
+        [DllImport("oottracker")]
+        internal static extern bool ram_result_is_ok(RamResultHandle ram_res);
+        [DllImport("oottracker")]
+        internal static extern RamHandle ram_result_unwrap(IntPtr ram_res);
+        [DllImport("oottracker")]
+        internal static extern StringHandle ram_result_debug_err(IntPtr ram_res);
+        [DllImport("oottracker")]
+        internal static extern void ram_free(IntPtr ram);
+        [DllImport("oottracker")]
+        internal static extern bool ram_equal(RamHandle ram1, RamHandle ram2);
+        [DllImport("oottracker")]
+        internal static extern void model_set_ram(ModelStateHandle model, RamHandle ram);
+        [DllImport("oottracker")]
+        internal static extern SaveHandle ram_clone_save(RamHandle ram);
+    }
+
+    internal class TrackerLayoutHandle : SafeHandle
+    {
+        internal TrackerLayoutHandle() : base(IntPtr.Zero, true) { }
+
+        public override bool IsInvalid
+        {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle()
+        {
+            if (!this.IsInvalid)
+            {
+                Native.layout_free(handle);
+            }
+            return true;
+        }
+    }
+
+    class TrackerLayout : IDisposable
+    {
+        internal TrackerLayoutHandle layout;
+
+        internal TrackerLayout()
+        {
+            layout = Native.layout_default();
+        }
+
+        public void Dispose()
+        {
+            layout.Dispose();
+        }
+    }
+
+    internal class TrackerCellHandle : SafeHandle
+    {
+        internal TrackerCellHandle() : base(IntPtr.Zero, true) { }
+
+        public override bool IsInvalid
+        {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle()
+        {
+            if (!this.IsInvalid)
+            {
+                Native.cell_free(handle);
+            }
+            return true;
+        }
+    }
+
+    class TrackerCell : IDisposable
+    {
+        internal TrackerCellHandle cell;
+
+        internal TrackerCell(TrackerLayout layout, byte idx)
+        {
+            cell = Native.layout_cell(layout.layout, idx);
+        }
+
+        public void Dispose()
+        {
+            cell.Dispose();
+        }
+
+        public StringHandle Image(ModelState model) => Native.cell_image(model.model, cell);
     }
 
     internal class TcpStreamResultHandle : SafeHandle
@@ -242,14 +349,14 @@ namespace Net.Fenhl.OotAutoTracker
         internal SaveHandle Unwrap()
         {
             var save = Native.save_result_unwrap(handle);
-            this.handle = IntPtr.Zero; // state_result_unwrap takes ownership
+            this.handle = IntPtr.Zero; // save_result_unwrap takes ownership
             return save;
         }
 
         internal StringHandle DebugErr()
         {
             var err = Native.save_result_debug_err(handle);
-            this.handle = IntPtr.Zero; // state_result_debug_err takes ownership
+            this.handle = IntPtr.Zero; // save_result_debug_err takes ownership
             return err;
         }
     }
@@ -317,15 +424,32 @@ namespace Net.Fenhl.OotAutoTracker
             }
             return true;
         }
+
+        public IntPtr Move()
+        {
+            var ptr = this.handle;
+            this.handle = IntPtr.Zero;
+            return ptr;
+        }
     }
 
     class Save : IDisposable
     {
-        private SaveHandle save;
+        internal SaveHandle save;
+
+        internal Save()
+        {
+            save = Native.save_default();
+        }
 
         internal Save(SaveResult save_res)
         {
             save = save_res.Unwrap();
+        }
+
+        internal Save(Ram ram)
+        {
+            save = Native.ram_clone_save(ram.ram);
         }
 
         internal bool Equals(Save other)
@@ -417,11 +541,18 @@ namespace Net.Fenhl.OotAutoTracker
             }
             return true;
         }
+
+        public IntPtr Move()
+        {
+            var ptr = this.handle;
+            this.handle = IntPtr.Zero;
+            return ptr;
+        }
     }
 
     class Knowledge : IDisposable
     {
-        private KnowledgeHandle knowledge;
+        internal KnowledgeHandle knowledge;
 
         internal Knowledge(bool isVanilla)
         {
@@ -446,62 +577,261 @@ namespace Net.Fenhl.OotAutoTracker
         }
     }
 
-    [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
-	public sealed class MainForm : Form, IExternalToolForm
+    internal class ModelStateHandle : SafeHandle
     {
+        internal ModelStateHandle() : base(IntPtr.Zero, true) { }
+
+        public override bool IsInvalid
+        {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle()
+        {
+            if (!this.IsInvalid)
+            {
+                Native.model_free(handle);
+            }
+            return true;
+        }
+    }
+
+    class ModelState : IDisposable
+    {
+        internal ModelStateHandle model;
+
+        internal ModelState(Save save, Knowledge knowledge)
+        {
+            var save_ptr = save.save.Move();
+            var knowledge_ptr = knowledge.knowledge.Move();
+            model = Native.model_new(save_ptr, knowledge_ptr);
+        }
+
+        public void Dispose()
+        {
+            model.Dispose();
+        }
+
+        public void SetRam(Ram ram)
+        {
+            Native.model_set_ram(model, ram.ram);
+        }
+    }
+
+    internal class RamResultHandle : SafeHandle
+    {
+        internal RamResultHandle() : base(IntPtr.Zero, true) { }
+
+        public override bool IsInvalid
+        {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle()
+        {
+            if (!this.IsInvalid)
+            {
+                Native.ram_result_free(handle);
+            }
+            return true;
+        }
+
+        internal RamHandle Unwrap()
+        {
+            var ram = Native.ram_result_unwrap(handle);
+            this.handle = IntPtr.Zero; // ram_result_unwrap takes ownership
+            return ram;
+        }
+
+        internal StringHandle DebugErr()
+        {
+            var err = Native.ram_result_debug_err(handle);
+            this.handle = IntPtr.Zero; // ram_result_debug_err takes ownership
+            return err;
+        }
+    }
+    class RamResult : IDisposable
+    {
+        internal RamResultHandle ram_res;
+
+        internal RamResult(RawRam rawRam)
+        {
+            IntPtr[] range_data = new IntPtr[rawRam.num_ranges];
+            for (byte i = 0; i < rawRam.num_ranges; i++)
+            {
+                range_data[i] = Marshal.AllocHGlobal(rawRam.ranges[2 * i + 1]);
+                Marshal.Copy(rawRam.range_data[i], 0, range_data[i], rawRam.ranges[2 * i + 1]);
+            }
+            ram_res = Native.ram_from_ranges(range_data);
+            for (byte i = 0; i < rawRam.num_ranges; i++)
+            {
+                Marshal.FreeHGlobal(range_data[i]);
+            }
+        }
+
+        public void Dispose()
+        {
+            ram_res.Dispose();
+        }
+
+        internal bool IsOk() => Native.ram_result_is_ok(ram_res);
+        internal RamHandle Unwrap() => ram_res.Unwrap();
+        internal StringHandle DebugErr() => ram_res.DebugErr();
+    }
+
+    internal class RamHandle : SafeHandle
+    {
+        internal RamHandle() : base(IntPtr.Zero, true) { }
+
+        public override bool IsInvalid
+        {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle()
+        {
+            if (!this.IsInvalid)
+            {
+                Native.ram_free(handle);
+            }
+            return true;
+        }
+
+        public IntPtr Move()
+        {
+            var ptr = this.handle;
+            this.handle = IntPtr.Zero;
+            return ptr;
+        }
+    }
+
+    class Ram : IDisposable
+    {
+        internal RamHandle ram;
+
+        internal Ram(RamResult ram_res)
+        {
+            ram = ram_res.Unwrap();
+        }
+
+        public void Dispose()
+        {
+            ram.Dispose();
+        }
+
+        internal bool Equals(Ram other)
+        {
+            return Native.ram_equal(ram, other.ram);
+        }
+    }
+
+    class RawRam
+    {
+        internal byte num_ranges;
+        internal int[] ranges;
+        private string[] range_hashes;
+        internal byte[][] range_data;
+
+        internal RawRam(IMemoryApi memoryApi)
+        {
+            this.num_ranges = Native.ram_num_ranges();
+            this.ranges = new int[2 * num_ranges];
+            Marshal.Copy(Native.ram_ranges(), this.ranges, 0, 2 * this.num_ranges);
+            this.range_hashes = new string[this.num_ranges];
+            this.range_data = new byte[this.num_ranges][];
+            for (byte i = 0; i < this.num_ranges; i++)
+            {
+                this.range_hashes[i] = memoryApi.HashRegion(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM");
+                this.range_data[i] = memoryApi.ReadByteRange(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM").ToArray();
+            }
+        }
+
+        internal bool Update(IMemoryApi memoryApi)
+        {
+            bool changed = false;
+            for (byte i = 0; i < this.num_ranges; i++)
+            {
+                var new_hash = memoryApi.HashRegion(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM");
+                if (new_hash != this.range_hashes[i])
+                {
+                    changed = true;
+                    this.range_hashes[i] = new_hash;
+                    this.range_data[i] = memoryApi.ReadByteRange(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM").ToArray();
+                }
+            }
+            return changed;
+        }
+    }
+
+    [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
+    public sealed class MainForm : Form, IExternalToolForm
+    {
+        private PictureBox[] cells = new PictureBox[52];
         private Label label_Version;
         private Label label_Game;
         private Label label_Connection;
         private Label label_Save;
         private Label label_Help;
+        private Button button_Close_Menu;
 
-        [RequiredApi]
-		private IMemoryApi? _maybeMemAPI { get; set; }
+        public ApiContainer? _apiContainer { get; set; }
 
-		private IMemoryApi _memAPI => _maybeMemAPI ?? throw new NullReferenceException();
+        private ApiContainer APIs => _apiContainer ?? throw new NullReferenceException();
 
         private bool isVanilla;
         private TcpStream? stream;
+        private RawRam? rawRam;
+        private Ram? prevRam;
         private List<byte> prevSaveData = new List<byte>();
         private Save? prevSave;
+        private ModelState model = new ModelState(new Save(), new Knowledge(false));
+        private TrackerLayout layout = new TrackerLayout();
+        private string[] cellImages = new string[52];
 
         private bool gameOk = false;
         private bool connectionOk = false;
         private bool saveOk = false;
 
-		public MainForm()
-		{
-			InitializeComponent();
-			ClientSize = new Size(640, 480);
-			Text = "OoT autotracker";
-			SuspendLayout();
-			ResumeLayout();
-		}
+        public MainForm()
+        {
+            InitializeComponent();
+            ClientSize = new Size(614, 754);
+            Text = "OoT autotracker";
+            SuspendLayout();
+            ResumeLayout();
+        }
 
-		public bool AskSaveChanges() => true;
+        public bool AskSaveChanges() => true;
 
-		public void Restart() {
+        public void Restart() {
+            this.model.Dispose();
             if (this.stream != null) this.stream.Disconnect().Dispose();
             this.stream = null;
             UpdateConnection(false, "Connection: waiting for game");
             if (this.prevSave != null) this.prevSave.Dispose();
             this.prevSave = null;
             UpdateSave(false, "Save: waiting for game");
-            if (GlobalWin.Game.Name == "Null") UpdateGame(false, "Not playing anything");
+            if (APIs.GameInfo.GetRomName() == "Null")
+            {
+                this.model = new ModelState(new Save(), new Knowledge(false));
+                UpdateGame(false, "Not playing anything");
+            }
             else
             {
-                var rom_ident = _memAPI.ReadByteRange(0x20, 0x18, "ROM");
+                var rom_ident = APIs.Memory.ReadByteRange(0x20, 0x18, "ROM");
                 if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0"))))
                 {
-                    UpdateGame(false, $"Game: Expected OoT or OoTR, found {GlobalWin.Game.Name} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})");
+                    this.model = new ModelState(new Save(), new Knowledge(false));
+                    UpdateGame(false, $"Game: Expected OoT or OoTR, found {APIs.GameInfo.GetRomName()} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})");
                 }
                 else
                 {
                     var version = rom_ident.GetRange(0x15, 3);
                     this.isVanilla = Enumerable.SequenceEqual(version, new List<byte>(new byte[] { 0, 0, 0 }));
+                    this.model = new ModelState(new Save(), new Knowledge(this.isVanilla));
                     if (this.isVanilla) UpdateGame(true, "Playing OoT (vanilla)");
                     else UpdateGame(true, $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}");
-                    using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback))
+                    using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback)) //TODO only connect manually
                     {
                         if (stream_res.IsOk())
                         {
@@ -510,7 +840,7 @@ namespace Net.Fenhl.OotAutoTracker
                             UpdateConnection(true, "Connected");
                             if (this.isVanilla)
                             {
-                                using (var knowledge = new Knowledge(true))
+                                using (var knowledge = new Knowledge(true)) //TODO pull knowledge back out of this.model
                                 {
                                     knowledge.Send(this.stream);
                                 }
@@ -526,84 +856,97 @@ namespace Net.Fenhl.OotAutoTracker
                     }
                 }
             }
+            UpdateCells();
         }
 
-		public void UpdateValues(ToolFormUpdateType type)
+        public void UpdateValues(ToolFormUpdateType type)
         {
-            if (GlobalWin.Game.Name == "Null") return;
             if (type != ToolFormUpdateType.PreFrame) return; //TODO setting to also enable auto-tracking during turbo (ToolFormUpdateType.FastPreFrame)?
-            var save_data = _memAPI.ReadByteRange(0x11a5d0, 0x1450, "RDRAM");
-            if (save_data != prevSaveData)
+            if (APIs.GameInfo.GetRomName() == "Null") return;
+            bool changed = true;
+            if (this.rawRam == null) this.rawRam = new RawRam(APIs.Memory);
+            else changed = this.rawRam.Update(APIs.Memory);
+            if (!changed) return;
+            using (var ram_res = new RamResult(this.rawRam))
             {
-                prevSaveData = save_data;
-                using (SaveResult state_res = new SaveResult(save_data))
+                if (ram_res.IsOk())
                 {
-                    bool is_ok = state_res.IsOk();
-                    if (is_ok)
+                    var ram = new Ram(ram_res);
+                    if (prevRam != null && ram.Equals(prevRam)) return;
+                    if (prevRam != null) prevRam.Dispose();
+                    prevRam = ram;
+                }
+                else
+                {
+                    UpdateSave(false, $"Failed to read game RAM: {ram_res.DebugErr().AsString()}");
+                    return;
+                }
+            }
+            UpdateSave(true, $"Save data ok, last checked {DateTime.Now}");
+            this.model.SetRam(prevRam);
+            UpdateCells();
+            var save = new Save(prevRam);
+            if (prevSave != null && save.Equals(prevSave)) return;
+            if (prevSave == null)
+            {
+                if (this.stream != null)
+                {
+                    using (IoResult io_res = save.Send(this.stream))
                     {
-                        Save save = new Save(state_res);
+                        if (!io_res.IsOk())
                         {
-                            using (StringHandle debug = save.Debug())
+                            if (this.stream != null) this.stream.Dispose();
+                            this.stream = null;
+                            using (StringHandle err = io_res.DebugErr())
                             {
-                                UpdateSave(true, $"Save data ok, last checked {DateTime.Now}");
-                            }
-                            if (prevSave == null)
-                            {
-                                if (this.stream != null)
-                                {
-                                    using (IoResult io_res = save.Send(this.stream))
-                                    {
-                                        if (!io_res.IsOk())
-                                        {
-                                            if (this.stream != null) this.stream.Dispose();
-                                            this.stream = null;
-                                            using (StringHandle err = io_res.DebugErr())
-                                            {
-                                                UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
-                                            }
-                                        }
-                                        else UpdateConnection(true, $"Connected, initial save data sent {DateTime.Now}");
-                                    }
-                                }
-                                prevSave = save;
-                            }
-                            else if (!save.Equals(prevSave))
-                            {
-                                if (this.stream != null)
-                                {
-                                    using (SavesDiff diff = prevSave.Diff(save))
-                                    {
-                                        using (IoResult io_res = diff.Send(this.stream))
-                                        {
-                                            if (!io_res.IsOk())
-                                            {
-                                                if (this.stream != null) this.stream.Dispose();
-                                                this.stream = null;
-                                                using (StringHandle err = io_res.DebugErr())
-                                                {
-                                                    UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
-                                                }
-                                            }
-                                            else UpdateConnection(true, $"Connected, save data last sent {DateTime.Now}");
-                                        }
-                                    }
-                                }
-                                prevSave.Dispose();
-                                prevSave = save;
-                            }
-                            else
-                            {
-                                save.Dispose();
+                                UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                             }
                         }
+                        else UpdateConnection(true, $"Connected, initial save data sent {DateTime.Now}");
                     }
-                    else
+                }
+                prevSave = save;
+            }
+            else if (!save.Equals(prevSave))
+            {
+                if (this.stream != null)
+                {
+                    using (SavesDiff diff = prevSave.Diff(save))
                     {
-                        using (StringHandle err = state_res.DebugErr())
+                        using (IoResult io_res = diff.Send(this.stream))
                         {
-                            UpdateSave(false, $"Error reading save data: {err.AsString()}");
+                            if (!io_res.IsOk())
+                            {
+                                if (this.stream != null) this.stream.Dispose();
+                                this.stream = null;
+                                using (StringHandle err = io_res.DebugErr())
+                                {
+                                    UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
+                                }
+                            }
+                            else UpdateConnection(true, $"Connected, save data last sent {DateTime.Now}");
                         }
                     }
+                }
+                prevSave.Dispose();
+                prevSave = save;
+            }
+            else
+            {
+                save.Dispose();
+            }
+        }
+
+        private void UpdateCells()
+        {
+            for (byte i = 0; i < 52; i++)
+            {
+                using (TrackerCell cell = new TrackerCell(this.layout, i))
+                {
+                    string new_img = cell.Image(this.model).AsString();
+                    if (new_img == this.cellImages[i]) continue;
+                    this.cellImages[i] = new_img;
+                    this.cells[i].Image = Image.FromStream(typeof(MainForm).Assembly.GetManifestResourceStream($"Net.Fenhl.OotAutoTracker.Resources.{new_img}.png"));
                 }
             }
         }
@@ -648,61 +991,145 @@ namespace Net.Fenhl.OotAutoTracker
             this.label_Connection = new Label();
             this.label_Save = new Label();
             this.label_Help = new Label();
+            this.button_Close_Menu = new Button();
             this.SuspendLayout();
+            //
+            // cells
+            //
+            for (int i = 0; i < 52; i++)
+            {
+                PictureBox cell = new PictureBox();
+                this.cells[i] = cell;
+                cell.Location = i switch
+                {
+                    _ when i < 6 => new Point(102 * i + 2, 2),
+                    _ when i < 14 => new Point(102 * (i % 6) + 2, 102 * (i / 6) - 62),
+                    14 or 16 or 18 => new Point(34 * (i - 14) + 206, 142),
+                    15 or 17 or 19 => new Point(34 * (i - 15) + 206, 168),
+                    _ => new Point(102 * ((i - 4) % 6) + 2, 102 * ((i - 4) / 6) - 62),
+                };
+                cell.Size = i switch
+                {
+                    _ when i < 6 => new Size(100, 36),
+                    14 or 16 or 18 => new Size(66, 24),
+                    15 or 17 or 19 => new Size(66, 66),
+                    _ => new Size(100, 100),
+                };
+                cell.SizeMode = PictureBoxSizeMode.StretchImage;
+                //TODO accessibility metadata?
+                if (i >= 6 && i < 12)
+                {
+                    cell.Click += new EventHandler((object sender, EventArgs e) => {
+                        MouseEventArgs me = (MouseEventArgs) e;
+                        if (me.Button == MouseButtons.Right)
+                        {
+                            this.label_Version.Visible = true;
+                            this.label_Game.Visible = true;
+                            this.label_Connection.Visible = true;
+                            this.label_Save.Visible = true;
+                            this.label_Help.Visible = true;
+                            this.button_Close_Menu.Visible = true;
+                            foreach (PictureBox cell in this.cells)
+                            {
+                                cell.Visible = false;
+                            }
+                        }
+                    });
+                }
+                //TODO right-click event for medallions
+                this.Controls.Add(cell);
+            }
+            this.UpdateCells();
             //
             // label_Version
             //
+            this.label_Version.ForeColor = Color.White;
             this.label_Version.AutoSize = true;
             this.label_Version.Location = new Point(12, 9);
             this.label_Version.Name = "label_Version";
             this.label_Version.Size = new Size(96, 25);
             this.label_Version.TabIndex = 0;
             this.label_Version.Text = $"OoT autotracker version {Native.version_string().AsString()}";
-            // 
+            this.label_Version.Visible = false;
+            //
             // label_Game
-            // 
+            //
+            this.label_Game.ForeColor = Color.White;
             this.label_Game.AutoSize = true;
             this.label_Game.Location = new Point(12, 34);
             this.label_Game.Name = "label_Game";
             this.label_Game.Size = new Size(96, 25);
             this.label_Game.TabIndex = 1;
             this.label_Game.Text = "Game: loading";
-            // 
+            this.label_Game.Visible = false;
+            //
             // label_Connection
-            // 
+            //
+            this.label_Connection.ForeColor = Color.White;
             this.label_Connection.AutoSize = true;
             this.label_Connection.Location = new Point(12, 59);
             this.label_Connection.Name = "label_Connection";
             this.label_Connection.Size = new Size(96, 25);
             this.label_Connection.TabIndex = 2;
             this.label_Connection.Text = "Connection: waiting for game";
-            // 
+            this.label_Connection.Visible = false;
+            //
             // label_Save
-            // 
+            //
+            this.label_Save.ForeColor = Color.White;
             this.label_Save.AutoSize = true;
             this.label_Save.Location = new Point(12, 84);
             this.label_Save.Name = "label_Save";
             this.label_Save.Size = new Size(96, 25);
             this.label_Save.TabIndex = 3;
             this.label_Save.Text = "Save: waiting for game";
+            this.label_Save.Visible = false;
             //
             // label_Help
             //
+            this.label_Help.ForeColor = Color.White;
             this.label_Help.AutoSize = true;
             this.label_Help.Location = new Point(12, 109);
             this.label_Help.Name = "label_Help";
             this.label_Help.Size = new Size(96, 25);
             this.label_Help.TabIndex = 4;
             this.label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
-            // 
+            this.label_Help.Visible = false;
+            //
+            // button_Close_Menu
+            //
+            this.button_Close_Menu.ForeColor = Color.White;
+            this.button_Close_Menu.AutoSize = true;
+            this.button_Close_Menu.Location = new Point(12, 134);
+            this.button_Close_Menu.Name = "button_Close_Menu";
+            this.button_Close_Menu.Size = new Size(96, 25);
+            this.button_Close_Menu.TabIndex = 5;
+            this.button_Close_Menu.Text = "Done";
+            this.button_Close_Menu.Visible = false;
+            this.button_Close_Menu.Click += new EventHandler((object sender, EventArgs e) => {
+                this.ClientSize = new Size(614, 754);
+                this.label_Version.Visible = false;
+                this.label_Game.Visible = false;
+                this.label_Connection.Visible = false;
+                this.label_Save.Visible = false;
+                this.label_Help.Visible = false;
+                this.button_Close_Menu.Visible = false;
+                foreach (PictureBox cell in this.cells)
+                {
+                    cell.Visible = true;
+                }
+            });
+            //
             // MainForm
-            // 
-            this.ClientSize = new Size(274, 229);
+            //
+            this.BackColor = Color.Black;
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             this.Controls.Add(this.label_Version);
             this.Controls.Add(this.label_Game);
             this.Controls.Add(this.label_Connection);
             this.Controls.Add(this.label_Save);
             this.Controls.Add(this.label_Help);
+            this.Controls.Add(this.button_Close_Menu);
             this.Name = "MainForm";
             this.ResumeLayout(false);
             this.PerformLayout();
