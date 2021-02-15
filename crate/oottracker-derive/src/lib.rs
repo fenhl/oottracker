@@ -835,7 +835,6 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                 })
             }
 
-            //#[allow(unused)] //DEBUG
             pub(crate) fn region<R: Rando>(&self, rando: &R, ram: &Ram) -> Result<RegionLookup, RegionLookupError<R>> {
                 match self.0 {
                     #(#region_arms,)*

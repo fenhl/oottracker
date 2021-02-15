@@ -22,6 +22,13 @@ use {
 };
 
 pub const SIZE: usize = 0x80_0000;
+pub const NUM_RANGES: usize = 4;
+pub static RANGES: [u32; NUM_RANGES * 2] = [
+    save::ADDR, save::SIZE as u32,
+    0x1c8545, 1,
+    0x1ca1c8, 4,
+    0x1ca1d8, 8,
+];
 
 #[derive(Debug, From)]
 pub enum DecodeError {

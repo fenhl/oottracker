@@ -39,6 +39,7 @@ use {
         },
         save::{
             self,
+            GameMode,
             QuestItems,
             Save,
         },
@@ -463,23 +464,15 @@ pub fn version() -> Version {
     let _ = model.into_box();
 }
 
-const RAM_NUM_RANGES: usize = 4;
-static RAM_RANGES: [u32; RAM_NUM_RANGES * 2] = [
-    save::ADDR, save::SIZE as u32,
-    0x1c8545, 1,
-    0x1ca1c8, 4,
-    0x1ca1d8, 8,
-];
-
-#[no_mangle] pub extern "C" fn ram_num_ranges() -> u8 { RAM_NUM_RANGES as u8 }
-#[no_mangle] pub extern "C" fn ram_ranges() -> *const u32 { &RAM_RANGES[0] }
+#[no_mangle] pub extern "C" fn ram_num_ranges() -> u8 { ram::NUM_RANGES as u8 }
+#[no_mangle] pub extern "C" fn ram_ranges() -> *const u32 { &ram::RANGES[0] }
 
 /// # Safety
 ///
 /// `ranges` must point at the start of a valid slice of `ram::NUM_RANGES` slices with the lengths specified in `ram::RANGES` and must not be mutated for the duration of the function call.
 #[no_mangle] pub unsafe extern "C" fn ram_from_ranges(ranges: *const *const u8) -> HandleOwned<Result<Ram, ram::DecodeError>> {
     assert!(!ranges.is_null());
-    let ranges = slice::from_raw_parts(ranges, RAM_NUM_RANGES);
+    let ranges = slice::from_raw_parts(ranges, ram::NUM_RANGES);
     let chest_and_room_clear = slice::from_raw_parts(ranges[3], 8);
     let (chest_flags, room_clear_flags) = chest_and_room_clear.split_at(4);
     HandleOwned::new(Ram::from_ranges(
@@ -539,7 +532,10 @@ static RAM_RANGES: [u32; RAM_NUM_RANGES * 2] = [
 ///
 /// `ram` must point at a valid `Ram` and must not be mutated during the function call.
 #[no_mangle] pub unsafe extern "C" fn model_set_ram(model: *mut ModelState, ram: *const Ram) {
-    (&mut *model).ram = *(&*ram);
+    let model = &mut *model;
+    let ram = &*ram;
+    if ram.save.game_mode == GameMode::Gameplay { model.ram = *ram }
+    model.update_knowledge();
 }
 
 /// # Safety

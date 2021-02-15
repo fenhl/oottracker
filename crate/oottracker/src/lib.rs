@@ -4,14 +4,23 @@
 use {
     std::collections::HashSet,
     collect_mac::collect,
+    enum_iterator::IntoEnumIterator as _,
+    itertools::Itertools as _,
     semver::Version,
     ootr::{
         Rando,
         access,
         check::Check,
         item::Item,
+        model::{
+            DungeonReward,
+            DungeonRewardLocation,
+        },
     },
-    crate::checks::CheckExt as _,
+    crate::{
+        checks::CheckExt as _,
+        save::GameMode,
+    },
 };
 pub use crate::{
     knowledge::Knowledge,
@@ -39,6 +48,13 @@ pub struct ModelState {
 }
 
 impl ModelState {
+    pub fn update_knowledge(&mut self) {
+        if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
+        if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
+            self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::LinksPocket);
+        }
+    }
+
     /// If access depends on other checks (including an event or the value of an unknown setting), those checks are returned.
     pub(crate) fn can_access<'a>(&self, rando: &impl Rando, rule: &'a access::Expr) -> Result<bool, HashSet<Check>> {
         Ok(match rule {

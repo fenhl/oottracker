@@ -35,6 +35,7 @@ use {
     ootr::{
         item::Item,
         model::{
+            DungeonReward,
             Medallion,
             Stone,
             TimeRange,
@@ -729,6 +730,15 @@ impl From<Stone> for QuestItems {
     }
 }
 
+impl From<DungeonReward> for QuestItems {
+    fn from(reward: DungeonReward) -> QuestItems {
+        match reward {
+            DungeonReward::Medallion(med) => med.into(),
+            DungeonReward::Stone(stone) => stone.into(),
+        }
+    }
+}
+
 impl<'a, T: Into<QuestItems> + Clone> From<&'a T> for QuestItems {
     fn from(x: &T) -> QuestItems { x.clone().into() }
 }
@@ -860,6 +870,43 @@ impl<'a> From<&'a SmallKeys> for Vec<u8> {
     }
 }
 
+#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+pub enum GameMode {
+    #[default] // represented as 0x0000_0000
+    Gameplay,
+    TitleScreen,
+    FileSelect,
+}
+
+impl TryFrom<Vec<u8>> for GameMode {
+    type Error = Vec<u8>;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<GameMode, Vec<u8>> {
+        Ok(match raw_data[..] {
+            [0, 0, 0, 0] => GameMode::Gameplay,
+            [0, 0, 0, 1] => GameMode::TitleScreen,
+            [0, 0, 0, 2] => GameMode::FileSelect,
+            _ => return Err(raw_data),
+        })
+    }
+}
+
+impl<'a> From<&'a GameMode> for [u8; 4] {
+    fn from(game_mode: &GameMode) -> [u8; 4] {
+        match game_mode {
+            GameMode::Gameplay => [0, 0, 0, 0],
+            GameMode::TitleScreen => [0, 0, 0, 1],
+            GameMode::FileSelect => [0, 0, 0, 2],
+        }
+    }
+}
+
+impl<'a> From<&'a GameMode> for Vec<u8> {
+    fn from(game_mode: &GameMode) -> Vec<u8> {
+        <[u8; 4]>::from(game_mode).into()
+    }
+}
+
 #[derive(Debug, From, Clone)]
 pub enum DecodeError {
     AssertEq {
@@ -913,6 +960,7 @@ pub struct Save {
     pub event_chk_inf: EventChkInf,
     pub item_get_inf: ItemGetInf,
     pub inf_table: InfTable,
+    pub game_mode: GameMode,
 }
 
 impl Save {
@@ -993,12 +1041,13 @@ impl Save {
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
             item_get_inf: try_get_offset!("item_get_inf", 0x0ef0, 0x8),
             inf_table: try_get_offset!("inf_table", 0x0ef8, 0x3c),
+            game_mode: try_get_offset!("game_mode", 0x135c, 0x4),
         })
     }
 
     fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table } = self;
+        let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table, game_mode } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
@@ -1024,6 +1073,7 @@ impl Save {
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
         buf.splice(0x0ef0..0x0ef8, Vec::from(item_get_inf));
         buf.splice(0x0ef8..0x0f34, Vec::from(inf_table));
+        buf.splice(0x135c..0x1360, Vec::from(game_mode));
         buf
     }
 

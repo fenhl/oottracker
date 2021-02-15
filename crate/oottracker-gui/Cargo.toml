@@ -8,7 +8,6 @@ edition = "2018"
 winres = "0.1"
 
 [dependencies]
-enum-iterator = "0.6"
 futures = "0.3"
 image = "0.23"
 itertools = "0.10"
@@ -20,6 +19,10 @@ url = "2"
 version = "0.99"
 default-features = false
 features = ["from"]
+
+[dependencies.enum-iterator]
+git = "https://github.com/dasgefolge/enum-iterator"
+branch = "fields"
 
 [dependencies.iced]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1

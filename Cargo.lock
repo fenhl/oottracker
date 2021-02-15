@@ -123,7 +123,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20b3c0ebdc33e35944d92b8fe0171a637136a9537e0ff960a137d7eba6b4481f"
 dependencies = [
  "convert_case",
- "itertools",
+ "itertools 0.10.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -924,8 +924,7 @@ dependencies = [
 [[package]]
 name = "enum-iterator"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c79a6321a1197d7730510c7e3f6cb80432dfefecb32426de8cea0aa19b4bb8d7"
+source = "git+https://github.com/dasgefolge/enum-iterator?branch=fields#e241a93a5d334a0f85288b4521b2b6830f5f961c"
 dependencies = [
  "enum-iterator-derive",
 ]
@@ -933,9 +932,9 @@ dependencies = [
 [[package]]
 name = "enum-iterator-derive"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e94aa31f7c0dc764f57896dc615ddd76fc13b0d5dca7eb6cc5e018a5a09ec06"
+source = "git+https://github.com/dasgefolge/enum-iterator?branch=fields#e241a93a5d334a0f85288b4521b2b6830f5f961c"
 dependencies = [
+ "itertools 0.9.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -2067,6 +2066,15 @@ checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
 
 [[package]]
 name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37d572918e350e82412fe766d24b15e6682fb2ed2bbe018280caa810397cb319"
@@ -2598,6 +2606,7 @@ name = "ootr"
 version = "0.2.0"
 dependencies = [
  "async-proto",
+ "enum-iterator",
  "quote-value",
  "semver 0.11.0",
 ]
@@ -2607,7 +2616,7 @@ name = "ootr-dynamic"
 version = "0.2.0"
 dependencies = [
  "derive_more",
- "itertools",
+ "itertools 0.10.0",
  "lazy_static",
  "ootr",
  "pyo3",
@@ -2662,7 +2671,7 @@ dependencies = [
  "futures",
  "iced",
  "image",
- "itertools",
+ "itertools 0.10.0",
  "lazy_static",
  "ootr",
  "ootr-static",
@@ -2699,7 +2708,7 @@ name = "oottracker-derive"
 version = "0.2.0"
 dependencies = [
  "convert_case",
- "itertools",
+ "itertools 0.10.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -2716,7 +2725,7 @@ dependencies = [
  "iced_futures",
  "iced_native",
  "image",
- "itertools",
+ "itertools 0.10.0",
  "num-traits",
  "ootr",
  "ootr-static",
@@ -2738,7 +2747,7 @@ dependencies = [
  "async-trait",
  "derive_more",
  "dir-lock",
- "itertools",
+ "itertools 0.10.0",
  "ootr",
  "ootr-dynamic",
  "ootr-static",
@@ -2761,7 +2770,7 @@ dependencies = [
 name = "oottracker-web"
 version = "0.2.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.0",
  "ootr",
  "oottracker",
  "rocket",

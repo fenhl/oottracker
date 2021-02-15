@@ -4,6 +4,7 @@ use {
         str::FromStr,
     },
     async_proto::Protocol,
+    enum_iterator::IntoEnumIterator,
     quote_value::QuoteValue,
 };
 
@@ -42,7 +43,7 @@ impl fmt::Display for Dungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol)]
 pub enum DungeonReward {
     Medallion(Medallion),
     Stone(Stone),
@@ -99,7 +100,7 @@ impl fmt::Display for MainDungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
 pub enum Medallion {
     Light,
     Forest,
@@ -123,7 +124,7 @@ impl Medallion {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol)]
 pub enum Stone {
     KokiriEmerald,
     GoronRuby,
