@@ -1,7 +1,15 @@
 use {
     std::{
-        collections::BTreeMap,
+        any::TypeId,
+        collections::{
+            BTreeMap,
+            hash_map::DefaultHasher,
+        },
         fmt,
+        hash::{
+            Hash,
+            Hasher,
+        },
         iter,
         sync::Arc,
     },
@@ -470,7 +478,10 @@ impl<A: App> Room<A> {
 
     pub fn to_dyn(&self) -> DynRoom
     where A: Clone + Send {
+        let mut hasher = DefaultHasher::default();
+        TypeId::of::<A>().hash(&mut hasher);
         DynRoom {
+            app_hash: hasher.finish(),
             session: Arc::new(Mutex::new(self.session.to_dyn())),
             name: self.name.clone(),
             passcode: self.passcode.clone(),
@@ -480,6 +491,7 @@ impl<A: App> Room<A> {
 
 #[derive(Clone)]
 pub struct DynRoom {
+    app_hash: u64,
     session: Arc<Mutex<Session<Box<dyn App>>>>,
     name: String,
     passcode: String,
@@ -505,5 +517,13 @@ impl DynRoom {
 impl fmt::Debug for DynRoom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "DynRoom {{ name: {:?}, session: _ }}", self.name) //TODO use debug_struct with finish_non_exhaustive
+    }
+}
+
+impl Hash for DynRoom {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.app_hash.hash(state);
+        self.name.hash(state);
+        self.passcode.hash(state);
     }
 }

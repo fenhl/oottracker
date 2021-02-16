@@ -1,9 +1,30 @@
 use byteorder::BigEndian;
 
 use {
+    std::{
+        borrow::Borrow,
+        fmt,
+        future::Future,
+        io::{
+            self,
+            prelude::*,
+        },
+        pin::Pin,
+        sync::Arc,
+    },
+    async_proto::Protocol,
     byteorder::ByteOrder as _,
     derive_more::From,
-    itertools::EitherOrBoth,
+    itertools::{
+        EitherOrBoth,
+        Itertools as _,
+    },
+    tokio::io::{
+        AsyncRead,
+        AsyncReadExt as _,
+        AsyncWrite,
+        AsyncWriteExt as _,
+    },
     ootr::Rando,
     crate::{
         save::{
@@ -30,13 +51,14 @@ pub static RANGES: [u32; NUM_RANGES * 2] = [
     0x1ca1d8, 8,
 ];
 
-#[derive(Debug, From)]
+#[derive(Debug, From, Clone)]
 pub enum DecodeError {
     Index(u32),
     IndexRange {
         start: u32,
         end: u32,
     },
+    Ranges,
     #[from]
     Save(save::DecodeError),
     Size(usize),
@@ -63,7 +85,7 @@ pub struct Ram {
 }
 
 impl Ram {
-    pub fn from_ranges(
+    fn new(
         save: &[u8],
         current_scene_id: u8,
         current_scene_switch_flags: &[u8],
@@ -79,20 +101,72 @@ impl Ram {
         })
     }
 
+    pub fn from_range_bufs(ranges: impl IntoIterator<Item = Vec<u8>>) -> Result<Ram, DecodeError> {
+        if let Some((
+            save,
+            current_scene_id,
+            current_scene_switch_flags,
+            chest_and_room_clear,
+        )) = ranges.into_iter().collect_tuple() {
+            let current_scene_id = match current_scene_id[..] {
+                [current_scene_id] => current_scene_id,
+                _ => return Err(DecodeError::Index(RANGES[2])),
+            };
+            let (chest_flags, room_clear_flags) = chest_and_room_clear.split_at(4);
+            Ok(Ram::new(
+                &save,
+                current_scene_id,
+                &current_scene_switch_flags,
+                chest_flags,
+                room_clear_flags,
+            )?)
+        } else {
+            Err(DecodeError::Ranges)
+        }
+    }
+
+    pub fn from_ranges<'a, R: Borrow<[u8]> + ?Sized + 'a, I: IntoIterator<Item = &'a R>>(ranges: I) -> Result<Ram, DecodeError> {
+        if let Some((
+            save,
+            &[current_scene_id],
+            current_scene_switch_flags,
+            chest_and_room_clear,
+        )) = ranges.into_iter().map(Borrow::borrow).collect_tuple() {
+            let (chest_flags, room_clear_flags) = chest_and_room_clear.split_at(4);
+            Ok(Ram::new(
+                save,
+                current_scene_id,
+                current_scene_switch_flags,
+                chest_flags,
+                room_clear_flags,
+            )?)
+        } else {
+            Err(DecodeError::Ranges)
+        }
+    }
+
     /// Converts an *Ocarina of Time* RAM dump into a `Ram`.
     ///
     /// # Panics
     ///
-    /// This method may panic if `ram_data`'s size is less than `0x80_0000` bytes, or if it doesn't contain a valid OoT RAM dump.
+    /// This method may panic if `ram_data` doesn't contain a valid OoT RAM dump.
     pub fn from_bytes(ram_data: &[u8]) -> Result<Ram, DecodeError> {
         if ram_data.len() != SIZE { return Err(DecodeError::Size(ram_data.len())) }
-        Ram::from_ranges(
-            ram_data.get(0x11a5d0..0x11a5d0 + 0x1450).ok_or(DecodeError::IndexRange { start: 0x11a5d0, end: 0x11a5d0 + 0x1450 })?,
-            *ram_data.get(0x1c8545).ok_or(DecodeError::Index(0x1c8545))?,
-            ram_data.get(0x1ca1c8..0x1ca1cc).ok_or(DecodeError::IndexRange { start: 0x1ca1c8, end: 0x1ca1cc })?,
-            ram_data.get(0x1ca1d8..0x1ca1dc).ok_or(DecodeError::IndexRange { start: 0x1ca1d8, end: 0x1ca1dc })?,
-            ram_data.get(0x1ca1dc..0x1ca1e0).ok_or(DecodeError::IndexRange { start: 0x1ca1dc, end: 0x1ca1e0 })?,
-        )
+        Ram::from_ranges(RANGES.iter().tuples().map(|(&start, &len)|
+            ram_data.get(start as usize..(start + len) as usize).ok_or(DecodeError::IndexRange { start, end: start + len })
+        ).try_collect::<_, Vec<_>, _>()?)
+    }
+
+    fn to_ranges(&self) -> Vec<Vec<u8>> {
+        let mut chest_and_room_clear = Vec::with_capacity(8);
+        chest_and_room_clear.extend_from_slice(&self.current_scene_chest_flags.to_be_bytes());
+        chest_and_room_clear.extend_from_slice(&self.current_scene_room_clear_flags.to_be_bytes());
+        vec![
+            self.save.to_save_data(),
+            vec![self.current_scene_id],
+            self.current_scene_switch_flags.to_be_bytes().into(),
+            chest_and_room_clear,
+        ]
     }
 
     pub(crate) fn current_region<R: Rando>(&self, rando: &R) -> Result<RegionLookup, RegionLookupError<R>> { //TODO disambiguate MQ-ness
@@ -129,5 +203,70 @@ impl Ram {
 impl From<Save> for Ram {
     fn from(save: Save) -> Ram {
         Ram { save, ..Ram::default() }
+    }
+}
+
+#[derive(Debug, From, Clone)]
+pub enum ReadError {
+    #[from]
+    Decode(DecodeError),
+    Io(Arc<io::Error>),
+}
+
+impl From<io::Error> for ReadError {
+    fn from(e: io::Error) -> ReadError {
+        ReadError::Io(Arc::new(e))
+    }
+}
+
+impl fmt::Display for ReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadError::Decode(e) => write!(f, "{:?}", e),
+            ReadError::Io(e) => write!(f, "I/O error: {}", e),
+        }
+    }
+}
+
+impl Protocol for Ram {
+    type ReadError = ReadError;
+
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Ram, ReadError>> + Send + 'a>> {
+        Box::pin(async move {
+            let mut ranges = Vec::with_capacity(NUM_RANGES);
+            for (_, len) in RANGES.iter().copied().tuples() {
+                let mut buf = vec![0; len as usize];
+                stream.read_exact(&mut buf).await?;
+                ranges.push(buf);
+            }
+            Ok(Ram::from_range_bufs(ranges)?)
+        })
+    }
+
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let ranges = self.to_ranges();
+            for range in ranges {
+                sink.write_all(&range).await?;
+            }
+            Ok(())
+        })
+    }
+
+    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Ram, ReadError> {
+        let ranges = RANGES.iter().tuples().map(|(_, &len)| {
+            let mut buf = vec![0; len as usize];
+            stream.read_exact(&mut buf)?;
+            Ok::<_, ReadError>(buf)
+        }).try_collect::<_, Vec<_>, _>()?;
+        Ok(Ram::from_range_bufs(ranges)?)
+    }
+
+    fn write_sync<'a>(&self, mut sink: impl Write + 'a) -> io::Result<()> {
+        let ranges = self.to_ranges();
+        for range in ranges {
+            sink.write_all(&range)?;
+        }
+        Ok(())
     }
 }

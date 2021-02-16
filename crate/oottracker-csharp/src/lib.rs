@@ -14,6 +14,7 @@ use {
         time::Duration,
     },
     async_proto::Protocol as _,
+    itertools::Itertools as _,
     libc::c_char,
     semver::Version,
     ootr::{
@@ -473,15 +474,8 @@ pub fn version() -> Version {
 #[no_mangle] pub unsafe extern "C" fn ram_from_ranges(ranges: *const *const u8) -> HandleOwned<Result<Ram, ram::DecodeError>> {
     assert!(!ranges.is_null());
     let ranges = slice::from_raw_parts(ranges, ram::NUM_RANGES);
-    let chest_and_room_clear = slice::from_raw_parts(ranges[3], 8);
-    let (chest_flags, room_clear_flags) = chest_and_room_clear.split_at(4);
-    HandleOwned::new(Ram::from_ranges(
-        slice::from_raw_parts(ranges[0], save::SIZE),
-        *ranges[1],
-        slice::from_raw_parts(ranges[2], 4),
-        chest_flags,
-        room_clear_flags,
-    ))
+    let ranges = ranges.iter().zip(ram::RANGES.iter().tuples()).map(|(&range, (_, &len))| slice::from_raw_parts(range, len as usize));
+    HandleOwned::new(Ram::from_ranges(ranges))
 }
 
 /// # Safety

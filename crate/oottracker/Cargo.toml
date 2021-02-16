@@ -57,3 +57,7 @@ features = ["derive"]
 [dependencies.tokio]
 version = "1"
 features = ["fs", "net"]
+
+[dependencies.tokio-stream]
+version = "0.1"
+features = ["net"]

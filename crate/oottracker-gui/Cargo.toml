@@ -57,11 +57,7 @@ features = ["paw"]
 
 [dependencies.tokio]
 version = "1"
-features = ["fs", "io-util", "net", "time"]
-
-[dependencies.tokio-stream]
-version = "0.1"
-features = ["net"]
+features = ["fs", "io-util", "net"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"

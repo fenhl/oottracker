@@ -12,6 +12,7 @@ use {
     tokio::net::TcpStream,
     crate::{
         knowledge,
+        ram::Ram,
         save,
     },
 };
@@ -25,6 +26,7 @@ pub enum Packet {
     SaveDelta(save::Delta),
     SaveInit(save::Save),
     KnowledgeInit(knowledge::Knowledge),
+    RamInit(Ram),
 }
 
 #[derive(Debug, Clone)]

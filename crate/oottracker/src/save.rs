@@ -1045,7 +1045,7 @@ impl Save {
         })
     }
 
-    fn to_save_data(&self) -> Vec<u8> {
+    pub(crate) fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
         let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, event_chk_inf, item_get_inf, inf_table, game_mode } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
@@ -1143,31 +1143,31 @@ impl Save {
 }
 
 #[derive(Debug, From, Clone)]
-pub enum SaveDataReadError {
+pub enum ReadError {
     #[from]
     Decode(DecodeError),
     Io(Arc<io::Error>),
 }
 
-impl From<io::Error> for SaveDataReadError {
-    fn from(e: io::Error) -> SaveDataReadError {
-        SaveDataReadError::Io(Arc::new(e))
+impl From<io::Error> for ReadError {
+    fn from(e: io::Error) -> ReadError {
+        ReadError::Io(Arc::new(e))
     }
 }
 
-impl fmt::Display for SaveDataReadError {
+impl fmt::Display for ReadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SaveDataReadError::Decode(e) => write!(f, "{:?}", e),
-            SaveDataReadError::Io(e) => write!(f, "I/O error: {}", e),
+            ReadError::Decode(e) => write!(f, "{:?}", e),
+            ReadError::Io(e) => write!(f, "I/O error: {}", e),
         }
     }
 }
 
 impl Protocol for Save {
-    type ReadError = SaveDataReadError;
+    type ReadError = ReadError;
 
-    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Save, SaveDataReadError>> + Send + 'a>> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Save, ReadError>> + Send + 'a>> {
         Box::pin(async move {
             let mut buf = vec![0; SIZE];
             stream.read_exact(&mut buf).await?;
@@ -1184,7 +1184,7 @@ impl Protocol for Save {
         })
     }
 
-    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Save, SaveDataReadError> {
+    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Save, ReadError> {
         let mut buf = vec![0; SIZE];
         stream.read_exact(&mut buf)?;
         Ok(Save::from_save_data(&buf)?)

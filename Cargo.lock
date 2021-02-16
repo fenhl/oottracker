@@ -2683,6 +2683,7 @@ dependencies = [
  "serde_json",
  "smart-default",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -2697,6 +2698,7 @@ name = "oottracker-csharp"
 version = "0.2.0"
 dependencies = [
  "async-proto",
+ "itertools 0.10.0",
  "libc",
  "ootr",
  "oottracker",
@@ -2734,7 +2736,6 @@ dependencies = [
  "smart-default",
  "structopt",
  "tokio",
- "tokio-stream",
  "url",
  "wheel",
  "winres",

@@ -8,7 +8,6 @@ use {
         collections::HashMap,
         fmt,
         sync::Arc,
-        time::Duration,
     },
     derive_more::From,
     enum_iterator::IntoEnumIterator as _,
@@ -54,7 +53,6 @@ use {
     itertools::Itertools as _,
     smart_default::SmartDefault,
     structopt::StructOpt,
-    tokio::time::sleep,
     url::Url,
     ootr::{
         check::Check,
@@ -74,10 +72,11 @@ use {
             CheckStatusError,
         },
         firebase,
-        proto::{
+        net::{
             self,
-            Packet,
+            Connection,
         },
+        proto::Packet,
         save::*,
         ui::{
             *,
@@ -87,7 +86,7 @@ use {
 };
 
 mod lang;
-mod tcp_server;
+mod subscriptions;
 
 const CELL_SIZE: u16 = 50;
 const STONE_SIZE: u16 = 33;
@@ -109,8 +108,8 @@ impl container::StyleSheet for ContainerStyle {
 
 trait TrackerCellKindExt {
     fn render(&self, state: &ModelState) -> Image;
-    #[must_use] fn left_click(&self, client_connected: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool;
-    #[must_use] fn right_click(&self, client_connected: bool, state: &mut ModelState) -> bool;
+    #[must_use] fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool;
+    #[must_use] fn right_click(&self, can_change_state: bool, state: &mut ModelState) -> bool;
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
@@ -218,11 +217,11 @@ impl TrackerCellKindExt for TrackerCellKind {
 
     #[must_use]
     /// Returns `true` if the menu should be opened.
-    fn left_click(&self, client_connected: bool, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
+    fn left_click(&self, can_change_state: bool, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
-            return self.right_click(client_connected, state)
+            return self.right_click(can_change_state, state)
         }
-        if !client_connected {
+        if can_change_state {
             match self {
                 Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
                 Count { get, set, max, step, .. } => {
@@ -243,9 +242,9 @@ impl TrackerCellKindExt for TrackerCellKind {
 
     #[must_use]
     /// Returns `true` if the menu should be opened.
-    fn right_click(&self, client_connected: bool, state: &mut ModelState) -> bool {
+    fn right_click(&self, can_change_state: bool, state: &mut ModelState) -> bool {
         if let Medallion(_) = self { return true }
-        if !client_connected {
+        if can_change_state {
             match self {
                 Composite { toggle_right: toggle, .. } | OptionalOverlay { toggle_overlay: toggle, .. } | Overlay { toggle_overlay: toggle, .. } => toggle(state),
                 Count { get, set, max, step, .. } => {
@@ -266,17 +265,16 @@ impl TrackerCellKindExt for TrackerCellKind {
 }
 
 trait TrackerCellIdExt {
-    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message>;
+    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message>;
 }
 
 impl TrackerCellIdExt for TrackerCellId {
-    fn view<'a>(&self, state: &ModelState, cell_button: Option<&'a mut button::State>) -> Element<'a, Message> {
-        let content = self.kind().render(state);
-        if let Some(cell_button) = cell_button {
-            Button::new(cell_button, content).on_press(Message::LeftClick(*self)).padding(0).style(DefaultButtonStyle).into()
-        } else {
-            content.into()
-        }
+    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message> {
+        Button::new(cell_button, self.kind().render(state))
+            .on_press(Message::LeftClick(*self))
+            .padding(0)
+            .style(DefaultButtonStyle)
+            .into()
     }
 }
 
@@ -357,14 +355,12 @@ impl TrackerLayoutExt for TrackerLayout {
 
 #[derive(Debug, Clone)]
 enum Message {
-    AutoDismissNotification,
     CheckStatusErrorStatic(CheckStatusError<ootr_static::Rando>),
-    ClientConnected,
     ClientDisconnected,
     CloseMenu,
     ConfigError(oottracker::ui::Error),
+    ConnectionError(ConnectionError),
     Connect,
-    ConnectError(ConnectError),
     DismissNotification,
     DismissWelcomeScreen,
     KeyboardModifiers(KeyboardModifiers),
@@ -372,14 +368,12 @@ enum Message {
     LoadConfig(Config),
     MissingConfig,
     MouseMoved([f32; 2]),
-    NetworkError(proto::ReadError),
     Nop,
     Packet(Packet),
     RightClick,
-    RoomError(firebase::Error),
     SetMedOrder(ElementOrder),
     SetPasscode(String),
-    SetRoom(firebase::DynRoom),
+    SetConnection(Arc<dyn Connection>),
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
     UpdateAvailableChecks(HashMap<Check, CheckStatus>),
@@ -389,12 +383,9 @@ impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Message::CheckStatusErrorStatic(e) => write!(f, "error calculating checks: {}", e),
-            Message::ClientConnected => write!(f, "auto-tracker connected"),
-            Message::ClientDisconnected => write!(f, "auto-tracker disconnected"),
+            Message::ClientDisconnected => write!(f, "connection lost"),
             Message::ConfigError(e) => write!(f, "error loading/saving preferences: {}", e),
-            Message::ConnectError(e) => write!(f, "error connecting: {}", e),
-            Message::NetworkError(e) => write!(f, "network error: {}", e),
-            Message::RoomError(e) => write!(f, "room error: {}", e),
+            Message::ConnectionError(e) => write!(f, "connection error: {}", e),
             _ => write!(f, "{:?}", self), // these messages are not notifications so just fall back to Debug
         }
     }
@@ -416,8 +407,7 @@ struct MenuState {
 struct State {
     flags: bool,
     config: Config,
-    client_connected: bool,
-    room: Option<firebase::DynRoom>,
+    connection: Option<Arc<dyn Connection>>,
     keyboard_modifiers: KeyboardModifiers,
     last_cursor_pos: [f32; 2],
     dismiss_welcome_screen_button: Option<button::State>,
@@ -457,12 +447,6 @@ impl State {
         Command::none()
     }
 
-    #[must_use]
-    fn notify_temp(&mut self, message: Message) -> Command<Message> {
-        self.notification = Some((true, message));
-        async { sleep(Duration::from_secs(10)).await; Message::AutoDismissNotification }.into()
-    }
-
     fn save_config(&self) -> Command<Message> {
         let config = self.config.clone();
         async move {
@@ -499,8 +483,8 @@ impl Application for State {
     }
 
     fn title(&self) -> String {
-        if self.client_connected {
-            format!("OoT Tracker (auto-tracker connected)")
+        if let Some(ref connection) = self.connection {
+            format!("OoT Tracker ({} connected)", connection.display_kind())
         } else {
             format!("OoT Tracker")
         }
@@ -508,22 +492,12 @@ impl Application for State {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::AutoDismissNotification => if let Some((true, _)) = self.notification {
-                self.notification = None;
-            },
             Message::CheckStatusErrorStatic(_) => return self.notify(message),
-            Message::ClientConnected => {
-                self.client_connected = true;
-                return self.notify_temp(message)
-            }
-            Message::ClientDisconnected => {
-                self.client_connected = false;
-                return self.notify(message)
-            }
+            Message::ClientDisconnected => return self.notify(message),
             Message::CloseMenu => self.menu_state = None,
             Message::ConfigError(_) => return self.notify(message),
-            Message::Connect => if self.room.is_some() {
-                self.room = None;
+            Message::Connect => if self.connection.is_some() {
+                self.connection = None;
             } else {
                 if let Some(ref menu_state) = self.menu_state {
                     let url = menu_state.url.clone();
@@ -531,29 +505,28 @@ impl Application for State {
                     let model = self.model.clone();
                     return async move {
                         match connect(url, passcode, model).await {
-                            Ok(room) => Message::SetRoom(room),
-                            Err(e) => Message::ConnectError(e),
+                            Ok(connection) => Message::SetConnection(connection),
+                            Err(e) => Message::ConnectionError(e),
                         }
                     }.into()
                 }
             },
-            Message::ConnectError(_) => return self.notify(message),
+            Message::ConnectionError(_) => return self.notify(message),
             Message::DismissNotification => self.notification = None,
             Message::DismissWelcomeScreen => {
                 self.dismiss_welcome_screen_button = None;
                 return self.save_config()
             }
             Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
-            Message::LeftClick(cell) => if cell.kind().left_click(self.client_connected, self.keyboard_modifiers, &mut self.model) {
+            Message::LeftClick(cell) => if cell.kind().left_click(self.connection.as_ref().map_or(true, |connection| connection.can_change_state()), self.keyboard_modifiers, &mut self.model) {
                 self.menu_state = Some(MenuState::default());
-            } else {
-                if let Some(ref mut room) = self.room {
-                    let room = room.clone();
-                    let model = self.model.clone();
+            } else if let Some(ref connection) = self.connection {
+                if connection.can_change_state() {
+                    let send_fut = connection.set_state(&self.model);
                     return async move {
-                        match room.set_state(&model).await {
+                        match send_fut.await {
                             Ok(()) => Message::Nop,
-                            Err(e) => Message::RoomError(e),
+                            Err(e) => Message::ConnectionError(e.into()),
                         }
                     }.into()
                 }
@@ -564,30 +537,30 @@ impl Application for State {
             },
             Message::MissingConfig => self.dismiss_welcome_screen_button = Some(button::State::default()),
             Message::MouseMoved(pos) => self.last_cursor_pos = pos,
-            Message::NetworkError(_) => return self.notify(message),
             Message::Nop => {}
             Message::Packet(packet) => {
                 match packet {
                     Packet::Goodbye => unreachable!(), // Goodbye is not yielded from proto::read
+                    Packet::RamInit(ram) => self.model.ram = ram,
                     Packet::SaveDelta(delta) => self.model.ram.save = &self.model.ram.save + &delta,
                     Packet::SaveInit(save) => self.model.ram.save = save,
                     Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
                 }
-                let room = self.room.clone();
-                let model = self.model.clone();
+                let send_fut = self.connection.as_ref().map(|connection| connection.set_state(&self.model));
                 let show_available_checks = self.flags;
+                let model = self.model.clone();
                 return async move {
-                    if let Some(room) = room {
-                        if let Err(e) = room.set_state(&model).await { return Message::RoomError(e) }
-                        if show_available_checks {
-                            return tokio::task::spawn_blocking(move || {
-                                let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
-                                match checks::status(&rando, &model) {
-                                    Ok(status) => Message::UpdateAvailableChecks(status),
-                                    Err(e) => Message::CheckStatusErrorStatic(e),
-                                }
-                            }).await.expect("status checks task panicked")
-                        }
+                    if let Some(send_fut) = send_fut {
+                        if let Err(e) = send_fut.await { return Message::ConnectionError(e.into()) }
+                    }
+                    if show_available_checks {
+                        return tokio::task::spawn_blocking(move || {
+                            let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
+                            match checks::status(&rando, &model) {
+                                Ok(status) => Message::UpdateAvailableChecks(status),
+                                Err(e) => Message::CheckStatusErrorStatic(e),
+                            }
+                        }).await.expect("status checks task panicked")
                     }
                     Message::Nop
                 }.into()
@@ -595,16 +568,15 @@ impl Application for State {
             Message::RightClick => {
                 if self.menu_state.is_none() {
                     if let Some(cell) = self.layout().cell_at(self.last_cursor_pos, self.notification.is_none()) {
-                        if cell.kind().right_click(self.client_connected, &mut self.model) {
+                        if cell.kind().right_click(self.connection.as_ref().map_or(true, |connection| connection.can_change_state()), &mut self.model) {
                             self.menu_state = Some(MenuState::default());
-                        } else {
-                            if let Some(ref room) = self.room {
-                                let room = room.clone();
-                                let model = self.model.clone();
+                        } else if let Some(ref connection) = self.connection {
+                            if connection.can_change_state() {
+                                let send_fut = connection.set_state(&self.model);
                                 return async move {
-                                    match room.set_state(&model).await {
+                                    match send_fut.await {
                                         Ok(()) => Message::Nop,
-                                        Err(e) => Message::RoomError(e),
+                                        Err(e) => Message::ConnectionError(e.into()),
                                     }
                                 }.into()
                             }
@@ -612,10 +584,7 @@ impl Application for State {
                     }
                 }
             }
-            Message::RoomError(ref e) => {
-                eprintln!("room error: {}", e);
-                return self.notify(message)
-            }
+            Message::SetConnection(connection) => self.connection = Some(connection),
             Message::SetMedOrder(med_order) => {
                 self.config.med_order = med_order;
                 return self.save_config()
@@ -623,7 +592,6 @@ impl Application for State {
             Message::SetPasscode(passcode) => if let Some(ref mut menu_state) = self.menu_state {
                 menu_state.passcode = passcode;
             },
-            Message::SetRoom(room) => self.room = Some(room),
             Message::SetUrl(url) => if let Some(ref mut menu_state) = self.menu_state {
                 menu_state.url = url;
             },
@@ -642,7 +610,7 @@ impl Application for State {
 
         macro_rules! cell {
             ($cell:expr) => {{
-                $cell.view(&self.model, if self.client_connected { None } else { cell_buttons.next() })
+                $cell.view(&self.model, cell_buttons.next().expect("not enough cell button states"))
             }}
         }
 
@@ -657,7 +625,7 @@ impl Application for State {
                 .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
                 .push(TextInput::new(&mut menu_state.url_state, "URL", &menu_state.url, Message::SetUrl))
                 .push(TextInput::new(&mut menu_state.passcode_state, "passcode", &menu_state.passcode, Message::SetPasscode).password())
-                .push(Button::new(&mut menu_state.connect_btn, Text::new(if self.room.is_some() { "Disconnect" } else { "Connect" })).on_press(Message::Connect))
+                .push(Button::new(&mut menu_state.connect_btn, Text::new(if self.connection.is_some() { "Disconnect" } else { "Connect" })).on_press(Message::Connect))
                 .into()
         }
         let mut med_locations = Row::new();
@@ -758,76 +726,76 @@ impl Application for State {
                 (iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Right)), iced_native::event::Status::Ignored) => Some(Message::RightClick),
                 _ => None,
             }),
-            Subscription::from_recipe(tcp_server::Subscription),
+            Subscription::from_recipe(subscriptions::Subscription(self.connection.clone().unwrap_or_else(|| Arc::new(net::NullConnection)))),
         ])
     }
 }
 
 #[derive(Debug, From, Clone)]
-enum ConnectError {
+enum ConnectionError {
     ExtraPathSegments,
-    #[from]
-    Firebase(firebase::Error),
     MissingRoomName,
+    #[from]
+    Net(net::Error),
     Reqwest(Arc<reqwest::Error>),
     UnsupportedHost(Option<url::Host<String>>),
     #[from]
     UrlParse(url::ParseError),
 }
 
-impl From<reqwest::Error> for ConnectError {
-    fn from(e: reqwest::Error) -> ConnectError {
-        ConnectError::Reqwest(Arc::new(e))
+impl From<reqwest::Error> for ConnectionError {
+    fn from(e: reqwest::Error) -> ConnectionError {
+        ConnectionError::Reqwest(Arc::new(e))
     }
 }
 
-impl fmt::Display for ConnectError {
+impl fmt::Display for ConnectionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ConnectError::ExtraPathSegments => write!(f, "too many path segments in URL"),
-            ConnectError::Firebase(e) => e.fmt(f),
-            ConnectError::MissingRoomName => write!(f, "missing room name"),
-            ConnectError::Reqwest(e) => if let Some(url) = e.url() {
+            ConnectionError::ExtraPathSegments => write!(f, "too many path segments in URL"),
+            ConnectionError::MissingRoomName => write!(f, "missing room name"),
+            ConnectionError::Net(e) => e.fmt(f),
+            ConnectionError::Reqwest(e) => if let Some(url) = e.url() {
                 write!(f, "HTTP error at {}: {}", url, e)
             } else {
                 write!(f, "HTTP error: {}", e)
             },
-            ConnectError::UnsupportedHost(Some(host)) => write!(f, "the tracker at {} is not (yet) supported", host),
-            ConnectError::UnsupportedHost(None) => write!(f, "this kind of connection is not supported"),
-            ConnectError::UrlParse(e) => e.fmt(f),
+            ConnectionError::UnsupportedHost(Some(host)) => write!(f, "the tracker at {} is not (yet) supported", host),
+            ConnectionError::UnsupportedHost(None) => write!(f, "this kind of connection is not supported"),
+            ConnectionError::UrlParse(e) => e.fmt(f),
         }
     }
 }
 
-async fn connect(url: String, passcode: String, state: ModelState) -> Result<firebase::DynRoom, ConnectError> {
+async fn connect(url: String, passcode: String, state: ModelState) -> Result<Arc<dyn Connection>, ConnectionError> {
     let url = url.parse::<Url>()?;
-    let room = match url.host() {
+    let connection = match url.host() {
         Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => {
             let mut path_segments = url.path_segments().into_iter().flatten().fuse();
             let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
-                (None, _, _) => return Err(ConnectError::MissingRoomName),
+                (None, _, _) => return Err(ConnectionError::MissingRoomName),
                 (Some(room_name), None, _) |
                 (Some(_), Some(room_name), None) => room_name.to_owned(),
-                (Some(_), Some(_), Some(_)) => return Err(ConnectError::ExtraPathSegments),
+                (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
             };
             let session = firebase::Session::new(firebase::RestreamTracker).await?;
-            firebase::Room { session, name, passcode }.to_dyn()
+            Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode }))
         }
         Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => {
             let mut path_segments = url.path_segments().into_iter().flatten().fuse();
             let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
-                (None, _, _) => return Err(ConnectError::MissingRoomName),
+                (None, _, _) => return Err(ConnectionError::MissingRoomName),
                 (Some(room_name), None, _) |
                 (Some(_), Some(room_name), None) => room_name.to_owned(),
-                (Some(_), Some(_), Some(_)) => return Err(ConnectError::ExtraPathSegments),
+                (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
             };
             let session = firebase::Session::new(firebase::RslItemTracker).await?;
-            firebase::Room { session, name, passcode }.to_dyn()
+            Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode }))
         }
-        host => return Err(ConnectError::UnsupportedHost(host.map(|host| host.to_owned()))),
+        host => return Err(ConnectionError::UnsupportedHost(host.map(|host| host.to_owned()))),
     };
-    room.set_state(&state).await?;
-    Ok(room)
+    connection.set_state(&state).await?;
+    Ok(connection)
 }
 
 #[derive(StructOpt)]
