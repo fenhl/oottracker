@@ -10,7 +10,7 @@ use {
         sync::Arc,
     },
     derive_more::From,
-    enum_iterator::IntoEnumIterator as _,
+    enum_iterator::IntoEnumIterator,
     iced::{
         Application,
         Background,
@@ -374,6 +374,8 @@ enum Message {
     SetMedOrder(ElementOrder),
     SetPasscode(String),
     SetConnection(Arc<dyn Connection>),
+    SetConnectionKind(ConnectionKind),
+    SetPort(String),
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
     UpdateAvailableChecks(HashMap<Check, CheckStatus>),
@@ -396,11 +398,79 @@ struct MenuState {
     dismiss_btn: button::State,
     med_order: pick_list::State<ElementOrder>,
     warp_song_order: pick_list::State<ElementOrder>,
-    url: String,
-    url_state: text_input::State,
-    passcode: String,
-    passcode_state: text_input::State,
+    connection_kind: pick_list::State<ConnectionKind>,
+    connection_params: ConnectionParams,
     connect_btn: button::State,
+}
+
+#[derive(Debug, SmartDefault, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+enum ConnectionKind {
+    #[default]
+    RetroArch,
+    Web,
+}
+
+impl fmt::Display for ConnectionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConnectionKind::RetroArch => write!(f, "RetroArch"),
+            ConnectionKind::Web => write!(f, "web"),
+        }
+    }
+}
+
+#[derive(Debug, SmartDefault, Clone)]
+enum ConnectionParams {
+    #[default]
+    RetroArch {
+        #[default = 55355]
+        port: u16,
+        port_state: text_input::State,
+    },
+    Web {
+        url: String,
+        url_state: text_input::State,
+        passcode: String,
+        passcode_state: text_input::State,
+    },
+}
+
+impl ConnectionParams {
+    fn kind(&self) -> ConnectionKind {
+        match self {
+            ConnectionParams::RetroArch { .. } => ConnectionKind::RetroArch,
+            ConnectionParams::Web { .. } => ConnectionKind::Web,
+        }
+    }
+
+    fn set_kind(&mut self, kind: ConnectionKind) {
+        if kind == self.kind() { return }
+        *self = match kind {
+            ConnectionKind::RetroArch => ConnectionParams::RetroArch {
+                port: 55355,
+                port_state: text_input::State::default(),
+            },
+            ConnectionKind::Web => ConnectionParams::Web {
+                url: String::default(),
+                url_state: text_input::State::default(),
+                passcode: String::default(),
+                passcode_state: text_input::State::default(),
+            },
+        };
+    }
+
+    fn view(&mut self) -> Element<'_, Message> {
+        match self {
+            ConnectionParams::RetroArch { port, port_state } => Row::new()
+                .push(Text::new("Port: "))
+                .push(TextInput::new(port_state, "", &port.to_string(), Message::SetPort))
+                .into(),
+            ConnectionParams::Web { url, url_state, passcode, passcode_state } => Column::new()
+                .push(TextInput::new(url_state, "URL", url, Message::SetUrl))
+                .push(TextInput::new(passcode_state, "passcode", passcode, Message::SetPasscode).password())
+                .into(),
+        }
+    }
 }
 
 #[derive(Debug, SmartDefault)]
@@ -500,11 +570,10 @@ impl Application for State {
                 self.connection = None;
             } else {
                 if let Some(ref menu_state) = self.menu_state {
-                    let url = menu_state.url.clone();
-                    let passcode = menu_state.passcode.clone();
+                    let params = menu_state.connection_params.clone();
                     let model = self.model.clone();
                     return async move {
-                        match connect(url, passcode, model).await {
+                        match connect(params, model).await {
                             Ok(connection) => Message::SetConnection(connection),
                             Err(e) => Message::ConnectionError(e),
                         }
@@ -541,29 +610,32 @@ impl Application for State {
             Message::Packet(packet) => {
                 match packet {
                     Packet::Goodbye => unreachable!(), // Goodbye is not yielded from proto::read
-                    Packet::RamInit(ram) => self.model.ram = ram,
-                    Packet::SaveDelta(delta) => self.model.ram.save = &self.model.ram.save + &delta,
-                    Packet::SaveInit(save) => self.model.ram.save = save,
+                    Packet::RamInit(ram) => {
+                        self.model.ram = ram;
+                        self.model.update_knowledge();
+                    }
+                    Packet::SaveDelta(delta) => {
+                        self.model.ram.save = &self.model.ram.save + &delta;
+                        self.model.update_knowledge();
+                    }
+                    Packet::SaveInit(save) => {
+                        self.model.ram.save = save;
+                        self.model.update_knowledge();
+                    }
                     Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
                 }
-                let send_fut = self.connection.as_ref().map(|connection| connection.set_state(&self.model));
-                let show_available_checks = self.flags;
-                let model = self.model.clone();
-                return async move {
-                    if let Some(send_fut) = send_fut {
-                        if let Err(e) = send_fut.await { return Message::ConnectionError(e.into()) }
-                    }
-                    if show_available_checks {
-                        return tokio::task::spawn_blocking(move || {
+                if self.flags {
+                    let model = self.model.clone();
+                    return async move {
+                        tokio::task::spawn_blocking(move || {
                             let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
                             match checks::status(&rando, &model) {
                                 Ok(status) => Message::UpdateAvailableChecks(status),
                                 Err(e) => Message::CheckStatusErrorStatic(e),
                             }
                         }).await.expect("status checks task panicked")
-                    }
-                    Message::Nop
-                }.into()
+                    }.into()
+                }
             }
             Message::RightClick => {
                 if self.menu_state.is_none() {
@@ -585,15 +657,23 @@ impl Application for State {
                 }
             }
             Message::SetConnection(connection) => self.connection = Some(connection),
+            Message::SetConnectionKind(kind) => if let Some(MenuState { ref mut connection_params, .. }) = self.menu_state {
+                connection_params.set_kind(kind);
+            }
             Message::SetMedOrder(med_order) => {
                 self.config.med_order = med_order;
                 return self.save_config()
             }
-            Message::SetPasscode(passcode) => if let Some(ref mut menu_state) = self.menu_state {
-                menu_state.passcode = passcode;
+            Message::SetPasscode(new_passcode) => if let Some(MenuState { connection_params: ConnectionParams::Web { ref mut passcode, .. }, .. }) = self.menu_state {
+                *passcode = new_passcode;
             },
-            Message::SetUrl(url) => if let Some(ref mut menu_state) = self.menu_state {
-                menu_state.url = url;
+            Message::SetPort(new_port) => if let Some(MenuState { connection_params: ConnectionParams::RetroArch { ref mut port, .. }, .. }) = self.menu_state {
+                if let Ok(new_port) = new_port.parse() {
+                    *port = new_port;
+                }
+            },
+            Message::SetUrl(new_url) => if let Some(MenuState { connection_params: ConnectionParams::Web { ref mut url, .. }, .. }) = self.menu_state {
+                *url = new_url;
             },
             Message::SetWarpSongOrder(warp_song_order) => {
                 self.config.warp_song_order = warp_song_order;
@@ -623,8 +703,8 @@ impl Application for State {
                 .push(Text::new("Warp song order:"))
                 .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.warp_song_order), Message::SetWarpSongOrder))
                 .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
-                .push(TextInput::new(&mut menu_state.url_state, "URL", &menu_state.url, Message::SetUrl))
-                .push(TextInput::new(&mut menu_state.passcode_state, "passcode", &menu_state.passcode, Message::SetPasscode).password())
+                .push(PickList::new(&mut menu_state.connection_kind, ConnectionKind::into_enum_iter().collect_vec(), Some(menu_state.connection_params.kind()), Message::SetConnectionKind))
+                .push(menu_state.connection_params.view())
                 .push(Button::new(&mut menu_state.connect_btn, Text::new(if self.connection.is_some() { "Disconnect" } else { "Connect" })).on_press(Message::Connect))
                 .into()
         }
@@ -767,34 +847,43 @@ impl fmt::Display for ConnectionError {
     }
 }
 
-async fn connect(url: String, passcode: String, state: ModelState) -> Result<Arc<dyn Connection>, ConnectionError> {
-    let url = url.parse::<Url>()?;
-    let connection = match url.host() {
-        Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => {
-            let mut path_segments = url.path_segments().into_iter().flatten().fuse();
-            let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
-                (None, _, _) => return Err(ConnectionError::MissingRoomName),
-                (Some(room_name), None, _) |
-                (Some(_), Some(room_name), None) => room_name.to_owned(),
-                (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
-            };
-            let session = firebase::Session::new(firebase::RestreamTracker).await?;
-            Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode }))
+async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn Connection>, ConnectionError> {
+    let connection = match params {
+        ConnectionParams::RetroArch { port, .. } => Arc::new(net::RetroArchConnection { port }),
+        ConnectionParams::Web { url, passcode, .. } => {
+            let url = url.parse::<Url>()?;
+            match url.host() {
+                Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => {
+                    let mut path_segments = url.path_segments().into_iter().flatten().fuse();
+                    let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
+                        (None, _, _) => return Err(ConnectionError::MissingRoomName),
+                        (Some(room_name), None, _) |
+                        (Some(_), Some(room_name), None) => room_name.to_owned(),
+                        (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
+                    };
+                    let session = firebase::Session::new(firebase::RestreamTracker).await?;
+                    Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode })) as Arc<dyn Connection>
+                }
+                Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => {
+                    let mut path_segments = url.path_segments().into_iter().flatten().fuse();
+                    let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
+                        (None, _, _) => return Err(ConnectionError::MissingRoomName),
+                        (Some(room_name), None, _) |
+                        (Some(_), Some(room_name), None) => room_name.to_owned(),
+                        (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
+                    };
+                    let session = firebase::Session::new(firebase::RslItemTracker).await?;
+                    Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode }))
+                }
+                //TODO support for rsl-settings-tracker.web.app
+                //TODO support for oottracker.fenhl.net
+                host => return Err(ConnectionError::UnsupportedHost(host.map(|host| host.to_owned()))),
+            }
         }
-        Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => {
-            let mut path_segments = url.path_segments().into_iter().flatten().fuse();
-            let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
-                (None, _, _) => return Err(ConnectionError::MissingRoomName),
-                (Some(room_name), None, _) |
-                (Some(_), Some(room_name), None) => room_name.to_owned(),
-                (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
-            };
-            let session = firebase::Session::new(firebase::RslItemTracker).await?;
-            Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode }))
-        }
-        host => return Err(ConnectionError::UnsupportedHost(host.map(|host| host.to_owned()))),
     };
-    connection.set_state(&state).await?;
+    if connection.can_change_state() {
+        connection.set_state(&state).await?;
+    }
     Ok(connection)
 }
 

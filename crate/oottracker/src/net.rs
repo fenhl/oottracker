@@ -17,6 +17,7 @@ use {
         },
         pin::Pin,
         sync::Arc,
+        time::Duration,
     },
     derive_more::From,
     futures::{
@@ -29,9 +30,12 @@ use {
         },
     },
     itertools::Itertools as _,
-    tokio::net::{
-        TcpListener,
-        UdpSocket,
+    tokio::{
+        net::{
+            TcpListener,
+            UdpSocket,
+        },
+        time::sleep,
     },
     tokio_stream::wrappers::TcpListenerStream,
     crate::{
@@ -169,7 +173,7 @@ impl Connection for TcpConnection {
 
 #[derive(Debug, Clone, Copy)]
 pub struct RetroArchConnection {
-    port: u16,
+    pub port: u16,
 }
 
 impl Connection for RetroArchConnection {
@@ -190,6 +194,7 @@ impl Connection for RetroArchConnection {
             sock.connect((Ipv4Addr::LOCALHOST, port)).await?;
             Ok::<_, Error>(sock)
         }) as Pin<Box<dyn Future<Output = _> + Send>>, |sock| async move {
+            sleep(Duration::from_secs(1)).await;
             let sock = sock.await?;
             let ram = retroarch_read_ram(&sock).await?;
             Ok(Some((Packet::RamInit(ram), Box::pin(async move { Ok(sock) }) as Pin<Box<dyn Future<Output = _> + Send>>)))
