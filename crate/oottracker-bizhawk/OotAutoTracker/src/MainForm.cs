@@ -765,6 +765,7 @@ namespace Net.Fenhl.OotAutoTracker
     }
 
     [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
+    [ExternalToolEmbeddedIcon("Net.Fenhl.OotAutoTracker.Resources.icon.ico")]
     public sealed class MainForm : FormBase, IExternalToolForm
     {
         private PictureBox[] cells = new PictureBox[52];
@@ -797,6 +798,7 @@ namespace Net.Fenhl.OotAutoTracker
         {
             InitializeComponent();
             ClientSize = new Size(614, 754);
+            Icon = new Icon(typeof(MainForm).Assembly.GetManifestResourceStream("Net.Fenhl.OotAutoTracker.Resources.icon.ico"));
             SuspendLayout();
             ResumeLayout();
         }
