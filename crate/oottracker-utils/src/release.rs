@@ -225,13 +225,17 @@ async fn build_web(verbose: bool) -> Result<(), Error> {
 }
 
 #[cfg(windows)]
-async fn write_release_notes(verbose: bool) -> Result<String, Error> {
+async fn write_release_notes(args: &Args) -> Result<String, Error> {
     eprintln!("editing release notes");
     let mut release_notes_file = tempfile::Builder::new()
         .prefix("oottracker-release-notes")
         .suffix(".md")
         .tempfile()?;
-    Command::new("C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd").arg("--wait").arg(release_notes_file.path()).check("code", verbose).await?;
+    let mut cmd = Command::new(&args.release_notes_editor);
+    if !args.no_wait {
+        cmd.arg("--wait");
+    }
+    cmd.arg(release_notes_file.path()).check("code", args.verbose).await?;
     let mut buf = String::default();
     <NamedTempFile as io::Read>::read_to_string(&mut release_notes_file, &mut buf)?;
     if buf.is_empty() { return Err(Error::EmptyReleaseNotes) }
@@ -244,6 +248,14 @@ struct Args {
     /// Create the GitHub release as a draft
     #[structopt(long)]
     no_publish: bool,
+    #[cfg(windows)]
+    /// Don't pass `--wait` to the release notes editor
+    #[structopt(short = "W", long)]
+    no_wait: bool,
+    #[cfg(windows)]
+    /// the editor for the release notes
+    #[structopt(short = "e", long, default_value = "C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd")]
+    release_notes_editor: String,
     /// Show output of build commands
     #[structopt(short, long)]
     verbose: bool,
@@ -277,12 +289,12 @@ async fn main(args: Args) -> Result<(), Error> {
     let ((client, repo), release_notes) = if args.verbose {
         (
             setup(args.verbose).await?,
-            write_release_notes(args.verbose).await?,
+            write_release_notes(&args).await?,
         )
     } else {
         let (setup_res, release_notes) = tokio::join!(
             setup(args.verbose),
-            write_release_notes(args.verbose),
+            write_release_notes(&args),
         );
         (setup_res?, release_notes?)
     };
