@@ -21,5 +21,5 @@ set -e
 cd "${0:a:h}"/..
 
 /opt/git/github.com/fenhl/syncbin/master/bin/rust $quiet --no-project
-git $quiet_verbose pull --ff-only
+git pull $quiet_verbose --ff-only
 cargo $quiet_verbose run --release --package=oottracker-utils --bin=oottracker-release -- $verbose

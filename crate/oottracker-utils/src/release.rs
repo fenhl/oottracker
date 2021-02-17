@@ -3,6 +3,7 @@
 
 use {
     std::{
+        fmt,
         io,
         process::ExitStatus,
     },
@@ -18,7 +19,6 @@ use {
     std::{
         cmp::Ordering::*,
         env,
-        fmt,
         io::Cursor,
         path::Path,
         process::Stdio,
@@ -69,7 +69,6 @@ enum Error {
     Zip(ZipError),
 }
 
-#[cfg(windows)]
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
