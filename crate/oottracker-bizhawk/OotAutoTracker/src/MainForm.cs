@@ -9,6 +9,7 @@ using System.Text;
 using System.Windows.Forms;
 
 using BizHawk.Client.Common;
+using BizHawk.Client.EmuHawk;
 
 namespace Net.Fenhl.OotAutoTracker
 {
@@ -764,7 +765,7 @@ namespace Net.Fenhl.OotAutoTracker
     }
 
     [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
-    public sealed class MainForm : Form, IExternalToolForm
+    public sealed class MainForm : FormBase, IExternalToolForm
     {
         private PictureBox[] cells = new PictureBox[52];
         private Label label_Version;
@@ -796,10 +797,12 @@ namespace Net.Fenhl.OotAutoTracker
         {
             InitializeComponent();
             ClientSize = new Size(614, 754);
-            Text = "OoT autotracker";
             SuspendLayout();
             ResumeLayout();
         }
+
+        public override bool BlocksInputWhenFocused { get; } = false;
+        protected override string WindowTitleStatic => "OoT autotracker";
 
         public bool AskSaveChanges() => true;
 
