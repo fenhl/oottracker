@@ -8,9 +8,12 @@ use {
     },
     async_trait::async_trait,
     derive_more::From,
-    ::tokio::process::Command,
+    structopt::StructOpt,
+    ::tokio::{
+        fs,
+        process::Command,
+    },
 };
-#[cfg(target_os = "macos")] use tokio::fs;
 #[cfg(windows)] use {
     std::{
         cmp::Ordering::*,
@@ -29,10 +32,6 @@ use {
     },
     serde::Deserialize,
     tempfile::NamedTempFile,
-    ::tokio::{
-        fs::File,
-        io::AsyncReadExt as _,
-    },
     zip::{
         ZipWriter,
         result::ZipError,
@@ -79,13 +78,17 @@ impl fmt::Display for Error {
 
 #[async_trait]
 trait CommandOutputExt {
-    async fn check(&mut self, name: &'static str) -> Result<ExitStatus, Error>;
+    async fn check(&mut self, name: &'static str, verbose: bool) -> Result<ExitStatus, Error>;
 }
 
 #[async_trait]
 impl CommandOutputExt for Command {
-    async fn check(&mut self, name: &'static str) -> Result<ExitStatus, Error> {
-        let status = self.status().await?;
+    async fn check(&mut self, name: &'static str, verbose: bool) -> Result<ExitStatus, Error> {
+        let status = if verbose {
+            self.status().await?
+        } else {
+            self.output().await?.status
+        };
         if status.success() {
             Ok(status)
         } else {
@@ -112,9 +115,7 @@ impl IoResultExt for io::Result<()> {
 #[cfg(windows)]
 async fn release_client() -> Result<reqwest::Client, Error> {
     let mut headers = reqwest::header::HeaderMap::new();
-    let mut token = String::default();
-    File::open("assets/release-token").await?.read_to_string(&mut token).await?;
-    headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&format!("token {}", token))?);
+    headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&format!("token {}", fs::read_to_string("assets/release-token").await?))?);
     headers.insert(reqwest::header::USER_AGENT, reqwest::header::HeaderValue::from_static(concat!("oottracker-release/", env!("CARGO_PKG_VERSION"))));
     Ok(reqwest::Client::builder().default_headers(headers).timeout(Duration::from_secs(600)).build()?)
 }
@@ -150,7 +151,7 @@ async fn version() -> Version {
 }
 
 #[cfg(windows)]
-async fn setup() -> Result<(reqwest::Client, Repo), Error> {
+async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
     eprintln!("creating reqwest client");
     let client = release_client().await?;
     //TODO make sure working dir is clean and on default branch and up to date with remote and remote is up to date
@@ -168,17 +169,17 @@ async fn setup() -> Result<(reqwest::Client, Repo), Error> {
     let lock_dir = Path::new(&env::var_os("TEMP").ok_or(Error::MissingEnvar("TEMP"))?).join("syncbin-startup-rust.lock");
     let lock = DirLock::new(&lock_dir).await?;
     eprintln!("updating Rust for x86_64");
-    Command::new("rustup").arg("update").arg("stable").check("rustup").await?;
+    Command::new("rustup").arg("update").arg("stable").check("rustup", verbose).await?;
     lock.drop_async().await?;
     Ok((client, repo))
 }
 
 #[cfg(windows)]
-async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
+async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
     eprintln!("building oottracker-csharp");
-    Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo build --package=oottracker-csharp").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
+    Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo build --package=oottracker-csharp", verbose).await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building oottracker-bizhawk");
-    Command::new("cargo").arg("build").arg("--package=oottracker-bizhawk").check("cargo build --package=oottracker-bizhawk").await?; //TODO figure out why release builds crash at runtime, then reenable --release here
+    Command::new("cargo").arg("build").arg("--package=oottracker-bizhawk").check("cargo build --package=oottracker-bizhawk", verbose).await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("creating oottracker-bizhawk-win64.zip");
     let mut buf = Cursor::<Vec<_>>::default();
     {
@@ -196,74 +197,75 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release)
 }
 
 #[cfg(windows)]
-async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
+async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
     eprintln!("building oottracker-win64.exe");
-    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo build --package=oottracker-gui").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo build --package=oottracker-gui", verbose).await?;
     eprintln!("uploading oottracker-win64.exe");
-    repo.release_attach(client, release, "oottracker-win64.exe", "application/vnd.microsoft.portable-executable", {
-        let mut f = File::open("target/release/oottracker-gui.exe").await?;
-        let mut buf = Vec::default();
-        f.read_to_end(&mut buf).await?;
-        buf
-    }).await?;
+    repo.release_attach(client, release, "oottracker-win64.exe", "application/vnd.microsoft.portable-executable", fs::read("target/release/oottracker-gui.exe").await?).await?;
     Ok(())
 }
 
 #[cfg(windows)]
-async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
+async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
     eprintln!("updating repo on bureflux");
-    Command::new("ssh").arg("bureflux").arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh").await?;
+    Command::new("ssh").arg("bureflux").arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh", verbose).await?;
     eprintln!("connecting to bureflux");
-    Command::new("ssh").arg("bureflux").arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").check("ssh").await?;
+    Command::new("ssh").arg("bureflux").arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").check("ssh", true).await?;
     eprintln!("downloading oottracker-mac-intel.dmg from bureflux");
-    Command::new("scp").arg("bureflux:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac-intel.dmg").arg("assets/oottracker-mac-intel.dmg").check("scp").await?;
+    Command::new("scp").arg("bureflux:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac-intel.dmg").arg("assets/oottracker-mac-intel.dmg").check("scp", verbose).await?;
     eprintln!("uploading oottracker-mac-intel.dmg");
-    repo.release_attach(client, release, "oottracker-mac-intel.dmg", "application/x-apple-diskimage", {
-        let mut f = File::open("assets/oottracker-mac-intel.dmg").await?;
-        let mut buf = Vec::default();
-        f.read_to_end(&mut buf).await?;
-        buf
-    }).await?;
+    repo.release_attach(client, release, "oottracker-mac-intel.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac-intel.dmg").await?).await?;
     Ok(())
 }
 
 #[cfg(windows)]
-async fn build_web() -> Result<(), Error> {
-    Command::new("ssh").arg("mercredi").arg("sudo").arg("systemctl").arg("restart").arg("oottracker-web").check("ssh").await?;
+async fn build_web(verbose: bool) -> Result<(), Error> {
+    Command::new("ssh").arg("mercredi").arg("sudo").arg("systemctl").arg("restart").arg("oottracker-web").check("ssh", verbose).await?;
     Ok(())
 }
 
 #[cfg(windows)]
-async fn write_release_notes() -> Result<String, Error> {
+async fn write_release_notes(verbose: bool) -> Result<String, Error> {
     eprintln!("editing release notes");
     let mut release_notes_file = tempfile::Builder::new()
         .prefix("oottracker-release-notes")
         .suffix(".md")
         .tempfile()?;
-    Command::new("C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd").arg("--wait").arg(release_notes_file.path()).check("code").await?;
+    Command::new("C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd").arg("--wait").arg(release_notes_file.path()).check("code", verbose).await?;
     let mut buf = String::default();
     <NamedTempFile as io::Read>::read_to_string(&mut release_notes_file, &mut buf)?;
     if buf.is_empty() { return Err(Error::EmptyReleaseNotes) }
     Ok(buf)
 }
 
+#[derive(StructOpt)]
+struct Args {
+    #[cfg(windows)]
+    /// Create the GitHub release as a draft
+    #[structopt(long)]
+    no_publish: bool,
+    /// Show output of build commands
+    #[structopt(short, long)]
+    verbose: bool,
+}
+
 #[cfg(target_os = "macos")]
-#[tokio::main]
-async fn main() -> Result<(), Error> {
+#[wheel::main]
+async fn main(args: Args) -> Result<(), Error> {
     eprintln!("building oottracker-mac-intel.app");
-    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
     fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     fs::copy("target/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
     eprintln!("packing oottracker-mac-intel.dmg");
-    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-intel.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil").await?;
+    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-intel.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil", args.verbose).await?;
 
     /*
     eprintln!("building oottracker-mac-arm.app");
-    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
     fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     fs::copy("target/aarch64-apple-darwin/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
     eprintln!("packing oottracker-mac-arm.dmg");
-    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-arm.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil").await?;
+    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-arm.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil", args.verbose).await?;
     */
 
     Ok(())
@@ -271,26 +273,41 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(windows)]
 #[wheel::main]
-async fn main() -> Result<(), Error> {
-    let (setup_res, release_notes) = tokio::join!(
-        setup(),
-        write_release_notes(),
-    );
-    let (client, repo) = setup_res?;
-    let release_notes = release_notes?;
+async fn main(args: Args) -> Result<(), Error> {
+    let ((client, repo), release_notes) = if args.verbose {
+        (
+            setup(args.verbose).await?,
+            write_release_notes(args.verbose).await?,
+        )
+    } else {
+        let (setup_res, release_notes) = tokio::join!(
+            setup(args.verbose),
+            write_release_notes(args.verbose),
+        );
+        (setup_res?, release_notes?)
+    };
     eprintln!("creating release");
     let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
-    let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
-        build_bizhawk(&client, &repo, &release),
-        build_gui(&client, &repo, &release),
-        build_macos(&client, &repo, &release),
-        build_web(),
-    );
-    let () = build_bizhawk_res?;
-    let () = build_gui_res?;
-    let () = build_macos_res?;
-    let () = build_web_res?;
-    eprintln!("publishing release");
-    repo.publish_release(&client, release).await?;
+    if args.verbose {
+        build_bizhawk(&client, &repo, &release, args.verbose).await?;
+        build_gui(&client, &repo, &release, args.verbose).await?;
+        build_macos(&client, &repo, &release, args.verbose).await?;
+        build_web(args.verbose).await?;
+    } else {
+        let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
+            build_bizhawk(&client, &repo, &release, args.verbose),
+            build_gui(&client, &repo, &release, args.verbose),
+            build_macos(&client, &repo, &release, args.verbose),
+            build_web(args.verbose),
+        );
+        let () = build_bizhawk_res?;
+        let () = build_gui_res?;
+        let () = build_macos_res?;
+        let () = build_web_res?;
+    }
+    if !args.no_publish {
+        eprintln!("publishing release");
+        repo.publish_release(&client, release).await?;
+    }
     Ok(())
 }
