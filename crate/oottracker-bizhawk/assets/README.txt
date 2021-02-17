@@ -1,16 +1,14 @@
 HOW TO INSTALL/UPDATE
 
-1. The main oottracker app is required. You can download it from https://github.com/fenhl/oottracker/releases/latest/download/oottracker-win64.exe
-2. You will need BizHawk version 2.5.x.
-3. Move the files OotAutoTracker.dll and oottracker.dll into the ExternalTools subfolder within your BizHawk folder. (The BizHawk folder is the one with EmuHawk.exe in it. You may have to create the ExternalTools folder if it doesn't exist.)
+1. You will need BizHawk version 2.6.x.
+2. Move the files OotAutoTracker.dll and oottracker.dll into the ExternalTools subfolder within your BizHawk folder. (The BizHawk folder is the one with EmuHawk.exe in it. You may have to create the ExternalTools folder if it doesn't exist.)
 
 HOW TO USE
 
-1. Open the main oottracker app
-2. Open BizHawk (EmuHawk.exe)
-3. In BizHawk, go to Tools menu > External Tool > OoT autotracker
-4. A window will open. You can minimize it, but closing it will stop the auto-tracker.
-5. Open the ROM. The main oottracker app should now automatically update based on your item status.
+1. Open BizHawk (EmuHawk.exe)
+2. In BizHawk, go to Tools menu > External Tool > OoT autotracker
+3. The tracker window will open. You can right-click on a Medallion to see debugging output.
+4. Open the ROM. The tracker should now automatically update based on your item status.
 
 SUPPORT
 

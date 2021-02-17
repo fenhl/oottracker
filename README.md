@@ -1,15 +1,16 @@
 **Warning:** As of 2020-11-03, [the racing rules](https://wiki.ootrandomizer.com/index.php?title=Rules#Universal_Rules) prohibit all usage of trackers capable of auto-tracking even in manual mode. How exactly this applies to my tracker is unclear pending discussion with the RaceMods.
 
-This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include auto-tracking for [BizHawk](http://tasvideos.org/BizHawk.html).
+This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include:
 
-# Web app
-
-<https://oottracker.fenhl.net/>
+* Runs on Windows and macOS, also available as [a web app](https://oottracker.fenhl.net/)
+* Support for auto-tracking with [BizHawk](http://tasvideos.org/BizHawk.html) or [RetroArch](https://retroarch.com/)
+* Can connect to the networked trackers <https://oot-tracker.web.app/> and <https://ootr-random-settings-tracker.web.app/>
 
 # Download
 
-* main app: [Windows (64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-win64.exe) • [macOS (Intel)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-mac-intel.dmg)
-* BizHawk auto-tracking plugin: [Windows (64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-bizhawk-win64.zip) (please see the included `README.txt` for instructions)
+* [BizHawk (Windows, 64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-bizhawk-win64.zip) (please see the included `README.txt` for instructions)
+* [Windows (64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-win64.exe) (includes auto-tracker for RetroArch)
+* [macOS (Intel)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-mac-intel.dmg) (includes auto-tracker for RetroArch)
 
 # Support
 
