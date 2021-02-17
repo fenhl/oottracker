@@ -210,10 +210,10 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release, v
     Command::new("ssh").arg("bureflux").arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh", verbose).await?;
     eprintln!("connecting to bureflux");
     Command::new("ssh").arg("bureflux").arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").arg(if verbose { "--verbose" } else { "" }).check("ssh", true).await?;
-    eprintln!("downloading oottracker-mac-intel.dmg from bureflux");
-    Command::new("scp").arg("bureflux:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac-intel.dmg").arg("assets/oottracker-mac-intel.dmg").check("scp", verbose).await?;
-    eprintln!("uploading oottracker-mac-intel.dmg");
-    repo.release_attach(client, release, "oottracker-mac-intel.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac-intel.dmg").await?).await?;
+    eprintln!("downloading oottracker-mac.dmg from bureflux");
+    Command::new("scp").arg("bureflux:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac.dmg").arg("assets/oottracker-mac.dmg").check("scp", verbose).await?;
+    eprintln!("uploading oottracker-mac.dmg");
+    repo.release_attach(client, release, "oottracker-mac.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac.dmg").await?).await?;
     Ok(())
 }
 
@@ -263,22 +263,15 @@ struct Args {
 #[cfg(target_os = "macos")]
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
-    eprintln!("building oottracker-mac-intel.app");
-    Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
-    fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
-    fs::copy("target/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
-    eprintln!("packing oottracker-mac-intel.dmg");
-    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-intel.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil", args.verbose).await?;
-
-    /*
-    eprintln!("building oottracker-mac-arm.app");
+    eprintln!("building oottracker-mac.app for x86_64");
+    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
+    eprintln!("building oottracker-mac.app for aarch64");
     Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
+    eprintln!("creating Universal macOS binary");
     fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
-    fs::copy("target/aarch64-apple-darwin/release/oottracker-gui", "assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").await?;
-    eprintln!("packing oottracker-mac-arm.dmg");
-    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac-arm.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil", args.verbose).await?;
-    */
-
+    Command::new("lipo").arg("-create").arg("target/aarch64-apple-darwin/release/oottracker-gui").arg("target/x86_64-apple-darwin/release/oottracker-gui").arg("-output").arg("assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").check("lipo", args.verbose).await?;
+    eprintln!("packing oottracker-mac.dmg");
+    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil", args.verbose).await?;
     Ok(())
 }
 

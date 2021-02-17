@@ -206,6 +206,9 @@ impl Connection for RetroArchConnection {
     }
 }
 
+/// The RetroArch UDP API does not seem to be documented,
+/// but there is a Python implementation at
+/// <https://github.com/eadmaster/console_hiscore/blob/master/tools/retroarchpythonapi.py>
 async fn retroarch_read_ram(sock: &UdpSocket) -> Result<Ram, Error> {
     let ranges = stream::iter(ram::RANGES.iter().copied().tuples()).then(|(start, len)| async move {
         // make sure we're word-aligned on both ends

@@ -10,7 +10,7 @@ This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* I
 
 * [BizHawk (Windows, 64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-bizhawk-win64.zip) (please see the included `README.txt` for instructions)
 * [Windows (64-bit)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-win64.exe) (includes auto-tracker for RetroArch)
-* [macOS (Intel)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-mac-intel.dmg) (includes auto-tracker for RetroArch)
+* [macOS (Universal)](https://github.com/fenhl/oottracker/releases/latest/download/oottracker-mac.dmg) (includes auto-tracker for RetroArch)
 
 # Support
 
