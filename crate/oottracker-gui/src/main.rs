@@ -707,7 +707,10 @@ impl Application for State {
 
         if let Some(ref mut menu_state) = self.menu_state {
             return Column::new()
-                .push(Button::new(&mut menu_state.dismiss_btn, Text::new("Back")).on_press(Message::CloseMenu))
+                .push(Row::new()
+                    .push(Button::new(&mut menu_state.dismiss_btn, Text::new("Back")).on_press(Message::CloseMenu))
+                    .push(Text::new(concat!("version ", env!("CARGO_PKG_VERSION"))).horizontal_alignment(HorizontalAlignment::Right).width(Length::Fill))
+                )
                 .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
                 .push(Text::new("Medallion order:"))
                 .push(PickList::new(&mut menu_state.med_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.med_order), Message::SetMedOrder))
