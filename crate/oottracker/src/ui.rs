@@ -185,6 +185,7 @@ impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> 
 }
 
 pub enum TrackerCellKind {
+    BigPoeTriforce,
     BossKey {
         active: Box<dyn Fn(&BossKeys) -> bool>,
         toggle: Box<dyn Fn(&mut BossKeys)>,
@@ -909,7 +910,7 @@ cells! {
         active: Box::new(|state| state.ram.save.equipment.contains(Equipment::ZORA_TUNIC)),
         toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
     },
-    Triforce: Count { //TODO if triforce hunt is off and autotracker is on, replace with something else (big poes?)
+    Triforce: Count {
         dimmed_img: "triforce",
         img: "force",
         get: Box::new(|state| state.ram.save.triforce_pieces()),
@@ -917,6 +918,7 @@ cells! {
         max: 100,
         step: 1,
     },
+    BigPoeTriforce: BigPoeTriforce,
     TriforceOneAndFives: Sequence {
         idx: Box::new(|state| match state.ram.save.triforce_pieces() {
             0 => 0,
@@ -1247,6 +1249,18 @@ pub struct TrackerLayout {
     pub warp_songs: ElementOrder,
 }
 
+impl TrackerLayout {
+    /// The default layout for auto-tracking, which replaces the Triforce piece count cell with a dynamic big Poe count/Triforce piece count cell.
+    pub fn default_auto() -> TrackerLayout { TrackerLayout::new_auto(&Config::default()) }
+
+    /// The auto-tracking layout for this config, which replaces the Triforce piece count cell with a dynamic big Poe count/Triforce piece count cell.
+    pub fn new_auto(config: &Config) -> TrackerLayout {
+        let mut layout = TrackerLayout::from(config);
+        layout.rest[2][5] = TrackerCellId::BigPoeTriforce;
+        layout
+    }
+}
+
 impl Default for TrackerLayout {
     fn default() -> TrackerLayout { TrackerLayout::from(&Config::default()) }
 }
@@ -1306,6 +1320,9 @@ impl FromEmbeddedImage for DynamicImage {
 pub mod images {
     use super::FromEmbeddedImage;
 
+    oottracker_derive::embed_images!("assets/img/extra-images");
+    oottracker_derive::embed_images!("assets/img/extra-images-count");
+    oottracker_derive::embed_images!("assets/img/extra-images-dimmed");
     oottracker_derive::embed_images!("assets/img/xopar-images");
     oottracker_derive::embed_images!("assets/img/xopar-images-count");
     oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");

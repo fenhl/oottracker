@@ -96,6 +96,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
                 Some(DungeonRewardLocation::LinksPocket) => 9,
             }),
+            BigPoeTriforce => unimplemented!(),
         }
     }
 }

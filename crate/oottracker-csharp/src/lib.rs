@@ -93,7 +93,7 @@ pub fn version() -> Version {
 }
 
 #[no_mangle] pub extern "C" fn layout_default() -> HandleOwned<TrackerLayout> {
-    HandleOwned::new(TrackerLayout::default())
+    HandleOwned::new(TrackerLayout::default_auto())
 }
 
 /// # Safety
@@ -145,6 +145,13 @@ pub fn version() -> Version {
     let state = &*model;
     let cell = &*cell;
     StringHandle::from_string(match cell.kind() {
+        TrackerCellKind::BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
+            format!("xopar_images_count.force_{}", state.ram.save.triforce_pieces())
+        } else if state.ram.save.big_poes > 0 { //TODO show dimmed Triforce icon if it's known that it's TH
+            format!("extra_images_count.poes_{}", state.ram.save.big_poes)
+        } else {
+            format!("extra_images_dimmed.big_poe")
+        },
         TrackerCellKind::Composite { left_img, right_img, both_img, active, .. } => match active(state) {
             (false, false) => format!("xopar_images_dimmed.{}", both_img),
             (false, true) => format!("xopar_images.{}", right_img),

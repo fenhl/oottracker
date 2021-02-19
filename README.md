@@ -23,4 +23,5 @@ If you run into any problems, you can:
 
 # Credits
 
-Item images by [Xopar](https://github.com/matthewkirby), used with permission.
+* Big Poe image created for this project by Maplestar.
+* Other item images by [Xopar](https://github.com/matthewkirby), used with permission.

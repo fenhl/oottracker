@@ -951,7 +951,9 @@ namespace Net.Fenhl.OotAutoTracker
                     string new_img = cell.Image(this.model).AsString();
                     if (new_img == this.cellImages[i]) continue;
                     this.cellImages[i] = new_img;
-                    this.cells[i].Image = Image.FromStream(typeof(MainForm).Assembly.GetManifestResourceStream($"Net.Fenhl.OotAutoTracker.Resources.{new_img}.png"));
+                    var stream = typeof(MainForm).Assembly.GetManifestResourceStream($"Net.Fenhl.OotAutoTracker.Resources.{new_img}.png");
+                    if (stream == null) throw new Exception($"image stream for cell {i} ({new_img}) is null");
+                    this.cells[i].Image = Image.FromStream(stream);
                 }
             }
         }

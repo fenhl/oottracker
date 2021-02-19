@@ -115,6 +115,13 @@ trait TrackerCellKindExt {
 impl TrackerCellKindExt for TrackerCellKind {
     fn render(&self, state: &ModelState) -> Image {
         match self {
+            BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
+                images::xopar_images_count(&format!("force_{}", state.ram.save.triforce_pieces()), "png")
+            } else if state.ram.save.big_poes > 0 { //TODO show dimmed Triforce icon if it's known that it's TH
+                images::extra_images_count(&format!("poes_{}", state.ram.save.big_poes), "png")
+            } else {
+                images::extra_images_dimmed("big_poe", "png")
+            },
             Composite { left_img, right_img, both_img, active, .. } => match active(state) {
                 (false, false) => images::xopar_images_dimmed(both_img, "png"),
                 (false, true) => images::xopar_images(right_img, "png"),
@@ -234,7 +241,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
                 Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
-                BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
+                BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
             }
         }
         false
@@ -257,7 +264,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Simple { .. } | Stone(_) => {}
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
-                BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
+                BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
             }
         }
         false
@@ -505,7 +512,11 @@ fn default_cell_buttons() -> [button::State; 52] {
 
 impl State {
     fn layout(&self) -> TrackerLayout {
-        TrackerLayout::from(&self.config)
+        if self.connection.as_ref().map_or(true, |connection| connection.can_change_state()) {
+            TrackerLayout::from(&self.config)
+        } else {
+            TrackerLayout::new_auto(&self.config)
+        }
     }
 
     /// Adds a visible notification/alert/log message.
