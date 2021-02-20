@@ -82,7 +82,7 @@ impl ModelState {
             }
             access::Expr::AnonymousEvent(at_check, id) => Check::AnonymousEvent(Box::new(at_check.clone()), *id).checked(self).expect(&format!("unimplemented anonymous event check: {} for {}", id, at_check)),
             access::Expr::Eq(left, right) => self.access_exprs_eq(rando, left, right)?,
-            access::Expr::Event(event) => Check::Event(event.clone()).checked(self).expect(&format!("unimplemented event check: {}", event)),
+            access::Expr::Event(event) | access::Expr::LitStr(event) => Check::Event(event.clone()).checked(self).expect(&format!("unimplemented event check: {}", event)),
             access::Expr::HasStones(count) => self.access_expr_le_val(count, self.ram.save.quest_items.num_stones())?,
             access::Expr::Item(item, count) => self.access_expr_le_val(count, self.ram.save.amount_of_item(item))?,
             access::Expr::LogicHelper(helper_name, args) => {

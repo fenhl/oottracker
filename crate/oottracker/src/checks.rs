@@ -17,7 +17,10 @@ use {
     ootr::{
         Rando,
         access,
-        region::Region,
+        region::{
+            Mq,
+            Region,
+        },
     },
     crate::{
         Check,
@@ -53,6 +56,22 @@ impl CheckExt for Check {
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::BLOW_UP_DC_ENTRANCE
                         | crate::scene::DeathMountainSwitches::PLANT_BEAN
+                    )
+                ),
+                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 0) if from == "Deku Tree Lobby" && to == "Deku Tree Basement Backroom" => Some(
+                    model.ram.scene_flags().deku_tree.switches.contains(
+                        crate::scene::DekuTreeSwitches::BASEMENT_BURN_FIRST_WEB_TO_BACK_ROOM
+                        | crate::scene::DekuTreeSwitches::LIGHT_TORCHES_AFTER_WATER_ROOM
+                    )
+                ),
+                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 2) if from == "Deku Tree Lobby" && to == "Deku Tree Basement Backroom" => Some(
+                    model.ram.scene_flags().deku_tree.switches.contains(
+                        crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
+                    )
+                ),
+                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 1) if from == "Deku Tree Lobby" && to == "Deku Tree Boss Room" => Some(
+                    model.ram.scene_flags().deku_tree.switches.contains(
+                        crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
                 ),
                 (_, _) => None, //TODO make a list of all anonymous events

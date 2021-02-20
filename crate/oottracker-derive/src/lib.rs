@@ -593,6 +593,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
     let mut entrance_prereqs = Vec::default();
     let mut event_checks = Vec::default();
     let mut location_checks = Vec::default();
+    let mut location_prereqs = Vec::default();
     for scene in &scenes {
         let scene_field = scene.name.to_field();
         for (kind, fields) in scene.fields() {
@@ -610,6 +611,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                     FlagName::Entrance(_, _) => unreachable!("entrance checks aren't saved in RAM"), //TODO replace with compile error
                     FlagName::Prereq(id, at_check) => match &**at_check {
                         FlagName::Entrance(from, to) => entrance_prereqs.push(quote!((#id, (#from, #to)) => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident)))),
+                        FlagName::Lit(name_lit) => location_prereqs.push(quote!((#id, #name_lit) => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident)))),
                         _ => unimplemented!("prereqs for non-entrance checks"),
                     },
                 }
@@ -782,6 +784,10 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                     ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
                         ootr::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
                             #(#entrance_prereqs,)*
+                            _ => None,
+                        },
+                        ootr::check::Check::Location(loc) => match (id, &**loc) {
+                            #(#location_prereqs,)*
                             _ => None,
                         },
                         _ => None,

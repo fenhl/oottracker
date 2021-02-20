@@ -7,8 +7,7 @@ function ThrowOnNativeFailure {
 
 $env:PYO3_PYTHON = "python"
 
-#cargo test --package=oottracker
-cargo check --package=oottracker #TODO replace with above
+cargo test --package=oottracker
 ThrowOnNativeFailure
 
 cargo check --package=oottracker-web --package=oottracker-csharp

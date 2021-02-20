@@ -32,6 +32,15 @@ scene_flags! {
         0x00: "Deku Tree" {
             region_name: |_| "Deku Tree Lobby", //TODO return region name based on room number and/or coords, missing regions: Deku Tree Slingshot Room, Deku Tree Basement Backroom, Deku Tree Boss Room
             //TODO region_name_mq
+            switches: {
+                1 for "Deku Tree GS Basement Backroom" = 0x0004_0000,
+                BASEMENT_PUSHED_BLOCK /*vanilla*/ = 0x0001_0000,
+                BASEMENT_BURN_FIRST_WEB_TO_BACK_ROOM /*vanilla*/ = 0x0000_0200,
+                0 for "Deku Tree GS Basement Backroom" = 0x0000_0100,
+                0 for "Deku Tree Lobby" /*vanilla*/ -> "Deku Tree Boss Room" = 0x0000_0040,
+                1 for "Deku Tree Lobby" /*vanilla*/ -> "Deku Tree Basement Backroom" = 0x0000_0010,
+                LIGHT_TORCHES_AFTER_WATER_ROOM /*vanilla*/ = 0x0000_0008,
+            },
             room_clear: {
                 0 for "Deku Tree Lobby" /*vanilla*/ -> "Deku Tree Slingshot Room" = 0x0000_0002,
             },
