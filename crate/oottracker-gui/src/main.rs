@@ -866,8 +866,9 @@ async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn 
         ConnectionParams::RetroArch { port, .. } => Arc::new(net::RetroArchConnection { port }),
         ConnectionParams::Web { url, passcode, .. } => {
             let url = url.parse::<Url>()?;
-            match url.host() {
-                Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => {
+
+            macro_rules! firebase_host {
+                ($ty:ident) => {{
                     let mut path_segments = url.path_segments().into_iter().flatten().fuse();
                     let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
                         (None, _, _) => return Err(ConnectionError::MissingRoomName),
@@ -875,20 +876,15 @@ async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn 
                         (Some(_), Some(room_name), None) => room_name.to_owned(),
                         (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
                     };
-                    let session = firebase::Session::new(firebase::RestreamTracker).await?;
+                    let session = firebase::Session::new(firebase::$ty).await?;
                     Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode })) as Arc<dyn Connection>
-                }
-                Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => {
-                    let mut path_segments = url.path_segments().into_iter().flatten().fuse();
-                    let name = match (path_segments.next(), path_segments.next(), path_segments.next()) {
-                        (None, _, _) => return Err(ConnectionError::MissingRoomName),
-                        (Some(room_name), None, _) |
-                        (Some(_), Some(room_name), None) => room_name.to_owned(),
-                        (Some(_), Some(_), Some(_)) => return Err(ConnectionError::ExtraPathSegments),
-                    };
-                    let session = firebase::Session::new(firebase::RslItemTracker).await?;
-                    Arc::new(net::FirebaseConnection::new(firebase::Room { session, name, passcode }))
-                }
+                }};
+            }
+
+            match url.host() {
+                Some(url::Host::Domain("oot-tracker.web.app")) | Some(url::Host::Domain("oot-tracker.firebaseapp.com")) => firebase_host!(OldRestreamTracker),
+                Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => firebase_host!(RestreamTracker),
+                Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => firebase_host!(RslItemTracker),
                 //TODO support for rsl-settings-tracker.web.app
                 //TODO support for oottracker.fenhl.net
                 host => return Err(ConnectionError::UnsupportedHost(host.map(|host| host.to_owned()))),

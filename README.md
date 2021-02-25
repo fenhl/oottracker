@@ -4,7 +4,7 @@ This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* I
 
 * Runs on Windows and macOS, also available as [a web app](https://oottracker.fenhl.net/)
 * Support for auto-tracking with [BizHawk](http://tasvideos.org/BizHawk.html) or [RetroArch](https://retroarch.com/)
-* Can connect to the networked trackers <https://oot-tracker.web.app/> and <https://ootr-random-settings-tracker.web.app/>
+* Can connect to the networked trackers <https://oot-tracker.web.app/>, <https://ootr-tracker.web.app/>, and <https://ootr-random-settings-tracker.web.app/>
 
 # Download
 

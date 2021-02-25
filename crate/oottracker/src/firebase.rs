@@ -5,6 +5,10 @@ use {
             BTreeMap,
             hash_map::DefaultHasher,
         },
+        convert::{
+            TryFrom as _,
+            TryInto as _,
+        },
         fmt,
         hash::{
             Hash,
@@ -13,6 +17,7 @@ use {
         iter,
         sync::Arc,
     },
+    collect_mac::collect,
     serde::{
         Deserialize,
         de::DeserializeOwned,
@@ -49,6 +54,7 @@ include!("../../../assets/firebase-api-keys.rs");
 
 trait TrackerCellKindExt {
     fn render(&self, state: &ModelState) -> Json;
+    fn set(&self, state: &mut ModelState, value: Json) -> Result<(), Json>;
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
@@ -98,6 +104,100 @@ impl TrackerCellKindExt for TrackerCellKind {
             }),
             BigPoeTriforce => unimplemented!(),
         }
+    }
+
+    fn set(&self, state: &mut ModelState, value: Json) -> Result<(), Json> {
+        match self {
+            BossKey { active, toggle } => if active(&state.ram.save.boss_keys) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle(&mut state.ram.save.boss_keys)
+            },
+            Composite { active, toggle_left, toggle_right, .. } => {
+                let (active_left, active_right) = active(state);
+                let (value_left, value_right) = match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => (false, false),
+                    1 => (true, false),
+                    2 => (false, true),
+                    3 => (true, true),
+                    _ => return Err(value),
+                };
+                if active_left != value_left { toggle_left(state) }
+                if active_right != value_right { toggle_right(state) }
+            }
+            Count { set, step, .. } => set(state, u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value)? * step),
+            FortressMq => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
+            } else {
+                state.knowledge.string_settings.remove("gerudo_fortress");
+            },
+            Medallion(med) => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.ram.save.quest_items.insert(med.into());
+            } else {
+                state.ram.save.quest_items.remove(med.into());
+            },
+            MedallionLocation(med) => {
+                match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Medallion(*med)),
+                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
+                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
+                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
+                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
+                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
+                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
+                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
+                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
+                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::LinksPocket),
+                    _ => return Err(value),
+                };
+            }
+            Mq(dungeon) => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.knowledge.mq.insert(*dungeon, Mq::Mq);
+            } else {
+                state.knowledge.mq.remove(dungeon);
+            },
+            OptionalOverlay { active, toggle_main, .. } | Overlay { active, toggle_main, .. } => if active(state).0 != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle_main(state);
+            },
+            Sequence { idx, increment, decrement, .. } => {
+                let mut old_idx = idx(state);
+                let new_idx = value.as_u64().ok_or_else(|| value.clone())?.try_into().map_err(|_| value.clone())?;
+                while old_idx < new_idx { increment(state); old_idx += 1 }
+                while old_idx > new_idx { decrement(state); old_idx -= 1 }
+            }
+            Simple { active, toggle, .. } => if active(state) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle(state);
+            },
+            SmallKeys { set, .. } => set(&mut state.ram.save.small_keys, value.as_u64().ok_or_else(|| value.clone())?.try_into().map_err(|_| value.clone())?),
+            Song { song, .. } => if value.as_bool().ok_or(value)? {
+                state.ram.save.quest_items.insert(*song);
+            } else {
+                state.ram.save.quest_items.remove(*song);
+            },
+            SongCheck { check, toggle_overlay } => if Check::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle_overlay(&mut state.ram.save.event_chk_inf);
+            },
+            Stone(stone) => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.ram.save.quest_items.insert(stone.into());
+            } else {
+                state.ram.save.quest_items.remove(stone.into());
+            },
+            StoneLocation(stone) => {
+                match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Stone(*stone)),
+                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
+                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
+                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
+                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
+                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
+                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
+                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
+                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
+                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::LinksPocket),
+                    _ => return Err(value),
+                };
+            }
+            BigPoeTriforce => unimplemented!(),
+        }
+        Ok(())
     }
 }
 
@@ -152,6 +252,69 @@ impl App for Box<dyn App> {
     fn base_url(&self) -> &'static str { (**self).base_url() }
     fn api_key(&self) -> &'static str { (**self).api_key() }
     fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> { (**self).serialize_state(state) }
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct OldRestreamTracker;
+
+impl App for OldRestreamTracker {
+    fn base_url(&self) -> &'static str { "https://oot-tracker.firebaseio.com" }
+    fn api_key(&self) -> &'static str { OLD_RESTREAM_API_KEY }
+
+    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
+        //TODO other collections (presumably medallions and chestsopened)
+        cells!(state, {
+            "Bow": Quiver,
+            "Hookshot": Hookshot,
+            "Hammer": Hammer,
+            "Bombs": BombBag,
+            "Scale": Scale,
+            "Glove": Strength,
+            "KokiriSword": KokiriSword,
+            "BiggoronSword": BiggoronSword,
+            "MirrorShield": MirrorShield,
+            "ZoraTunic": ZoraTunic,
+            "GoronTunic": GoronTunic,
+            "IronBoots": IronBoots,
+            "HoverBoots": HoverBoots,
+            "Dins": DinsFire,
+            "Farores": FaroresWind,
+            "Nayrus": NayrusLove,
+            "Magic": MagicCapacity,
+            "Fire": FireArrows,
+            "Ice": IceArrows,
+            "Light": LightArrows,
+            "Slingshot": BulletBag,
+            "Boomerang": Boomerang,
+            "Lens": Lens,
+            "Bottle": NumBottles,
+            "ZoraLetter": RutosLetter,
+            "Wallet": WalletNoTycoon,
+            "Skulltula": SkulltulaTens,
+            "ZeldasLullaby": ZeldasLullaby,
+            "EponasSong": EponasSong,
+            "SunsSong": SunsSong,
+            "SariasSong": SariasSong,
+            "SongofTime": SongOfTime,
+            "SongofStorms": SongOfStorms,
+            "MinuetofForest": Minuet,
+            "BoleroofTire": Bolero,
+            "SerenadeofWater": Serenade,
+            "NocturneofShadow": Nocturne,
+            "RequiemofSpirit": Requiem,
+            "PreludeofLight": Prelude,
+            "ForestMedallion": ForestMedallion,
+            "FireMedallion": FireMedallion,
+            "WaterMedallion": WaterMedallion,
+            "ShadowMedallion": ShadowMedallion,
+            "SpiritMedallion": SpiritMedallion,
+            "LightMedallion": LightMedallion,
+            "KokiriEmerald": KokiriEmerald,
+            "GoronRuby": GoronRuby,
+            "ZoraSapphire": ZoraSapphire,
+            "StoneofAgony": StoneOfAgony,
+        })
+    }
 }
 
 #[derive(Default, Clone, Copy)]
