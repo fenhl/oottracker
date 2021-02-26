@@ -23,3 +23,8 @@ path = "../ootr"
 [dependencies.serde]
 version = "1"
 features = ["derive"]
+
+[dependencies.wheel]
+git = "https://github.com/fenhl/wheel"
+branch = "main"
+default-features = false

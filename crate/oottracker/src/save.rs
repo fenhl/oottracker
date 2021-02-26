@@ -32,6 +32,7 @@ use {
         AsyncWrite,
         AsyncWriteExt as _,
     },
+    wheel::FromArc,
     ootr::{
         item::Item,
         model::{
@@ -1145,17 +1146,12 @@ impl Save {
     }
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, From, FromArc, Clone)]
 pub enum ReadError {
     #[from]
     Decode(DecodeError),
+    #[from_arc]
     Io(Arc<io::Error>),
-}
-
-impl From<io::Error> for ReadError {
-    fn from(e: io::Error) -> ReadError {
-        ReadError::Io(Arc::new(e))
-    }
 }
 
 impl fmt::Display for ReadError {

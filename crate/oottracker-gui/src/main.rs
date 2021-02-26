@@ -54,6 +54,7 @@ use {
     smart_default::SmartDefault,
     structopt::StructOpt,
     url::Url,
+    wheel::FromArc,
     ootr::{
         check::Check,
         model::{
@@ -634,6 +635,11 @@ impl Application for State {
                         self.model.update_knowledge();
                     }
                     Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
+                    Packet::UpdateCell(cell_id, value) => if let Some(ref connection) = self.connection {
+                        if let Some(app) = connection.firebase_app() {
+                            app.set_cell(&mut self.model, cell_id, value).expect("failed to apply state change from Firebase"); //TODO show error message instead of panicking?
+                        }
+                    },
                 }
                 if self.flags {
                     let model = self.model.clone();
@@ -825,22 +831,17 @@ impl Application for State {
     }
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, From, FromArc, Clone)]
 enum ConnectionError {
     ExtraPathSegments,
     MissingRoomName,
     #[from]
     Net(net::Error),
+    #[from_arc]
     Reqwest(Arc<reqwest::Error>),
     UnsupportedHost(Option<url::Host<String>>),
     #[from]
     UrlParse(url::ParseError),
-}
-
-impl From<reqwest::Error> for ConnectionError {
-    fn from(e: reqwest::Error) -> ConnectionError {
-        ConnectionError::Reqwest(Arc::new(e))
-    }
 }
 
 impl fmt::Display for ConnectionError {

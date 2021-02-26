@@ -9,16 +9,19 @@ use {
     async_stream::try_stream,
     futures::prelude::*,
     pin_utils::pin_mut,
+    serde_json::Value as Json,
     tokio::net::TcpStream,
+    wheel::FromArc,
     crate::{
         knowledge,
         ram::Ram,
         save,
+        ui::TrackerCellId,
     },
 };
 
 pub const TCP_PORT: u16 = 24801;
-pub const VERSION: u8 = 2;
+pub const VERSION: u8 = 3;
 
 #[derive(Debug, Clone, Protocol)]
 pub enum Packet {
@@ -27,28 +30,19 @@ pub enum Packet {
     SaveInit(save::Save),
     KnowledgeInit(knowledge::Knowledge),
     RamInit(Ram),
+    UpdateCell(TrackerCellId, Json),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum ReadError {
+    #[from_arc]
     Io(Arc<io::Error>),
+    #[from_arc]
     Packet(Arc<PacketReadError>),
     VersionMismatch {
         server: u8,
         client: u8,
     },
-}
-
-impl From<io::Error> for ReadError {
-    fn from(e: io::Error) -> ReadError {
-        ReadError::Io(Arc::new(e))
-    }
-}
-
-impl From<PacketReadError> for ReadError {
-    fn from(e: PacketReadError) -> ReadError {
-        ReadError::Packet(Arc::new(e))
-    }
 }
 
 impl fmt::Display for ReadError {

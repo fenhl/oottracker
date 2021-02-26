@@ -30,6 +30,7 @@ use {
     pyo3::prelude::*,
     semver::Version,
     serde::de::DeserializeOwned,
+    wheel::FromArc,
     ootr::{
         check::Check,
         item::Item,
@@ -89,27 +90,17 @@ impl<'p> fmt::Debug for Rando<'p> {
     }
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, From, FromArc, Clone)]
 pub enum RandoErr {
     #[from]
     AccessExprParse(access::ParseError),
+    #[from_arc]
     Io(Arc<io::Error>),
     InvalidLogicHelper,
     ItemNotFound,
+    #[from_arc]
     Py(Arc<PyErr>),
     RegionFilename,
-}
-
-impl From<io::Error> for RandoErr {
-    fn from(e: io::Error) -> RandoErr {
-        RandoErr::Io(Arc::new(e))
-    }
-}
-
-impl From<PyErr> for RandoErr {
-    fn from(e: PyErr) -> RandoErr {
-        RandoErr::Py(Arc::new(e))
-    }
 }
 
 impl fmt::Display for RandoErr {

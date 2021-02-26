@@ -38,6 +38,7 @@ use {
         time::sleep,
     },
     tokio_stream::wrappers::TcpListenerStream,
+    wheel::FromArc,
     crate::{
         ModelState,
         firebase,
@@ -53,19 +54,14 @@ use {
     },
 };
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, From, FromArc, Clone)]
 pub enum Error {
     CannotChangeState,
     Firebase(firebase::Error),
+    #[from_arc]
     Io(Arc<io::Error>),
     Protocol(proto::ReadError),
     RamDecode(ram::DecodeError),
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::Io(Arc::new(e))
-    }
 }
 
 impl fmt::Display for Error {
@@ -86,6 +82,8 @@ pub trait Connection: fmt::Debug + Send + Sync {
     fn display_kind(&self) -> &'static str;
     fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>>;
     fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
+
+    fn firebase_app(&self) -> Option<&dyn firebase::App> { None }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -111,11 +109,17 @@ impl Connection for NullConnection {
 }
 
 #[derive(Debug)]
-pub struct FirebaseConnection(firebase::DynRoom);
+pub struct FirebaseConnection {
+    app: Box<dyn firebase::App>,
+    room: firebase::DynRoom,
+}
 
 impl FirebaseConnection {
-    pub fn new<A: firebase::App + Clone + Send>(room: firebase::Room<A>) -> FirebaseConnection {
-        FirebaseConnection(room.to_dyn())
+    pub fn new<A: firebase::App + Default + Clone + Send>(room: firebase::Room<A>) -> FirebaseConnection {
+        FirebaseConnection {
+            app: Box::new(A::default()),
+            room: room.to_dyn(),
+        }
     }
 }
 
@@ -123,7 +127,7 @@ impl Connection for FirebaseConnection {
     fn hash(&self) -> u64 {
         let mut state = DefaultHasher::default();
         TypeId::of::<Self>().hash(&mut state);
-        self.0.hash(&mut state);
+        self.room.hash(&mut state);
         state.finish()
     }
 
@@ -131,15 +135,23 @@ impl Connection for FirebaseConnection {
     fn display_kind(&self) -> &'static str { "Firebase" }
 
     fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>> {
-        Box::pin(stream::pending()) //TODO websocket connection to listen for changes on Firebase?
+        Box::pin(
+            self.room.subscribe()
+                .map_ok(|(cell, new_value)| Packet::UpdateCell(cell, new_value))
+                .err_into()
+        )
     }
 
     fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
-        let room = self.0.clone();
+        let room = self.room.clone();
         let model = model.clone();
         Box::pin(async move {
             Ok(room.set_state(&model).await?)
         })
+    }
+
+    fn firebase_app(&self) -> Option<&dyn firebase::App> {
+        Some(&self.app)
     }
 }
 

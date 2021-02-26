@@ -17,7 +17,13 @@ use {
         iter,
         sync::Arc,
     },
+    async_stream::try_stream,
     collect_mac::collect,
+    futures::stream::{
+        Stream,
+        TryStreamExt as _,
+    },
+    pin_utils::pin_mut,
     serde::{
         Deserialize,
         de::DeserializeOwned,
@@ -28,6 +34,7 @@ use {
         Value as Json,
     },
     tokio::sync::Mutex,
+    wheel::FromArc,
     ootr::{
         check::Check,
         model::{
@@ -202,302 +209,323 @@ impl TrackerCellKindExt for TrackerCellKind {
 }
 
 macro_rules! cells {
-    ($state:expr, {$($cell_name:literal: $id:ident),*$(,)?}) => {{
-        let mut map = BTreeMap::default();
-        $(
-            map.insert($cell_name, serde_json::to_value(TrackerCellId::$id.kind().render($state))?);
-        )*
-        Ok(map)
-    }};
+    ($($cell_name:literal: $id:ident),*$(,)?) => {
+        fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId> {
+            match cell_id {
+                $(
+                    $cell_name => Some(TrackerCellId::$id),
+                )*
+                _ => None,
+            }
+        }
+
+        fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
+            let mut map = BTreeMap::default();
+            $(
+                map.insert($cell_name, serde_json::to_value(TrackerCellId::$id.kind().render(state))?);
+            )*
+            Ok(map)
+        }
+    };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum Error {
+    Cancelled,
+    CellId,
+    EventSource(String),
+    #[from_arc]
     Json(Arc<serde_json::Error>),
+    MissingData,
+    PathPrefix,
+    #[from_arc]
     Reqwest(Arc<reqwest::Error>),
+    UnexpectedEndOfStream,
+    UnknownEvent(String),
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Json(Arc::new(e))
-    }
-}
-
-impl From<reqwest::Error> for Error {
-    fn from(e: reqwest::Error) -> Error {
-        Error::Reqwest(Arc::new(e))
+impl From<eventsource_client::Error> for Error {
+    fn from(e: eventsource_client::Error) -> Error {
+        Error::EventSource(format!("{:?}", e))
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::Cancelled => write!(f, "event source was cancelled"),
+            Error::CellId => write!(f, "received data for unknown cell"),
+            Error::EventSource(debug) => write!(f, "error in event source: {}", debug),
             Error::Json(e) => write!(f, "JSON error: {}", e),
+            Error::MissingData => write!(f, "event source did not send any data"),
+            Error::PathPrefix => write!(f, "event source sent an incorrect path"),
             Error::Reqwest(e) => if let Some(url) = e.url() {
                 write!(f, "HTTP error at {}: {}", url, e)
             } else {
                 write!(f, "HTTP error: {}", e)
             },
+            Error::UnexpectedEndOfStream => write!(f, "unexpected end of event stream"),
+            Error::UnknownEvent(event) => write!(f, "event source sent unknown event: {:?}", event),
         }
     }
 }
 
-pub trait App: Send + Sync + 'static {
+pub trait App: fmt::Debug + Send + Sync + 'static {
     fn base_url(&self) -> &'static str;
     fn api_key(&self) -> &'static str;
+    fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId>;
     fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>>;
+
+    fn set_cell(&self, state: &mut ModelState, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
+        cell_id.kind().set(state, value)
+    }
 }
 
 impl App for Box<dyn App> {
     fn base_url(&self) -> &'static str { (**self).base_url() }
     fn api_key(&self) -> &'static str { (**self).api_key() }
+    fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId> { (**self).cell_id(cell_id) }
     fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> { (**self).serialize_state(state) }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct OldRestreamTracker;
 
 impl App for OldRestreamTracker {
     fn base_url(&self) -> &'static str { "https://oot-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { OLD_RESTREAM_API_KEY }
 
-    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
-        //TODO other collections (presumably medallions and chestsopened)
-        cells!(state, {
-            "Bow": Quiver,
-            "Hookshot": Hookshot,
-            "Hammer": Hammer,
-            "Bombs": BombBag,
-            "Scale": Scale,
-            "Glove": Strength,
-            "KokiriSword": KokiriSword,
-            "BiggoronSword": BiggoronSword,
-            "MirrorShield": MirrorShield,
-            "ZoraTunic": ZoraTunic,
-            "GoronTunic": GoronTunic,
-            "IronBoots": IronBoots,
-            "HoverBoots": HoverBoots,
-            "Dins": DinsFire,
-            "Farores": FaroresWind,
-            "Nayrus": NayrusLove,
-            "Magic": MagicCapacity,
-            "Fire": FireArrows,
-            "Ice": IceArrows,
-            "Light": LightArrows,
-            "Slingshot": BulletBag,
-            "Boomerang": Boomerang,
-            "Lens": Lens,
-            "Bottle": NumBottles,
-            "ZoraLetter": RutosLetter,
-            "Wallet": WalletNoTycoon,
-            "Skulltula": SkulltulaTens,
-            "ZeldasLullaby": ZeldasLullaby,
-            "EponasSong": EponasSong,
-            "SunsSong": SunsSong,
-            "SariasSong": SariasSong,
-            "SongofTime": SongOfTime,
-            "SongofStorms": SongOfStorms,
-            "MinuetofForest": Minuet,
-            "BoleroofTire": Bolero,
-            "SerenadeofWater": Serenade,
-            "NocturneofShadow": Nocturne,
-            "RequiemofSpirit": Requiem,
-            "PreludeofLight": Prelude,
-            "ForestMedallion": ForestMedallion,
-            "FireMedallion": FireMedallion,
-            "WaterMedallion": WaterMedallion,
-            "ShadowMedallion": ShadowMedallion,
-            "SpiritMedallion": SpiritMedallion,
-            "LightMedallion": LightMedallion,
-            "KokiriEmerald": KokiriEmerald,
-            "GoronRuby": GoronRuby,
-            "ZoraSapphire": ZoraSapphire,
-            "StoneofAgony": StoneOfAgony,
-        })
+    //TODO other collections (presumably medallions and chestsopened)
+    cells! {
+        "Bow": Quiver,
+        "Hookshot": Hookshot,
+        "Hammer": Hammer,
+        "Bombs": BombBag,
+        "Scale": Scale,
+        "Glove": Strength,
+        "KokiriSword": KokiriSword,
+        "BiggoronSword": BiggoronSword,
+        "MirrorShield": MirrorShield,
+        "ZoraTunic": ZoraTunic,
+        "GoronTunic": GoronTunic,
+        "IronBoots": IronBoots,
+        "HoverBoots": HoverBoots,
+        "Dins": DinsFire,
+        "Farores": FaroresWind,
+        "Nayrus": NayrusLove,
+        "Magic": MagicCapacity,
+        "Fire": FireArrows,
+        "Ice": IceArrows,
+        "Light": LightArrows,
+        "Slingshot": BulletBag,
+        "Boomerang": Boomerang,
+        "Lens": Lens,
+        "Bottle": NumBottles,
+        "ZoraLetter": RutosLetter,
+        "Wallet": WalletNoTycoon,
+        "Skulltula": SkulltulaTens,
+        "ZeldasLullaby": ZeldasLullaby,
+        "EponasSong": EponasSong,
+        "SunsSong": SunsSong,
+        "SariasSong": SariasSong,
+        "SongofTime": SongOfTime,
+        "SongofStorms": SongOfStorms,
+        "MinuetofForest": Minuet,
+        "BoleroofTire": Bolero,
+        "SerenadeofWater": Serenade,
+        "NocturneofShadow": Nocturne,
+        "RequiemofSpirit": Requiem,
+        "PreludeofLight": Prelude,
+        "ForestMedallion": ForestMedallion,
+        "FireMedallion": FireMedallion,
+        "WaterMedallion": WaterMedallion,
+        "ShadowMedallion": ShadowMedallion,
+        "SpiritMedallion": SpiritMedallion,
+        "LightMedallion": LightMedallion,
+        "KokiriEmerald": KokiriEmerald,
+        "GoronRuby": GoronRuby,
+        "ZoraSapphire": ZoraSapphire,
+        "StoneofAgony": StoneOfAgony,
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct RestreamTracker;
 
 impl App for RestreamTracker {
     fn base_url(&self) -> &'static str { "https://ootr-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RESTREAM_API_KEY }
 
-    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
-        //TODO medallions, chestsopened
-        cells!(state, {
-            "KokiriSword": KokiriSword,
-            "Slingshot": BulletBag,
-            "GoMode": GoMode,
-            "BiggoronSword": BiggoronSword,
-            "Bombchu": Bombchus,
-            "Mask": ChildTradeSoldOut,
-            "Bombs": BombBag,
-            "Bow": Quiver,
-            "ForestMedallion": ForestMedallion,
-            "Skulltula": SkulltulaTens,
-            "Wallet": WalletNoTycoon,
-            "Trade": AdultTrade, //TODO add Pocket Cucco
-            "Boomerang": Boomerang,
-            "Hammer": Hammer,
-            "FireMedallion": FireMedallion,
-            "ZoraTunic": ZoraTunic,
-            "GoronTunic": GoronTunic,
-            "Triforce": TriforceOneAndFives,
-            "Hookshot": Hookshot,
-            "Spells": Spells,
-            "WaterMedallion": WaterMedallion,
-            "Nayrus": NayrusLove,
-            "Magic": MagicCapacity,
-            "Lens": Lens,
-            "ZoraLetter": RutosLetter,
-            "Arrows": Arrows,
-            "SpiritMedallion": SpiritMedallion,
-            "Ice": IceArrows,
-            "Bottle": NumBottles,
-            "StoneofAgony": StoneOfAgony,
-            "MirrorShield": MirrorShield,
-            "Glove": Strength,
-            "ShadowMedallion": ShadowMedallion,
-            "Boots": Boots,
-            "Scale": Scale,
-            "LightMedallion": LightMedallion,
-            "ZeldasLullaby": ZeldasLullaby,
-            "EponasSong": EponasSong,
-            "SariasSong": SariasSong,
-            "KokiriEmerald": KokiriEmerald,
-            "GoronRuby": GoronRuby,
-            "ZoraSapphire": ZoraSapphire,
-            "SunsSong": SunsSong,
-            "SongofTime": SongOfTime,
-            "SongofStorms": SongOfStorms,
-            "MinuetofForest": Minuet,
-            "BoleroofFire": Bolero,
-            "SerenadeofWater": Serenade,
-            "RequiemofSpirit": Requiem,
-            "NocturneofShadow": Nocturne,
-            "PreludeofLight": Prelude,
-            "Fire": FireArrows,
-            "Light": LightArrows,
-            "Dins": DinsFire,
-            "Farores": FaroresWind,
-            "IronBoots": IronBoots,
-            "HoverBoots": HoverBoots,
-        })
+    //TODO medallions, chestsopened
+    cells! {
+        "KokiriSword": KokiriSword,
+        "Slingshot": BulletBag,
+        "GoMode": GoMode,
+        "BiggoronSword": BiggoronSword,
+        "Bombchu": Bombchus,
+        "Mask": ChildTradeSoldOut,
+        "Bombs": BombBag,
+        "Bow": Quiver,
+        "ForestMedallion": ForestMedallion,
+        "Skulltula": SkulltulaTens,
+        "Wallet": WalletNoTycoon,
+        "Trade": AdultTrade, //TODO add Pocket Cucco
+        "Boomerang": Boomerang,
+        "Hammer": Hammer,
+        "FireMedallion": FireMedallion,
+        "ZoraTunic": ZoraTunic,
+        "GoronTunic": GoronTunic,
+        "Triforce": TriforceOneAndFives,
+        "Hookshot": Hookshot,
+        "Spells": Spells,
+        "WaterMedallion": WaterMedallion,
+        "Nayrus": NayrusLove,
+        "Magic": MagicCapacity,
+        "Lens": Lens,
+        "ZoraLetter": RutosLetter,
+        "Arrows": Arrows,
+        "SpiritMedallion": SpiritMedallion,
+        "Ice": IceArrows,
+        "Bottle": NumBottles,
+        "StoneofAgony": StoneOfAgony,
+        "MirrorShield": MirrorShield,
+        "Glove": Strength,
+        "ShadowMedallion": ShadowMedallion,
+        "Boots": Boots,
+        "Scale": Scale,
+        "LightMedallion": LightMedallion,
+        "ZeldasLullaby": ZeldasLullaby,
+        "EponasSong": EponasSong,
+        "SariasSong": SariasSong,
+        "KokiriEmerald": KokiriEmerald,
+        "GoronRuby": GoronRuby,
+        "ZoraSapphire": ZoraSapphire,
+        "SunsSong": SunsSong,
+        "SongofTime": SongOfTime,
+        "SongofStorms": SongOfStorms,
+        "MinuetofForest": Minuet,
+        "BoleroofFire": Bolero,
+        "SerenadeofWater": Serenade,
+        "RequiemofSpirit": Requiem,
+        "NocturneofShadow": Nocturne,
+        "PreludeofLight": Prelude,
+        "Fire": FireArrows,
+        "Light": LightArrows,
+        "Dins": DinsFire,
+        "Farores": FaroresWind,
+        "IronBoots": IronBoots,
+        "HoverBoots": HoverBoots,
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct RslItemTracker;
 
 impl App for RslItemTracker {
     fn base_url(&self) -> &'static str { "https://ootr-random-settings-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RSL_API_KEY }
 
-    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
-        cells!(state, {
-            "forestmed": ForestMedallion,
-            "forest_med_text": ForestMedallionLocation,
-            "firemed": FireMedallion,
-            "fire_med_text": FireMedallionLocation,
-            "watermed": WaterMedallion,
-            "water_med_text": WaterMedallionLocation,
-            "shadowmed": ShadowMedallion,
-            "shadow_med_text": ShadowMedallionLocation,
-            "spiritmed": SpiritMedallion,
-            "spirit_med_text": SpiritMedallionLocation,
-            "lightmed": LightMedallion,
-            "light_med_text": LightMedallionLocation,
-            "atrade_full": AdultTradeNoChicken,
-            "gst": Skulltula,
-            "kokiri_emerald": KokiriEmerald,
-            "kokiri_emerald_text": KokiriEmeraldLocation,
-            "goron_ruby": GoronRuby,
-            "goron_ruby_text": GoronRubyLocation,
-            "zora_sapphire": ZoraSapphire,
-            "zora_sapphire_text": ZoraSapphireLocation,
-            "bottle_letter_base": Bottle,
-            "bottle_letter_badge": RutosLetter,
-            "scale": Scale,
-            "slingshot": Slingshot,
-            "explosives_base": Bombs,
-            "explosives_badge": Bombchus,
-            "boomerang": Boomerang,
-            "strength": Strength,
-            "magic_lens_base": Magic,
-            "magic_lens_badge": Lens,
-            "spells": Spells,
-            "hooks": Hookshot,
-            "bow": Bow,
-            "magicarrows": Arrows,
-            "hammer": Hammer,
-            "boots": Boots,
-            "mirrorshield": MirrorShield,
-            "ctrade_full": ChildTradeNoChicken,
-            "ocarina": Ocarina,
-            "beans": Beans,
-            "dungeonopeners": SwordCard,
-            "tunics": Tunics,
-            "triforce": Triforce,
-            "zlsong_base": ZeldasLullaby,
-            "zlsong_badge": ZeldasLullabyCheck,
-            "eponasong_base": EponasSong,
-            "eponasong_badge": EponasSongCheck,
-            "sariasong_base": SariasSong,
-            "sariasong_badge": SariasSongCheck,
-            "sunsong_base": SunsSong,
-            "sunsong_badge": SunsSongCheck,
-            "timesong_base": SongOfTime,
-            "timesong_badge": SongOfTimeCheck,
-            "stormssong_base": SongOfStorms,
-            "stormssong_badge": SongOfStormsCheck,
-            "minuetsong_base": Minuet,
-            "minuetsong_badge": MinuetCheck,
-            "bolerosong_base": Bolero,
-            "bolerosong_badge": BoleroCheck,
-            "serenadesong_base": Serenade,
-            "serenadesong_badge": SerenadeCheck,
-            "nocturnesong_base": Nocturne,
-            "nocturnesong_badge": NocturneCheck,
-            "requiemsong_base": Requiem,
-            "requiemsong_badge": RequiemCheck,
-            "preludesong_base": Prelude,
-            "preludesong_badge": PreludeCheck,
-            "dekutype": DekuMq,
-            "dctype": DcMq,
-            "jabutype": JabuMq,
-            "foresttype": ForestMq,
-            "forestsk": ForestSmallKeys,
-            "forestbk": ForestBossKey,
-            "shadowtype": ShadowMq,
-            "shadowsk": ShadowSmallKeys,
-            "shadowbk": ShadowBossKey,
-            "welltype": WellMq,
-            "wellsk": WellSmallKeys,
-            "firetype": FireMq,
-            "firesk": FireSmallKeys,
-            "firebk": FireBossKey,
-            "spirittype": SpiritMq,
-            "spiritsk": SpiritSmallKeys,
-            "spiritbk": SpiritBossKey,
-            "forttype": FortressMq,
-            "fortsk": FortressSmallKeys,
-            "watertype": WaterMq,
-            "watersk": WaterSmallKeys,
-            "waterbk": WaterBossKey,
-            "ganontype": GanonMq,
-            "ganonsk": GanonSmallKeys,
-            "ganonbk": GanonBossKey,
-            "gtgtype": GtgMq,
-            "gtgsk": GtgSmallKeys,
-            // for tsgmain and tsgsquare layouts:
-            "kokirisword": KokiriSword,
-            "gomode": GoMode,
-            "kokiri_emerald_full": KokiriEmerald,
-            "goron_ruby_full": GoronRuby,
-            "zora_sapphire_full": ZoraSapphire,
-        })
+    cells! {
+        "forestmed": ForestMedallion,
+        "forest_med_text": ForestMedallionLocation,
+        "firemed": FireMedallion,
+        "fire_med_text": FireMedallionLocation,
+        "watermed": WaterMedallion,
+        "water_med_text": WaterMedallionLocation,
+        "shadowmed": ShadowMedallion,
+        "shadow_med_text": ShadowMedallionLocation,
+        "spiritmed": SpiritMedallion,
+        "spirit_med_text": SpiritMedallionLocation,
+        "lightmed": LightMedallion,
+        "light_med_text": LightMedallionLocation,
+        "atrade_full": AdultTradeNoChicken,
+        "gst": Skulltula,
+        "kokiri_emerald": KokiriEmerald,
+        "kokiri_emerald_text": KokiriEmeraldLocation,
+        "goron_ruby": GoronRuby,
+        "goron_ruby_text": GoronRubyLocation,
+        "zora_sapphire": ZoraSapphire,
+        "zora_sapphire_text": ZoraSapphireLocation,
+        "bottle_letter_base": Bottle,
+        "bottle_letter_badge": RutosLetter,
+        "scale": Scale,
+        "slingshot": Slingshot,
+        "explosives_base": Bombs,
+        "explosives_badge": Bombchus,
+        "boomerang": Boomerang,
+        "strength": Strength,
+        "magic_lens_base": Magic,
+        "magic_lens_badge": Lens,
+        "spells": Spells,
+        "hooks": Hookshot,
+        "bow": Bow,
+        "magicarrows": Arrows,
+        "hammer": Hammer,
+        "boots": Boots,
+        "mirrorshield": MirrorShield,
+        "ctrade_full": ChildTradeNoChicken,
+        "ocarina": Ocarina,
+        "beans": Beans,
+        "dungeonopeners": SwordCard,
+        "tunics": Tunics,
+        "triforce": Triforce,
+        "zlsong_base": ZeldasLullaby,
+        "zlsong_badge": ZeldasLullabyCheck,
+        "eponasong_base": EponasSong,
+        "eponasong_badge": EponasSongCheck,
+        "sariasong_base": SariasSong,
+        "sariasong_badge": SariasSongCheck,
+        "sunsong_base": SunsSong,
+        "sunsong_badge": SunsSongCheck,
+        "timesong_base": SongOfTime,
+        "timesong_badge": SongOfTimeCheck,
+        "stormssong_base": SongOfStorms,
+        "stormssong_badge": SongOfStormsCheck,
+        "minuetsong_base": Minuet,
+        "minuetsong_badge": MinuetCheck,
+        "bolerosong_base": Bolero,
+        "bolerosong_badge": BoleroCheck,
+        "serenadesong_base": Serenade,
+        "serenadesong_badge": SerenadeCheck,
+        "nocturnesong_base": Nocturne,
+        "nocturnesong_badge": NocturneCheck,
+        "requiemsong_base": Requiem,
+        "requiemsong_badge": RequiemCheck,
+        "preludesong_base": Prelude,
+        "preludesong_badge": PreludeCheck,
+        "dekutype": DekuMq,
+        "dctype": DcMq,
+        "jabutype": JabuMq,
+        "foresttype": ForestMq,
+        "forestsk": ForestSmallKeys,
+        "forestbk": ForestBossKey,
+        "shadowtype": ShadowMq,
+        "shadowsk": ShadowSmallKeys,
+        "shadowbk": ShadowBossKey,
+        "welltype": WellMq,
+        "wellsk": WellSmallKeys,
+        "firetype": FireMq,
+        "firesk": FireSmallKeys,
+        "firebk": FireBossKey,
+        "spirittype": SpiritMq,
+        "spiritsk": SpiritSmallKeys,
+        "spiritbk": SpiritBossKey,
+        "forttype": FortressMq,
+        "fortsk": FortressSmallKeys,
+        "watertype": WaterMq,
+        "watersk": WaterSmallKeys,
+        "waterbk": WaterBossKey,
+        "ganontype": GanonMq,
+        "ganonsk": GanonSmallKeys,
+        "ganonbk": GanonBossKey,
+        "gtgtype": GtgMq,
+        "gtgsk": GtgSmallKeys,
+        // for tsgmain and tsgsquare layouts:
+        "kokirisword": KokiriSword,
+        "gomode": GoMode,
+        "kokiri_emerald_full": KokiriEmerald,
+        "goron_ruby_full": GoronRuby,
+        "zora_sapphire_full": ZoraSapphire,
     }
 }
 
@@ -515,6 +543,20 @@ struct AuthResponse {
     //refresh_token: String,
     //expires_in: String, //TODO decode to Duration?
     local_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PutData {
+    path: String,
+    data: Json,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PatchData {
+    path: String,
+    data: BTreeMap<String, Json>,
 }
 
 #[derive(Clone)]
@@ -630,16 +672,6 @@ pub struct Room<A: App> {
 }
 
 impl<A: App> Room<A> {
-    /*
-    async fn state(&mut self) -> reqwest::Result<ModelState> {
-        self.session.get_reauth(&self.name, &self.passcode, &format!("{}/games/{}/items.json", self.session.app.base_url(), self.name)).await
-    }
-    */
-
-    pub async fn set_state(&mut self, new_state: &ModelState) -> Result<(), Error> {
-        Ok(self.session.put_reauth(&self.name, &self.passcode, &format!("{}/games/{}/items.json", self.session.app.base_url(), self.name), &self.session.app.serialize_state(new_state)?).await?)
-    }
-
     pub fn to_dyn(&self) -> DynRoom
     where A: Clone + Send {
         let mut hasher = DefaultHasher::default();
@@ -662,19 +694,64 @@ pub struct DynRoom {
 }
 
 impl DynRoom {
-    /*
-    async fn state(&self) -> reqwest::Result<ModelState> {
-        let mut session = self.session.lock().await;
-        let url = format!("{}/games/{}/items.json", session.app.base_url(), self.name);
-        session.get_reauth(&self.name, &self.passcode, &url).await
-    }
-    */
-
     pub async fn set_state(&self, new_state: &ModelState) -> Result<(), Error> {
         let mut session = self.session.lock().await;
         let url = format!("{}/games/{}/items.json", session.app.base_url(), self.name);
         let state = session.app.serialize_state(new_state)?;
         Ok(session.put_reauth(&self.name, &self.passcode, &url, &state).await?)
+    }
+
+    pub fn subscribe(&self) -> impl Stream<Item = Result<(TrackerCellId, Json), Error>> {
+        let session = Arc::clone(&self.session);
+        let name = self.name.clone();
+        try_stream! {
+            'reauth_loop: loop {
+                let url = {
+                    let session = session.lock().await;
+                    format!("{}/games/{}/items.json?auth={}", session.app.base_url(), name, session.id_token)
+                };
+                let events = eventsource_client::Client::for_url(&url)?
+                    .header("Accept", "text/event-stream")?
+                    .build()
+                    .stream();
+                pin_mut!(events);
+                while let Some(event) = events.try_next().await? {
+                    match &*event.event_type {
+                        "put" => {
+                            let PutData { path, data } = serde_json::from_slice(event.field("data").ok_or(Error::MissingData)?)?;
+                            let session = session.lock().await;
+                            if path == "/" {
+                                for (item, value) in serde_json::from_value::<BTreeMap<String, Json>>(data)? {
+                                    let cell_id = session.app.cell_id(&item).ok_or(Error::CellId)?;
+                                    yield (cell_id, value);
+                                }
+                            } else {
+                                let item = path.strip_prefix('/').ok_or(Error::PathPrefix)?;
+                                let cell_id = session.app.cell_id(item).ok_or(Error::CellId)?;
+                                yield (cell_id, data);
+                            }
+                        }
+                        "patch" => {
+                            let PatchData { path, data } = serde_json::from_slice(event.field("data").ok_or(Error::MissingData)?)?;
+                            if path != "/" { unimplemented!("patch for path {}", path) }
+                            let session = session.lock().await;
+                            for (item, value) in data {
+                                let cell_id = session.app.cell_id(&item).ok_or(Error::CellId)?;
+                                yield (cell_id, value);
+                            }
+                        }
+                        "keep-alive" => {}
+                        "cancel" => { Err(Error::Cancelled)?; }
+                        "auth_revoked" => {
+                            session.lock().await.base_auth().await?;
+                            continue 'reauth_loop
+                        }
+                        _ => { Err(Error::UnknownEvent(event.event_type))?; }
+                    }
+                }
+                Err(Error::UnexpectedEndOfStream)?;
+            }
+        }
     }
 }
 

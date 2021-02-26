@@ -20,8 +20,8 @@ serde_json = "1"
 smart-default = "0.6"
 
 [dependencies.async-proto]
-version = "0.4"
-features = ["blocking"]
+version = "0.5"
+features = ["blocking", "serde_json"]
 
 [dependencies.derive_more]
 version = "0.99"
@@ -31,6 +31,10 @@ features = ["from"]
 [dependencies.enum-iterator]
 git = "https://github.com/dasgefolge/enum-iterator"
 branch = "fields"
+
+[dependencies.eventsource-client]
+git = "https://github.com/mraerino/rust-eventsource-client"
+branch = "refactor/tokio-hyper"
 
 [dependencies.iced]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
@@ -61,3 +65,8 @@ features = ["fs", "net", "time"]
 [dependencies.tokio-stream]
 version = "0.1"
 features = ["net"]
+
+[dependencies.wheel]
+git = "https://github.com/fenhl/wheel"
+branch = "main"
+default-features = false

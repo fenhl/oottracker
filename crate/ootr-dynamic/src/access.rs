@@ -17,6 +17,7 @@ use {
         },
     },
     regex::Regex,
+    wheel::FromArc,
     ootr::{
         Rando as _,
         access::{
@@ -43,23 +44,18 @@ lazy_static! {
 #[derive(Debug, Default)]
 struct Args<'a>(HashMap<&'a str, (&'a PyAny, &'a Args<'a>)>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum ParseError {
     HelperNumArgs {
         name: String,
         expected: usize,
         found: usize,
     },
+    #[from_arc]
     Io(Arc<io::Error>),
     Py(&'static str, Arc<PyErr>),
     Rando(Box<RandoErr>),
     TupleLength,
-}
-
-impl From<io::Error> for ParseError {
-    fn from(e: io::Error) -> ParseError {
-        ParseError::Io(Arc::new(e))
-    }
 }
 
 impl From<PyErr> for ParseError {

@@ -10,6 +10,7 @@ use {
         sync::Arc,
         vec,
     },
+    async_proto::Protocol,
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
     image::DynamicImage,
@@ -28,6 +29,7 @@ use {
             AsyncWriteExt as _,
         },
     },
+    wheel::FromArc,
     ootr::model::{
         Dungeon,
         DungeonReward,
@@ -45,23 +47,13 @@ use {
 
 const VERSION: u8 = 0;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum Error {
+    #[from_arc]
     Io(Arc<io::Error>),
+    #[from_arc]
     Json(Arc<serde_json::Error>),
     MissingHomeDir,
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::Io(Arc::new(e))
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Json(Arc::new(e))
-    }
 }
 
 impl fmt::Display for Error {
@@ -258,7 +250,7 @@ use TrackerCellKind::*;
 
 macro_rules! cells {
     ($($cell:ident: $kind:expr,)*) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
         pub enum TrackerCellId {
             $(
                 $cell,

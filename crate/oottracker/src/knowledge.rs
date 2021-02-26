@@ -23,64 +23,30 @@ use {
         AsyncRead,
         AsyncWrite,
     },
+    wheel::FromArc,
     ootr::{
         model::*,
         region::Mq,
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum KnowledgeReadError {
+    #[from_arc]
     ActiveTrials(Arc<MapReadError<Medallion, bool>>),
+    #[from_arc]
     BoolSettings(Arc<MapReadError<String, bool>>),
+    #[from_arc]
     DungeonRewardLocations(Arc<MapReadError<DungeonReward, DungeonRewardLocation>>),
+    #[from_arc]
     Exits(Arc<MapReadError<String, HashMap<String, String>>>),
+    #[from_arc]
     Io(Arc<io::Error>),
+    #[from_arc]
     Mq(Arc<MapReadError<Dungeon, Mq>>),
+    #[from_arc]
     StringSettings(Arc<MapReadError<String, HashSet<String>>>),
     UnknownPreset(u8),
-}
-
-impl From<MapReadError<Medallion, bool>> for KnowledgeReadError {
-    fn from(e: MapReadError<Medallion, bool>) -> KnowledgeReadError {
-        KnowledgeReadError::ActiveTrials(Arc::new(e))
-    }
-}
-
-impl From<MapReadError<String, bool>> for KnowledgeReadError {
-    fn from(e: MapReadError<String, bool>) -> KnowledgeReadError {
-        KnowledgeReadError::BoolSettings(Arc::new(e))
-    }
-}
-
-impl From<MapReadError<DungeonReward, DungeonRewardLocation>> for KnowledgeReadError {
-    fn from(e: MapReadError<DungeonReward, DungeonRewardLocation>) -> KnowledgeReadError {
-        KnowledgeReadError::DungeonRewardLocations(Arc::new(e))
-    }
-}
-
-impl From<MapReadError<String, HashMap<String, String>>> for KnowledgeReadError {
-    fn from(e: MapReadError<String, HashMap<String, String>>) -> KnowledgeReadError {
-        KnowledgeReadError::Exits(Arc::new(e))
-    }
-}
-
-impl From<io::Error> for KnowledgeReadError {
-    fn from(e: io::Error) -> KnowledgeReadError {
-        KnowledgeReadError::Io(Arc::new(e))
-    }
-}
-
-impl From<MapReadError<Dungeon, Mq>> for KnowledgeReadError {
-    fn from(e: MapReadError<Dungeon, Mq>) -> KnowledgeReadError {
-        KnowledgeReadError::Mq(Arc::new(e))
-    }
-}
-
-impl From<MapReadError<String, HashSet<String>>> for KnowledgeReadError {
-    fn from(e: MapReadError<String, HashSet<String>>) -> KnowledgeReadError {
-        KnowledgeReadError::StringSettings(Arc::new(e))
-    }
 }
 
 impl fmt::Display for KnowledgeReadError {

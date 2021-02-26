@@ -933,7 +933,7 @@ pub enum CheckStatusError<R: Rando> {
     RegionLookup(RegionLookupError<R>),
 }
 
-impl<R: Rando> From<io::Error> for CheckStatusError<R> {
+impl<R: Rando> From<io::Error> for CheckStatusError<R> { //TODO add support for generics to FromArc derive macro
     fn from(e: io::Error) -> CheckStatusError<R> {
         CheckStatusError::Io(Arc::new(e))
     }

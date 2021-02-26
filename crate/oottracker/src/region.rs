@@ -27,7 +27,7 @@ pub enum RegionLookupError<R: Rando> {
     Rando(R::Err),
 }
 
-impl<R: Rando> From<io::Error> for RegionLookupError<R> {
+impl<R: Rando> From<io::Error> for RegionLookupError<R> { //TODO add support for generics to FromArc derive macro
     fn from(e: io::Error) -> RegionLookupError<R> {
         RegionLookupError::Io(Arc::new(e))
     }

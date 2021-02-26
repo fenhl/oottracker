@@ -25,6 +25,7 @@ use {
         AsyncWrite,
         AsyncWriteExt as _,
     },
+    wheel::FromArc,
     ootr::Rando,
     crate::{
         save::{
@@ -174,7 +175,7 @@ impl Ram {
             RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, mq)) => {
                 //TODO auto-disambiguate
                 // visibility of MQ-ness per dungeon
-                // immediately upon entering: Deku Tree (torch next to web), Jabu Jabus Belly (boulder and 2 cows), Forest Temple (extra skulltulas and no wolfos), Fire Temple (extra small torches and no hammer blocks), Ganons Castle (extra green bubbles), Spirit Temple (extra switch above and to the right of the exit)
+                // immediately upon entering: Deku Tree (torch next to web), Jabu Jabus Belly (boulder and 2 cows), Forest Temple (extra skulltulas and no wolfos), Fire Temple (extra small torches and no hammer blocks), Ganons Castle (extra green bubbles), Spirit Temple (extra boulders)
                 // not immediately but without checks: Ice Cavern (boulder takes a couple seconds to be visible), Gerudo Training Grounds (the different torches in the first room only become visible after approx. 1 roll forward), Bottom of the Well (the first skulltula being replaced with a ReDead is audible from the entrance)
                 // requires checks (exits/locations): Dodongos Cavern (must blow up the first mud block to see that the lobby has an additional boulder)
                 // unsure: Water Temple (not sure if the tektite on the ledge of the central pillar is still there in MQ, if not that's the first difference), Shadow Temple (the extra boxes are only visible after going through the first fake wall, not sure if that counts as a check)
@@ -206,17 +207,12 @@ impl From<Save> for Ram {
     }
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, From, FromArc, Clone)]
 pub enum ReadError {
     #[from]
     Decode(DecodeError),
+    #[from_arc]
     Io(Arc<io::Error>),
-}
-
-impl From<io::Error> for ReadError {
-    fn from(e: io::Error) -> ReadError {
-        ReadError::Io(Arc::new(e))
-    }
 }
 
 impl fmt::Display for ReadError {
