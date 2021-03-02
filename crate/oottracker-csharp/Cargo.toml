@@ -9,10 +9,13 @@ name = "oottracker"
 crate-type = ["cdylib"]
 
 [dependencies]
-async-proto = "0.6"
 itertools = "0.10"
 libc = "0.2"
 semver = "0.11"
+
+[dependencies.async-proto]
+version = "0.6"
+features = ["write-sync"]
 
 [dependencies.ootr]
 path = "../ootr"

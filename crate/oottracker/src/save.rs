@@ -1162,12 +1162,6 @@ impl Protocol for Save {
         })
     }
 
-    fn read_sync(stream: &mut impl Read) -> Result<Save, ReadError> {
-        let mut buf = vec![0; SIZE];
-        stream.read_exact(&mut buf)?;
-        Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {:?}", e)))?)
-    }
-
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         let buf = self.to_save_data();
         assert_eq!(buf.len(), SIZE);

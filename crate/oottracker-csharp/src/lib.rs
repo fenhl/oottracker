@@ -282,7 +282,9 @@ pub fn version() -> Version {
     let tcp_stream = TcpStream::connect((Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]), proto::TCP_PORT))
         .map_err(DebugError::from)
         .and_then(|mut tcp_stream| {
-            proto::VERSION.write_sync(&mut tcp_stream)?;
+            tcp_stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+            tcp_stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+            proto::handshake_sync(&mut tcp_stream)?;
             Ok(tcp_stream)
         });
     HandleOwned::new(tcp_stream)
@@ -299,7 +301,7 @@ pub fn version() -> Version {
         .and_then(|mut tcp_stream| {
             tcp_stream.set_read_timeout(Some(Duration::from_secs(5)))?;
             tcp_stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-            proto::VERSION.write_sync(&mut tcp_stream)?;
+            proto::handshake_sync(&mut tcp_stream)?;
             Ok(tcp_stream)
         });
     HandleOwned::new(tcp_stream)

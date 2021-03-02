@@ -58,6 +58,7 @@ use {
     },
 };
 
+// to obtain a Firebase web tracker's API key, open a room in the tracker and copy the element `apiKey` from the local storage entry starting with `firebase:authUser`.
 include!("../../../assets/firebase-api-keys.rs");
 
 trait TrackerCellKindExt {

@@ -21,7 +21,7 @@ smart-default = "0.6"
 
 [dependencies.async-proto]
 version = "0.6"
-features = ["blocking", "serde_json"]
+features = ["serde_json", "write-sync"]
 
 [dependencies.derive_more]
 version = "0.99"

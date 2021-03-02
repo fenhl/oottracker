@@ -229,15 +229,6 @@ impl Protocol for Ram {
         })
     }
 
-    fn read_sync(stream: &mut impl Read) -> Result<Ram, ReadError> {
-        let ranges = RANGES.iter().tuples().map(|(_, &len)| {
-            let mut buf = vec![0; len as usize];
-            stream.read_exact(&mut buf)?;
-            Ok::<_, ReadError>(buf)
-        }).try_collect::<_, Vec<_>, _>()?;
-        Ok(Ram::from_range_bufs(ranges).map_err(|e| ReadError::Custom(format!("failed to decode RAM data: {:?}", e)))?)
-    }
-
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         let ranges = self.to_ranges();
         for range in ranges {
