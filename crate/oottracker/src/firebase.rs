@@ -131,11 +131,21 @@ impl TrackerCellKindExt for TrackerCellKind {
                 if active_left != value_left { toggle_left(state) }
                 if active_right != value_right { toggle_right(state) }
             }
-            Count { set, step, .. } => set(state, u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value)? * step),
+            Count { get, set, max, step, .. } => {
+                let value = u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value)?;
+                // only update if the local value doesn't fit into the window received
+                // so that e.g. decrementing skulls from 40 to 39 doesn't immediately set them to 30
+                if get(state).min(*max) / step != value {
+                    set(state, value * step);
+                }
+            }
             FortressMq => if value.as_bool().ok_or_else(|| value.clone())? {
                 state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
             } else {
-                state.knowledge.string_settings.remove("gerudo_fortress");
+                // don't override local state that's consistent with the value received
+                if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |fort| fort.iter().eq(iter::once("normal"))) {
+                    state.knowledge.string_settings.remove("gerudo_fortress");
+                }
             },
             Medallion(med) => if value.as_bool().ok_or_else(|| value.clone())? {
                 state.ram.save.quest_items.insert(med.into());
@@ -160,7 +170,10 @@ impl TrackerCellKindExt for TrackerCellKind {
             Mq(dungeon) => if value.as_bool().ok_or_else(|| value.clone())? {
                 state.knowledge.mq.insert(*dungeon, Mq::Mq);
             } else {
-                state.knowledge.mq.remove(dungeon);
+                // don't override local state that's consistent with the value received
+                if state.knowledge.mq.get(dungeon).map_or(false, |&mq| mq == Mq::Mq) {
+                    state.knowledge.mq.remove(dungeon);
+                }
             },
             OptionalOverlay { active, toggle_main, .. } | Overlay { active, toggle_main, .. } => if active(state).0 != value.as_bool().ok_or_else(|| value.clone())? {
                 toggle_main(state);
@@ -332,7 +345,7 @@ impl App for OldRestreamTracker {
         "SongofTime": SongOfTime,
         "SongofStorms": SongOfStorms,
         "MinuetofForest": Minuet,
-        "BoleroofTire": Bolero,
+        "BoleroofFire": Bolero,
         "SerenadeofWater": Serenade,
         "NocturneofShadow": Nocturne,
         "RequiemofSpirit": Requiem,
@@ -541,8 +554,6 @@ enum SignupNewUserResponse {
 struct AuthResponse {
     kind: SignupNewUserResponse,
     id_token: String,
-    //refresh_token: String,
-    //expires_in: String, //TODO decode to Duration?
     local_id: String,
 }
 
@@ -611,21 +622,6 @@ impl<A: App> Session<A> {
             .error_for_status()?
             .json().await
     }
-
-    /*
-    async fn get_reauth<T: DeserializeOwned>(&mut self, name: &str, passcode: &str, url: &str) -> reqwest::Result<T> {
-        let mut response = self.client.get(url)
-            .query(&[("auth", &self.id_token)])
-            .send().await?;
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            self.room_auth(name, passcode).await?;
-            response = self.client.get(url)
-                .query(&[("auth", &self.id_token)])
-                .send().await?;
-        }
-        response.error_for_status()?.json().await
-    }
-    */
 
     async fn put<T: Serialize>(&mut self, url: &str, data: &T) -> reqwest::Result<()> {
         self.client.put(url)

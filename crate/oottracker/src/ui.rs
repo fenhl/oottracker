@@ -464,7 +464,10 @@ cells! {
     Slingshot: Simple {
         img: "slingshot",
         active: Box::new(|state| state.ram.save.inv.slingshot),
-        toggle: Box::new(|state| state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot),
+        toggle: Box::new(|state| {
+            state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot;
+            state.ram.save.upgrades.set_bullet_bag(if state.ram.save.inv.slingshot { Upgrades::BULLET_BAG_30 } else { Upgrades::NONE });
+        }),
     },
     BulletBag: Sequence {
         idx: Box::new(|state| match state.ram.save.upgrades.bullet_bag() {
@@ -474,18 +477,24 @@ cells! {
             _ => 0,
         }),
         img: Box::new(|state| (state.ram.save.inv.slingshot, "slingshot")),
-        increment: Box::new(|state| state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
-            Upgrades::BULLET_BAG_30 => Upgrades::BULLET_BAG_40,
-            Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_50,
-            Upgrades::BULLET_BAG_50 => Upgrades::NONE,
-            _ => Upgrades::BULLET_BAG_30,
-        })),
-        decrement: Box::new(|state| state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
-            Upgrades::BULLET_BAG_30 => Upgrades::NONE,
-            Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_30,
-            Upgrades::BULLET_BAG_50 => Upgrades::BULLET_BAG_40,
-            _ => Upgrades::BULLET_BAG_50,
-        })),
+        increment: Box::new(|state| {
+            state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
+                Upgrades::BULLET_BAG_30 => Upgrades::BULLET_BAG_40,
+                Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_50,
+                Upgrades::BULLET_BAG_50 => Upgrades::NONE,
+                _ => Upgrades::BULLET_BAG_30,
+            });
+            state.ram.save.inv.slingshot = state.ram.save.upgrades.bullet_bag() != Upgrades::NONE;
+        }),
+        decrement: Box::new(|state| {
+            state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
+                Upgrades::BULLET_BAG_30 => Upgrades::NONE,
+                Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_30,
+                Upgrades::BULLET_BAG_50 => Upgrades::BULLET_BAG_40,
+                _ => Upgrades::BULLET_BAG_50,
+            });
+            state.ram.save.inv.slingshot = state.ram.save.upgrades.bullet_bag() != Upgrades::NONE;
+        }),
     },
     Bombs: Overlay {
         main_img: "bomb_bag",
@@ -638,7 +647,10 @@ cells! {
         main_img: "bow",
         overlay_img: "ice_arrows",
         active: Box::new(|state| (state.ram.save.inv.bow, state.ram.save.inv.ice_arrows)),
-        toggle_main: Box::new(|state| state.ram.save.inv.bow = !state.ram.save.inv.bow),
+        toggle_main: Box::new(|state| {
+            state.ram.save.inv.bow = !state.ram.save.inv.bow;
+            state.ram.save.upgrades.set_quiver(if state.ram.save.inv.bow { Upgrades::QUIVER_30 } else { Upgrades::NONE });
+        }),
         toggle_overlay: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
     },
     IceArrows: Simple {
@@ -654,18 +666,24 @@ cells! {
             _ => 0,
         }),
         img: Box::new(|state| (state.ram.save.inv.bow, "bow")),
-        increment: Box::new(|state| state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
-            Upgrades::QUIVER_30 => Upgrades::QUIVER_40,
-            Upgrades::QUIVER_40 => Upgrades::QUIVER_50,
-            Upgrades::QUIVER_50 => Upgrades::NONE,
-            _ => Upgrades::QUIVER_30,
-        })),
-        decrement: Box::new(|state| state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
-            Upgrades::QUIVER_30 => Upgrades::NONE,
-            Upgrades::QUIVER_40 => Upgrades::QUIVER_30,
-            Upgrades::QUIVER_50 => Upgrades::QUIVER_40,
-            _ => Upgrades::QUIVER_50,
-        })),
+        increment: Box::new(|state| {
+            state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
+                Upgrades::QUIVER_30 => Upgrades::QUIVER_40,
+                Upgrades::QUIVER_40 => Upgrades::QUIVER_50,
+                Upgrades::QUIVER_50 => Upgrades::NONE,
+                _ => Upgrades::QUIVER_30,
+            });
+            state.ram.save.inv.bow = state.ram.save.upgrades.quiver() != Upgrades::NONE;
+        }),
+        decrement: Box::new(|state| {
+            state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
+                Upgrades::QUIVER_30 => Upgrades::NONE,
+                Upgrades::QUIVER_40 => Upgrades::QUIVER_30,
+                Upgrades::QUIVER_50 => Upgrades::QUIVER_40,
+                _ => Upgrades::QUIVER_50,
+            });
+            state.ram.save.inv.bow = state.ram.save.upgrades.quiver() != Upgrades::NONE;
+        }),
     },
     Arrows: Composite {
         left_img: "fire_arrows",
@@ -1168,7 +1186,7 @@ cells! {
             state.ram.save.equipment.remove(Equipment::GIANTS_KNIFE);
         } else {
             state.ram.save.biggoron_sword = true;
-            state.ram.save.equipment.remove(Equipment::GIANTS_KNIFE);
+            state.ram.save.equipment.insert(Equipment::GIANTS_KNIFE);
         }),
     },
     WalletNoTycoon: Sequence {
