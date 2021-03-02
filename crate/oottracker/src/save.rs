@@ -4,21 +4,20 @@ use {
             TryFrom,
             TryInto as _,
         },
-        fmt,
         future::Future,
-        io::{
-            self,
-            prelude::*,
-        },
+        io::prelude::*,
         num::TryFromIntError,
         ops::{
             Add,
             Sub,
         },
         pin::Pin,
-        sync::Arc,
     },
-    async_proto::Protocol,
+    async_proto::{
+        Protocol,
+        ReadError,
+        WriteError,
+    },
     bitflags::bitflags,
     byteorder::{
         BigEndian,
@@ -32,7 +31,6 @@ use {
         AsyncWrite,
         AsyncWriteExt as _,
     },
-    wheel::FromArc,
     ootr::{
         item::Item,
         model::{
@@ -1146,35 +1144,16 @@ impl Save {
     }
 }
 
-#[derive(Debug, From, FromArc, Clone)]
-pub enum ReadError {
-    #[from]
-    Decode(DecodeError),
-    #[from_arc]
-    Io(Arc<io::Error>),
-}
-
-impl fmt::Display for ReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ReadError::Decode(e) => write!(f, "{:?}", e),
-            ReadError::Io(e) => write!(f, "I/O error: {}", e),
-        }
-    }
-}
-
 impl Protocol for Save {
-    type ReadError = ReadError;
-
-    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Save, ReadError>> + Send + 'a>> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Save, ReadError>> + Send + 'a>> {
         Box::pin(async move {
             let mut buf = vec![0; SIZE];
             stream.read_exact(&mut buf).await?;
-            Ok(Save::from_save_data(&buf)?)
+            Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {:?}", e)))?)
         })
     }
 
-    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
         Box::pin(async move {
             let buf = self.to_save_data();
             assert_eq!(buf.len(), SIZE);
@@ -1183,13 +1162,13 @@ impl Protocol for Save {
         })
     }
 
-    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Save, ReadError> {
+    fn read_sync(stream: &mut impl Read) -> Result<Save, ReadError> {
         let mut buf = vec![0; SIZE];
         stream.read_exact(&mut buf)?;
-        Ok(Save::from_save_data(&buf)?)
+        Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {:?}", e)))?)
     }
 
-    fn write_sync<'a>(&self, mut sink: impl Write + 'a) -> io::Result<()> {
+    fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         let buf = self.to_save_data();
         assert_eq!(buf.len(), SIZE);
         sink.write_all(&buf)?;

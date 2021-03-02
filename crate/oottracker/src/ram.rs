@@ -1,19 +1,19 @@
-use byteorder::BigEndian;
-
 use {
     std::{
         borrow::Borrow,
-        fmt,
         future::Future,
-        io::{
-            self,
-            prelude::*,
-        },
+        io::prelude::*,
         pin::Pin,
-        sync::Arc,
     },
-    async_proto::Protocol,
-    byteorder::ByteOrder as _,
+    async_proto::{
+        Protocol,
+        ReadError,
+        WriteError,
+    },
+    byteorder::{
+        BigEndian,
+        ByteOrder as _,
+    },
     derive_more::From,
     itertools::{
         EitherOrBoth,
@@ -25,7 +25,6 @@ use {
         AsyncWrite,
         AsyncWriteExt as _,
     },
-    wheel::FromArc,
     ootr::Rando,
     crate::{
         save::{
@@ -207,27 +206,8 @@ impl From<Save> for Ram {
     }
 }
 
-#[derive(Debug, From, FromArc, Clone)]
-pub enum ReadError {
-    #[from]
-    Decode(DecodeError),
-    #[from_arc]
-    Io(Arc<io::Error>),
-}
-
-impl fmt::Display for ReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ReadError::Decode(e) => write!(f, "{:?}", e),
-            ReadError::Io(e) => write!(f, "I/O error: {}", e),
-        }
-    }
-}
-
 impl Protocol for Ram {
-    type ReadError = ReadError;
-
-    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Ram, ReadError>> + Send + 'a>> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Ram, ReadError>> + Send + 'a>> {
         Box::pin(async move {
             let mut ranges = Vec::with_capacity(NUM_RANGES);
             for (_, len) in RANGES.iter().copied().tuples() {
@@ -235,11 +215,11 @@ impl Protocol for Ram {
                 stream.read_exact(&mut buf).await?;
                 ranges.push(buf);
             }
-            Ok(Ram::from_range_bufs(ranges)?)
+            Ok(Ram::from_range_bufs(ranges).map_err(|e| ReadError::Custom(format!("failed to decode RAM data: {:?}", e)))?)
         })
     }
 
-    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
         Box::pin(async move {
             let ranges = self.to_ranges();
             for range in ranges {
@@ -249,16 +229,16 @@ impl Protocol for Ram {
         })
     }
 
-    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Ram, ReadError> {
+    fn read_sync(stream: &mut impl Read) -> Result<Ram, ReadError> {
         let ranges = RANGES.iter().tuples().map(|(_, &len)| {
             let mut buf = vec![0; len as usize];
             stream.read_exact(&mut buf)?;
             Ok::<_, ReadError>(buf)
         }).try_collect::<_, Vec<_>, _>()?;
-        Ok(Ram::from_range_bufs(ranges)?)
+        Ok(Ram::from_range_bufs(ranges).map_err(|e| ReadError::Custom(format!("failed to decode RAM data: {:?}", e)))?)
     }
 
-    fn write_sync<'a>(&self, mut sink: impl Write + 'a) -> io::Result<()> {
+    fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         let ranges = self.to_ranges();
         for range in ranges {
             sink.write_all(&range)?;

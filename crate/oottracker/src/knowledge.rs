@@ -4,18 +4,14 @@ use {
             HashMap,
             HashSet,
         },
-        fmt,
         future::Future,
-        io::{
-            self,
-            prelude::*,
-        },
+        io::prelude::*,
         pin::Pin,
-        sync::Arc,
     },
     async_proto::{
         Protocol,
-        impls::MapReadError,
+        ReadError,
+        WriteError,
     },
     collect_mac::collect,
     smart_default::SmartDefault,
@@ -23,46 +19,11 @@ use {
         AsyncRead,
         AsyncWrite,
     },
-    wheel::FromArc,
     ootr::{
         model::*,
         region::Mq,
     },
 };
-
-#[derive(Debug, FromArc, Clone)]
-pub enum KnowledgeReadError {
-    #[from_arc]
-    ActiveTrials(Arc<MapReadError<Medallion, bool>>),
-    #[from_arc]
-    BoolSettings(Arc<MapReadError<String, bool>>),
-    #[from_arc]
-    DungeonRewardLocations(Arc<MapReadError<DungeonReward, DungeonRewardLocation>>),
-    #[from_arc]
-    Exits(Arc<MapReadError<String, HashMap<String, String>>>),
-    #[from_arc]
-    Io(Arc<io::Error>),
-    #[from_arc]
-    Mq(Arc<MapReadError<Dungeon, Mq>>),
-    #[from_arc]
-    StringSettings(Arc<MapReadError<String, HashSet<String>>>),
-    UnknownPreset(u8),
-}
-
-impl fmt::Display for KnowledgeReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            KnowledgeReadError::ActiveTrials(e) => write!(f, "failed to decode trials knowledge: {}", e),
-            KnowledgeReadError::BoolSettings(e) => write!(f, "failed to decode settings knowledge: {}", e),
-            KnowledgeReadError::DungeonRewardLocations(e) => write!(f, "failed to decode dungeon reward locations: {}", e),
-            KnowledgeReadError::Exits(e) => write!(f, "failed to decode entrance knowledge: {}", e),
-            KnowledgeReadError::Io(e) => write!(f, "I/O error: {}", e),
-            KnowledgeReadError::Mq(e) => write!(f, "failed to decode MQ knowledge: {}", e),
-            KnowledgeReadError::StringSettings(e) => write!(f, "failed to decode settings knowledge: {}", e),
-            KnowledgeReadError::UnknownPreset(id) => write!(f, "unknown knowledge preset: {}", id),
-        }
-    }
-}
 
 #[derive(Debug, SmartDefault, Clone, PartialEq, Eq)]
 pub struct Knowledge {
@@ -196,77 +157,75 @@ impl Knowledge {
 }
 
 impl Protocol for Knowledge {
-    type ReadError = KnowledgeReadError;
-
-    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(mut stream: R) -> Pin<Box<dyn Future<Output = Result<Knowledge, KnowledgeReadError>> + Send + 'a>> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Knowledge, ReadError>> + Send + 'a>> {
         Box::pin(async move {
-            Ok(match u8::read(&mut stream).await? {
+            Ok(match u8::read(stream).await? {
                 0 => Knowledge {
-                    bool_settings: HashMap::read(&mut stream).await?,
-                    tricks: Some(HashMap::read(&mut stream).await?),
-                    dungeon_reward_locations: HashMap::read(&mut stream).await?,
-                    mq: HashMap::read(&mut stream).await?,
-                    exits: Some(HashMap::read(&mut stream).await?),
-                    active_trials: HashMap::read(&mut stream).await?,
+                    bool_settings: HashMap::read(stream).await?,
+                    tricks: Some(HashMap::read(stream).await?),
+                    dungeon_reward_locations: HashMap::read(stream).await?,
+                    mq: HashMap::read(stream).await?,
+                    exits: Some(HashMap::read(stream).await?),
+                    active_trials: HashMap::read(stream).await?,
                     string_settings: HashMap::read(stream).await?,
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
-                n => return Err(KnowledgeReadError::UnknownPreset(n)),
+                n => return Err(ReadError::UnknownVariant(n)),
             })
         })
     }
 
-    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, mut sink: W) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>> {
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
         Box::pin(async move {
             if *self == Knowledge::default() {
                 1u8.write(sink).await?;
             } else if *self == Knowledge::vanilla() {
                 2u8.write(sink).await?;
             } else {
-                0u8.write(&mut sink).await?;
-                self.bool_settings.write(&mut sink).await?;
-                self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write(&mut sink).await?;
-                self.dungeon_reward_locations.write(&mut sink).await?;
-                self.mq.write(&mut sink).await?;
-                self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(&mut sink).await?;
-                self.active_trials.write(&mut sink).await?;
+                0u8.write(sink).await?;
+                self.bool_settings.write(sink).await?;
+                self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write(sink).await?;
+                self.dungeon_reward_locations.write(sink).await?;
+                self.mq.write(sink).await?;
+                self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(sink).await?;
+                self.active_trials.write(sink).await?;
                 self.string_settings.write(sink).await?;
             }
             Ok(())
         })
     }
 
-    fn read_sync<'a>(mut stream: impl Read + 'a) -> Result<Knowledge, KnowledgeReadError> {
-        Ok(match u8::read_sync(&mut stream)? {
+    fn read_sync(stream: &mut impl Read) -> Result<Knowledge, ReadError> {
+        Ok(match u8::read_sync(stream)? {
             0 => Knowledge {
-                bool_settings: HashMap::read_sync(&mut stream)?,
-                tricks: Some(HashMap::read_sync(&mut stream)?),
-                dungeon_reward_locations: HashMap::read_sync(&mut stream)?,
-                mq: HashMap::read_sync(&mut stream)?,
-                exits: Some(HashMap::read_sync(&mut stream)?),
-                active_trials: HashMap::read_sync(&mut stream)?,
+                bool_settings: HashMap::read_sync(stream)?,
+                tricks: Some(HashMap::read_sync(stream)?),
+                dungeon_reward_locations: HashMap::read_sync(stream)?,
+                mq: HashMap::read_sync(stream)?,
+                exits: Some(HashMap::read_sync(stream)?),
+                active_trials: HashMap::read_sync(stream)?,
                 string_settings: HashMap::read_sync(stream)?,
             },
             1 => Knowledge::default(),
             2 => Knowledge::vanilla(),
-            n => return Err(KnowledgeReadError::UnknownPreset(n)),
+            n => return Err(ReadError::UnknownVariant(n)),
         })
     }
 
-    fn write_sync<'a>(&self, mut sink: impl Write + 'a) -> io::Result<()> {
+    fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         if *self == Knowledge::default() {
             1u8.write_sync(sink)?;
         } else if *self == Knowledge::vanilla() {
             2u8.write_sync(sink)?;
         } else {
-            0u8.write_sync(&mut sink)?;
-            self.bool_settings.write_sync(&mut sink)?;
-            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write_sync(&mut sink)?;
-            self.dungeon_reward_locations.write_sync(&mut sink)?;
-            self.mq.write_sync(&mut sink)?;
-            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write_sync(&mut sink)?;
-            self.active_trials.write_sync(&mut sink)?;
+            0u8.write_sync(sink)?;
+            self.bool_settings.write_sync(sink)?;
+            self.tricks.as_ref().expect("non-vanilla Knowledge should have Some in tricks field").write_sync(sink)?;
+            self.dungeon_reward_locations.write_sync(sink)?;
+            self.mq.write_sync(sink)?;
+            self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write_sync(sink)?;
+            self.active_trials.write_sync(sink)?;
             self.string_settings.write_sync(sink)?;
         }
         Ok(())

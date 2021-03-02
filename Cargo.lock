@@ -106,9 +106,9 @@ dependencies = [
 
 [[package]]
 name = "async-proto"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dec64457b7c26e51eb8d6c88c4b55d7ac91a873c7b0894b8627a004a64f1d01"
+checksum = "e975c638a425392d9a6a35aa6861f3e42fd14dd1d52374cf780a22ab3ad2dce5"
 dependencies = [
  "async-proto-derive",
  "byteorder",
@@ -119,11 +119,10 @@ dependencies = [
 
 [[package]]
 name = "async-proto-derive"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e0095076b94a6ced06d94058d95c2bd0c6221f292cd0759cd8562b5d07b8510"
+checksum = "a07cb24f6b6708024145426ad1a439239ef0e85f240741ae5730f88d03fcec05"
 dependencies = [
- "convert_case",
  "itertools 0.10.0",
  "proc-macro2",
  "quote",

@@ -4,7 +4,7 @@ use {
     std::{
         convert::TryFrom as _,
         ffi::CString,
-        io,
+        fmt,
         net::{
             Ipv4Addr,
             Ipv6Addr,
@@ -81,6 +81,41 @@ impl StringHandle {
 impl<T: Default> Default for HandleOwned<T> {
     fn default() -> HandleOwned<T> {
         HandleOwned(Box::into_raw(Box::default()))
+    }
+}
+
+pub struct DebugError(String);
+
+impl<E: fmt::Debug> From<E> for DebugError {
+    fn from(e: E) -> DebugError {
+        DebugError(format!("{:?}", e))
+    }
+}
+
+impl fmt::Display for DebugError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// A result type where the error has been converted to its `Debug` representation.
+/// Useful because it somewhat deduplicates boilerplate on the C# side.
+pub type DebugResult<T> = Result<T, DebugError>;
+
+trait DebugResultExt {
+    type T;
+
+    fn unwrap(self) -> Self::T;
+}
+
+impl<T> DebugResultExt for DebugResult<T> {
+    type T = T;
+
+    fn unwrap(self) -> T {
+        match self {
+            Ok(x) => x,
+            Err(e) => panic!(e),
+        }
     }
 }
 
@@ -241,10 +276,11 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `addr` must point at the start of a valid slice of length 4 and must not be mutated for the duration of the function call.
-#[no_mangle] pub unsafe extern "C" fn connect_ipv4(addr: *const u8) -> HandleOwned<io::Result<TcpStream>> {
+#[no_mangle] pub unsafe extern "C" fn connect_ipv4(addr: *const u8) -> HandleOwned<DebugResult<TcpStream>> {
     assert!(!addr.is_null());
     let addr = slice::from_raw_parts(addr, 4);
     let tcp_stream = TcpStream::connect((Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]), proto::TCP_PORT))
+        .map_err(DebugError::from)
         .and_then(|mut tcp_stream| {
             proto::VERSION.write_sync(&mut tcp_stream)?;
             Ok(tcp_stream)
@@ -255,10 +291,11 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `addr` must point at the start of a valid slice of length 16 and must not be mutated for the duration of the function call.
-#[no_mangle] pub unsafe extern "C" fn connect_ipv6(addr: *const u8) -> HandleOwned<io::Result<TcpStream>> {
+#[no_mangle] pub unsafe extern "C" fn connect_ipv6(addr: *const u8) -> HandleOwned<DebugResult<TcpStream>> {
     assert!(!addr.is_null());
     let addr = <[u8; 16]>::try_from(slice::from_raw_parts(addr, 16)).unwrap();
     let tcp_stream = TcpStream::connect((Ipv6Addr::from(addr), proto::TCP_PORT))
+        .map_err(DebugError::from)
         .and_then(|mut tcp_stream| {
             tcp_stream.set_read_timeout(Some(Duration::from_secs(5)))?;
             tcp_stream.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -270,22 +307,22 @@ pub fn version() -> Version {
 
 /// # Safety
 ///
-/// `tcp_stream_res` must point at a valid `io::Result<TcpStream>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_free(tcp_stream_res: HandleOwned<io::Result<TcpStream>>) {
+/// `tcp_stream_res` must point at a valid `DebugResult<TcpStream>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_free(tcp_stream_res: HandleOwned<DebugResult<TcpStream>>) {
     let _ = tcp_stream_res.into_box();
 }
 
 /// # Safety
 ///
-/// `tcp_stream_res` must point at a valid `io::Result<TcpStream>`.
-#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_is_ok(tcp_stream_res: *const io::Result<TcpStream>) -> bool {
+/// `tcp_stream_res` must point at a valid `DebugResult<TcpStream>`.
+#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_is_ok(tcp_stream_res: *const DebugResult<TcpStream>) -> bool {
     (&*tcp_stream_res).is_ok()
 }
 
 /// # Safety
 ///
-/// `tcp_stream_res` must point at a valid `io::Result<TcpStream>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_unwrap(tcp_stream_res: HandleOwned<io::Result<TcpStream>>) -> HandleOwned<TcpStream> {
+/// `tcp_stream_res` must point at a valid `DebugResult<TcpStream>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_unwrap(tcp_stream_res: HandleOwned<DebugResult<TcpStream>>) -> HandleOwned<TcpStream> {
     HandleOwned::new(tcp_stream_res.into_box().unwrap())
 }
 
@@ -298,9 +335,9 @@ pub fn version() -> Version {
 
 /// # Safety
 ///
-/// `tcp_stream_res` must point at a valid `io::Result<TcpStream>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_debug_err(tcp_stream_res: HandleOwned<io::Result<TcpStream>>) -> StringHandle {
-    StringHandle::from_string(format!("{:?}", tcp_stream_res.into_box().unwrap_err()))
+/// `tcp_stream_res` must point at a valid `DebugResult<TcpStream>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_debug_err(tcp_stream_res: HandleOwned<DebugResult<TcpStream>>) -> StringHandle {
+    StringHandle::from_string(tcp_stream_res.into_box().unwrap_err())
 }
 
 /// # Safety
@@ -313,59 +350,59 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `tcp_stream` must point at a valid `TcpStream`. This function takes ownership of the `TcpStream`.
-#[no_mangle] pub unsafe extern "C" fn tcp_stream_disconnect(tcp_stream: HandleOwned<TcpStream>) -> HandleOwned<io::Result<()>> {
+#[no_mangle] pub unsafe extern "C" fn tcp_stream_disconnect(tcp_stream: HandleOwned<TcpStream>) -> HandleOwned<DebugResult<()>> {
     let mut tcp_stream = tcp_stream.into_box();
-    HandleOwned::new(Packet::Goodbye.write_sync(&mut tcp_stream))
+    HandleOwned::new(Packet::Goodbye.write_sync(&mut tcp_stream).map_err(DebugError::from))
 }
 
 /// # Safety
 ///
-/// `io_res` must point at a valid `io::Result<()>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn io_result_free(io_res: HandleOwned<io::Result<()>>) {
-    let _ = io_res.into_box();
+/// `io_res` must point at a valid `DebugResult<()>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn unit_result_free(unit_res: HandleOwned<DebugResult<()>>) {
+    let _ = unit_res.into_box();
 }
 
 /// # Safety
 ///
-/// `io_res` must point at a valid `io::Result<()>`.
-#[no_mangle] pub unsafe extern "C" fn io_result_is_ok(io_res: *const io::Result<()>) -> bool {
-    (&*io_res).is_ok()
+/// `io_res` must point at a valid `DebugResult<()>`.
+#[no_mangle] pub unsafe extern "C" fn unit_result_is_ok(unit_res: *const DebugResult<()>) -> bool {
+    (&*unit_res).is_ok()
 }
 
 /// # Safety
 ///
-/// `io_res` must point at a valid `io::Result<()>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn io_result_debug_err(io_res: HandleOwned<io::Result<()>>) -> StringHandle {
-    StringHandle::from_string(format!("{:?}", io_res.into_box().unwrap_err()))
+/// `io_res` must point at a valid `DebugResult<()>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn unit_result_debug_err(unit_res: HandleOwned<DebugResult<()>>) -> StringHandle {
+    StringHandle::from_string(unit_res.into_box().unwrap_err())
 }
 
 /// # Safety
 ///
 /// `start` must point at the start of a valid slice of length `0x1450` and must not be mutated for the duration of the function call.
-#[no_mangle] pub unsafe extern "C" fn save_from_save_data(start: *const u8) -> HandleOwned<Result<Save, save::DecodeError>> {
+#[no_mangle] pub unsafe extern "C" fn save_from_save_data(start: *const u8) -> HandleOwned<DebugResult<Save>> {
     assert!(!start.is_null());
     let save_data = slice::from_raw_parts(start, save::SIZE);
-    HandleOwned::new(Save::from_save_data(save_data))
+    HandleOwned::new(Save::from_save_data(save_data).map_err(DebugError::from))
 }
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, save::DecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn save_result_free(save_res: HandleOwned<Result<Save, save::DecodeError>>) {
+/// `save_res` must point at a valid `DebugResult<Save>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn save_result_free(save_res: HandleOwned<DebugResult<Save>>) {
     let _ = save_res.into_box();
 }
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, save::DecodeError>`.
-#[no_mangle] pub unsafe extern "C" fn save_result_is_ok(save_res: *const Result<Save, save::DecodeError>) -> bool {
+/// `save_res` must point at a valid `DebugResult<Save>`.
+#[no_mangle] pub unsafe extern "C" fn save_result_is_ok(save_res: *const DebugResult<Save>) -> bool {
     (&*save_res).is_ok()
 }
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, save::DecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn save_result_unwrap(save_res: HandleOwned<Result<Save, save::DecodeError>>) -> HandleOwned<Save> {
+/// `save_res` must point at a valid `DebugResult<Save>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn save_result_unwrap(save_res: HandleOwned<DebugResult<Save>>) -> HandleOwned<Save> {
     HandleOwned::new(save_res.into_box().unwrap())
 }
 
@@ -389,16 +426,16 @@ pub fn version() -> Version {
 
 /// # Safety
 ///
-/// `save_res` must point at a valid `Result<Save, save::DecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn save_result_debug_err(save_res: HandleOwned<Result<Save, save::DecodeError>>) -> StringHandle {
-    StringHandle::from_string(format!("{:?}", save_res.into_box().unwrap_err()))
+/// `save_res` must point at a valid `DebugResult<Save>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn save_result_debug_err(save_res: HandleOwned<DebugResult<Save>>) -> StringHandle {
+    StringHandle::from_string(save_res.into_box().unwrap_err())
 }
 
 /// # Safety
 ///
 /// `tcp_stream` must be a unique pointer at a valid `TcpStream` and `save` must point at a valid `Save`.
-#[no_mangle] pub unsafe extern "C" fn save_send(tcp_stream: *mut TcpStream, save: *const Save) -> HandleOwned<io::Result<()>> {
-    HandleOwned::new(Packet::SaveInit((&*save).clone()).write_sync(&mut *tcp_stream))
+#[no_mangle] pub unsafe extern "C" fn save_send(tcp_stream: *mut TcpStream, save: *const Save) -> HandleOwned<DebugResult<()>> {
+    HandleOwned::new(Packet::SaveInit((&*save).clone()).write_sync(&mut *tcp_stream).map_err(DebugError::from))
 }
 
 /// # Safety
@@ -427,8 +464,8 @@ pub fn version() -> Version {
 /// `tcp_stream` must be a unique pointer at a valid `TcpStream`.
 ///
 /// `diff` must point at a valid `Delta`. This function takes ownership of the `Delta`.
-#[no_mangle] pub unsafe extern "C" fn saves_diff_send(tcp_stream: *mut TcpStream, diff: HandleOwned<save::Delta>) -> HandleOwned<io::Result<()>> {
-    HandleOwned::new(Packet::SaveDelta(*diff.into_box()).write_sync(&mut *tcp_stream))
+#[no_mangle] pub unsafe extern "C" fn saves_diff_send(tcp_stream: *mut TcpStream, diff: HandleOwned<save::Delta>) -> HandleOwned<DebugResult<()>> {
+    HandleOwned::new(Packet::SaveDelta(*diff.into_box()).write_sync(&mut *tcp_stream).map_err(DebugError::from))
 }
 
 #[no_mangle] pub extern "C" fn knowledge_none() -> HandleOwned<Knowledge> {
@@ -451,8 +488,8 @@ pub fn version() -> Version {
 /// `tcp_stream` must be a unique pointer at a valid `TcpStream`.
 ///
 /// `knowledge` must point at a valid `Knowledge`.
-#[no_mangle] pub unsafe extern "C" fn knowledge_send(tcp_stream: *mut TcpStream, knowledge: *const Knowledge) -> HandleOwned<io::Result<()>> {
-    HandleOwned::new(Packet::KnowledgeInit((&*knowledge).clone()).write_sync(&mut *tcp_stream))
+#[no_mangle] pub unsafe extern "C" fn knowledge_send(tcp_stream: *mut TcpStream, knowledge: *const Knowledge) -> HandleOwned<DebugResult<()>> {
+    HandleOwned::new(Packet::KnowledgeInit((&*knowledge).clone()).write_sync(&mut *tcp_stream).map_err(DebugError::from))
 }
 
 /// # Safety
@@ -478,39 +515,39 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `ranges` must point at the start of a valid slice of `ram::NUM_RANGES` slices with the lengths specified in `ram::RANGES` and must not be mutated for the duration of the function call.
-#[no_mangle] pub unsafe extern "C" fn ram_from_ranges(ranges: *const *const u8) -> HandleOwned<Result<Ram, ram::DecodeError>> {
+#[no_mangle] pub unsafe extern "C" fn ram_from_ranges(ranges: *const *const u8) -> HandleOwned<DebugResult<Ram>> {
     assert!(!ranges.is_null());
     let ranges = slice::from_raw_parts(ranges, ram::NUM_RANGES);
     let ranges = ranges.iter().zip(ram::RANGES.iter().tuples()).map(|(&range, (_, &len))| slice::from_raw_parts(range, len as usize));
-    HandleOwned::new(Ram::from_ranges(ranges))
+    HandleOwned::new(Ram::from_ranges(ranges).map_err(DebugError::from))
 }
 
 /// # Safety
 ///
-/// `ram_res` must point at a valid `Result<Ram, ram::DecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn ram_result_free(ram_res: HandleOwned<Result<Ram, ram::DecodeError>>) {
+/// `ram_res` must point at a valid `DebugResult<Ram>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn ram_result_free(ram_res: HandleOwned<DebugResult<Ram>>) {
     let _ = ram_res.into_box();
 }
 
 /// # Safety
 ///
-/// `ram_res` must point at a valid `Result<Ram, ram::DecodeError>`.
-#[no_mangle] pub unsafe extern "C" fn ram_result_is_ok(ram_res: *const Result<Ram, ram::DecodeError>) -> bool {
+/// `ram_res` must point at a valid `DebugResult<Ram>`.
+#[no_mangle] pub unsafe extern "C" fn ram_result_is_ok(ram_res: *const DebugResult<Ram>) -> bool {
     (&*ram_res).is_ok()
 }
 
 /// # Safety
 ///
-/// `ram_res` must point at a valid `Result<Ram, ram::DecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn ram_result_unwrap(ram_res: HandleOwned<Result<Ram, ram::DecodeError>>) -> HandleOwned<Ram> {
+/// `ram_res` must point at a valid `DebugResult<Ram>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn ram_result_unwrap(ram_res: HandleOwned<DebugResult<Ram>>) -> HandleOwned<Ram> {
     HandleOwned::new(ram_res.into_box().unwrap())
 }
 
 /// # Safety
 ///
-/// `ram_res` must point at a valid `Result<Ram, ram::DecodeError>`. This function takes ownership of the `Result`.
-#[no_mangle] pub unsafe extern "C" fn ram_result_debug_err(ram_res: HandleOwned<Result<Ram, ram::DecodeError>>) -> StringHandle {
-    StringHandle::from_string(format!("{:?}", ram_res.into_box().unwrap_err()))
+/// `ram_res` must point at a valid `DebugResult<Ram>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn ram_result_debug_err(ram_res: HandleOwned<DebugResult<Ram>>) -> StringHandle {
+    StringHandle::from_string(ram_res.into_box().unwrap_err())
 }
 
 /// # Safety

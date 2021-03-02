@@ -15,6 +15,7 @@ use {
             Hasher,
         },
         iter,
+        pin::Pin,
         sync::Arc,
     },
     async_stream::try_stream,
@@ -701,10 +702,10 @@ impl DynRoom {
         Ok(session.put_reauth(&self.name, &self.passcode, &url, &state).await?)
     }
 
-    pub fn subscribe(&self) -> impl Stream<Item = Result<(TrackerCellId, Json), Error>> {
+    pub fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Result<(TrackerCellId, Json), Error>> + Send>> {
         let session = Arc::clone(&self.session);
         let name = self.name.clone();
-        try_stream! {
+        Box::pin(try_stream! {
             'reauth_loop: loop {
                 let url = {
                     let session = session.lock().await;
@@ -751,7 +752,7 @@ impl DynRoom {
                 }
                 Err(Error::UnexpectedEndOfStream)?;
             }
-        }
+        })
     }
 }
 

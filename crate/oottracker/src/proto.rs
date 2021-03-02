@@ -2,16 +2,15 @@ use {
     std::{
         cmp::Ordering::*,
         fmt,
-        io,
-        sync::Arc,
+        pin::Pin,
     },
     async_proto::Protocol,
     async_stream::try_stream,
+    derive_more::From,
     futures::prelude::*,
     pin_utils::pin_mut,
     serde_json::Value as Json,
     tokio::net::TcpStream,
-    wheel::FromArc,
     crate::{
         knowledge,
         ram::Ram,
@@ -33,12 +32,10 @@ pub enum Packet {
     UpdateCell(TrackerCellId, Json),
 }
 
-#[derive(Debug, FromArc, Clone)]
+#[derive(Debug, From, Clone)]
 pub enum ReadError {
-    #[from_arc]
-    Io(Arc<io::Error>),
-    #[from_arc]
-    Packet(Arc<PacketReadError>),
+    #[from]
+    Packet(async_proto::ReadError),
     VersionMismatch {
         server: u8,
         client: u8,
@@ -48,7 +45,6 @@ pub enum ReadError {
 impl fmt::Display for ReadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ReadError::Io(e) => write!(f, "I/O error: {}", e),
             ReadError::Packet(e) => e.fmt(f),
             ReadError::VersionMismatch { server, client } => match client.cmp(server) {
                 Less => write!(f, "An outdated auto-tracker attempted to connect. Please update the auto-tracker and try again."),
@@ -60,8 +56,8 @@ impl fmt::Display for ReadError {
 }
 
 /// Reads packets from the given stream.
-pub fn read(mut tcp_stream: TcpStream) -> impl Stream<Item = Result<Packet, ReadError>> {
-    try_stream! {
+pub fn read(mut tcp_stream: TcpStream) -> Pin<Box<dyn Stream<Item = Result<Packet, ReadError>> + Send>> {
+    Box::pin(try_stream! {
         let version = u8::read(&mut tcp_stream).await?;
         if version != VERSION { Err(ReadError::VersionMismatch { server: VERSION, client: version })? }
         loop {
@@ -69,13 +65,13 @@ pub fn read(mut tcp_stream: TcpStream) -> impl Stream<Item = Result<Packet, Read
             if let Packet::Goodbye = packet { break }
             yield packet
         }
-    }
+    })
 }
 
 /// Writes the given packets to the given stream.
 ///
 /// The handshake at the start and the `Goodbye` packet at the end are inserted automatically.
-pub async fn write(mut tcp_stream: TcpStream, packets: impl Stream<Item = Packet>) -> io::Result<()> {
+pub async fn write(mut tcp_stream: TcpStream, packets: impl Stream<Item = Packet>) -> Result<(), async_proto::WriteError> {
     VERSION.write(&mut tcp_stream).await?;
     pin_mut!(packets);
     while let Some(packet) = packets.next().await {
@@ -85,7 +81,7 @@ pub async fn write(mut tcp_stream: TcpStream, packets: impl Stream<Item = Packet
     Ok(())
 }
 
-pub fn handshake_sync(tcp_stream: &mut std::net::TcpStream) -> io::Result<()> {
+pub fn handshake_sync(tcp_stream: &mut std::net::TcpStream) -> Result<(), async_proto::WriteError> {
     VERSION.write_sync(tcp_stream)?;
     Ok(())
 }

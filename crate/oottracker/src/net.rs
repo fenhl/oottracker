@@ -170,11 +170,11 @@ impl Connection for TcpConnection {
 
     fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>> {
         Box::pin(
-            stream::once(async { io::Result::Ok(TcpListenerStream::new(TcpListener::bind((Ipv6Addr::LOCALHOST, TCP_PORT)).await?)) })
+            stream::once(async { TcpListener::bind((Ipv6Addr::LOCALHOST, TCP_PORT)).await })
+                .map_ok(|listener| TcpListenerStream::new(listener).err_into::<Error>())
                 .try_flatten()
-                .map_ok(|tcp_stream| proto::read(tcp_stream))
+                .map_ok(|tcp_stream| proto::read(tcp_stream).err_into::<Error>())
                 .try_flatten()
-                .map_err(Error::Protocol)
         )
     }
 

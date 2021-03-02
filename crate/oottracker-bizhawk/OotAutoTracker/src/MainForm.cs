@@ -44,13 +44,13 @@ namespace Net.Fenhl.OotAutoTracker
         [DllImport("oottracker")]
         internal static extern void string_free(IntPtr s);
         [DllImport("oottracker")]
-        internal static extern IoResultHandle tcp_stream_disconnect(IntPtr tcp_stream);
+        internal static extern UnitResultHandle tcp_stream_disconnect(IntPtr tcp_stream);
         [DllImport("oottracker")]
-        internal static extern void io_result_free(IntPtr io_res);
+        internal static extern void unit_result_free(IntPtr unit_res);
         [DllImport("oottracker")]
-        internal static extern bool io_result_is_ok(IoResultHandle io_res);
+        internal static extern bool unit_result_is_ok(UnitResultHandle unit_res);
         [DllImport("oottracker")]
-        internal static extern StringHandle io_result_debug_err(IntPtr io_res);
+        internal static extern StringHandle unit_result_debug_err(IntPtr unit_res);
         [DllImport("oottracker")]
         internal static extern SaveResultHandle save_from_save_data(byte[] start);
         [DllImport("oottracker")]
@@ -68,7 +68,7 @@ namespace Net.Fenhl.OotAutoTracker
         [DllImport("oottracker")]
         internal static extern StringHandle save_result_debug_err(IntPtr save_res);
         [DllImport("oottracker")]
-        internal static extern IoResultHandle save_send(TcpStreamHandle tcp_stream, SaveHandle save);
+        internal static extern UnitResultHandle save_send(TcpStreamHandle tcp_stream, SaveHandle save);
         [DllImport("oottracker")]
         internal static extern bool saves_equal(SaveHandle save1, SaveHandle save2);
         [DllImport("oottracker")]
@@ -76,7 +76,7 @@ namespace Net.Fenhl.OotAutoTracker
         [DllImport("oottracker")]
         internal static extern void saves_diff_free(IntPtr diff);
         [DllImport("oottracker")]
-        internal static extern IoResultHandle saves_diff_send(TcpStreamHandle tcp_stream, IntPtr diff);
+        internal static extern UnitResultHandle saves_diff_send(TcpStreamHandle tcp_stream, IntPtr diff);
         [DllImport("oottracker")]
         internal static extern KnowledgeHandle knowledge_none();
         [DllImport("oottracker")]
@@ -84,7 +84,7 @@ namespace Net.Fenhl.OotAutoTracker
         [DllImport("oottracker")]
         internal static extern void knowledge_free(IntPtr knowledge);
         [DllImport("oottracker")]
-        internal static extern IoResultHandle knowledge_send(TcpStreamHandle tcp_stream, KnowledgeHandle knowledge);
+        internal static extern UnitResultHandle knowledge_send(TcpStreamHandle tcp_stream, KnowledgeHandle knowledge);
         [DllImport("oottracker")]
         internal static extern ModelStateHandle model_new(IntPtr save, IntPtr knowledge);
         [DllImport("oottracker")]
@@ -257,11 +257,11 @@ namespace Net.Fenhl.OotAutoTracker
             return true;
         }
 
-        internal IoResultHandle Disconnect()
+        internal UnitResultHandle Disconnect()
         {
-            var io_res = Native.tcp_stream_disconnect(handle);
+            var unit_res = Native.tcp_stream_disconnect(handle);
             this.handle = IntPtr.Zero; // tcp_stream_disconnect takes ownership
-            return io_res;
+            return unit_res;
         }
     }
 
@@ -279,15 +279,15 @@ namespace Net.Fenhl.OotAutoTracker
             tcp_stream.Dispose();
         }
 
-        internal IoResult Disconnect()
+        internal UnitResult Disconnect()
         {
-            return new IoResult(tcp_stream.Disconnect());
+            return new UnitResult(tcp_stream.Disconnect());
         }
     }
 
-    internal class IoResultHandle : SafeHandle
+    internal class UnitResultHandle : SafeHandle
     {
-        internal IoResultHandle() : base(IntPtr.Zero, true) { }
+        internal UnitResultHandle() : base(IntPtr.Zero, true) { }
 
         public override bool IsInvalid
         {
@@ -298,35 +298,35 @@ namespace Net.Fenhl.OotAutoTracker
         {
             if (!this.IsInvalid)
             {
-                Native.io_result_free(handle);
+                Native.unit_result_free(handle);
             }
             return true;
         }
 
         internal StringHandle DebugErr()
         {
-            var err = Native.io_result_debug_err(handle);
-            this.handle = IntPtr.Zero; // io_result_debug_err takes ownership
+            var err = Native.unit_result_debug_err(handle);
+            this.handle = IntPtr.Zero; // unit_result_debug_err takes ownership
             return err;
         }
     }
 
-    internal class IoResult : IDisposable
+    internal class UnitResult : IDisposable
     {
-        internal IoResultHandle io_res;
+        internal UnitResultHandle unit_res;
 
-        internal IoResult(IoResultHandle io_res)
+        internal UnitResult(UnitResultHandle unit_res)
         {
-            this.io_res = io_res;
+            this.unit_res = unit_res;
         }
 
         public void Dispose()
         {
-            io_res.Dispose();
+            unit_res.Dispose();
         }
 
-        internal bool IsOk() => Native.io_result_is_ok(io_res);
-        internal StringHandle DebugErr() => io_res.DebugErr();
+        internal bool IsOk() => Native.unit_result_is_ok(unit_res);
+        internal StringHandle DebugErr() => unit_res.DebugErr();
     }
 
     internal class SaveResultHandle : SafeHandle
@@ -463,9 +463,9 @@ namespace Net.Fenhl.OotAutoTracker
             return new SavesDiff(save, other.save);
         }
 
-        internal IoResult Send(TcpStream tcp_stream)
+        internal UnitResult Send(TcpStream tcp_stream)
         {
-            return new IoResult(Native.save_send(tcp_stream.tcp_stream, save));
+            return new UnitResult(Native.save_send(tcp_stream.tcp_stream, save));
         }
 
         internal StringHandle Debug()
@@ -497,11 +497,11 @@ namespace Net.Fenhl.OotAutoTracker
             return true;
         }
 
-        internal IoResultHandle Send(TcpStreamHandle tcp_stream)
+        internal UnitResultHandle Send(TcpStreamHandle tcp_stream)
         {
-            var io_res = Native.saves_diff_send(tcp_stream, handle);
+            var unit_res = Native.saves_diff_send(tcp_stream, handle);
             this.handle = IntPtr.Zero; // saves_diff_send takes ownership
-            return io_res;
+            return unit_res;
         }
     }
 
@@ -519,9 +519,9 @@ namespace Net.Fenhl.OotAutoTracker
             diff.Dispose();
         }
 
-        internal IoResult Send(TcpStream tcp_stream)
+        internal UnitResult Send(TcpStream tcp_stream)
         {
-            return new IoResult(diff.Send(tcp_stream.tcp_stream));
+            return new UnitResult(diff.Send(tcp_stream.tcp_stream));
         }
     }
 
@@ -567,9 +567,9 @@ namespace Net.Fenhl.OotAutoTracker
             }
         }
 
-        internal IoResult Send(TcpStream tcp_stream)
+        internal UnitResult Send(TcpStream tcp_stream)
         {
-            return new IoResult(Native.knowledge_send(tcp_stream.tcp_stream, knowledge));
+            return new UnitResult(Native.knowledge_send(tcp_stream.tcp_stream, knowledge));
         }
 
         public void Dispose()
@@ -896,13 +896,13 @@ namespace Net.Fenhl.OotAutoTracker
             {
                 if (this.stream != null)
                 {
-                    using (IoResult io_res = save.Send(this.stream))
+                    using (UnitResult unit_res = save.Send(this.stream))
                     {
-                        if (!io_res.IsOk())
+                        if (!unit_res.IsOk())
                         {
                             if (this.stream != null) this.stream.Dispose();
                             this.stream = null;
-                            using (StringHandle err = io_res.DebugErr())
+                            using (StringHandle err = unit_res.DebugErr())
                             {
                                 UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                             }
@@ -918,13 +918,13 @@ namespace Net.Fenhl.OotAutoTracker
                 {
                     using (SavesDiff diff = prevSave.Diff(save))
                     {
-                        using (IoResult io_res = diff.Send(this.stream))
+                        using (UnitResult unit_res = diff.Send(this.stream))
                         {
-                            if (!io_res.IsOk())
+                            if (!unit_res.IsOk())
                             {
                                 if (this.stream != null) this.stream.Dispose();
                                 this.stream = null;
-                                using (StringHandle err = io_res.DebugErr())
+                                using (StringHandle err = unit_res.DebugErr())
                                 {
                                     UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                                 }
