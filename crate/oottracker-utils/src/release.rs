@@ -21,29 +21,27 @@ use {
         env,
         io::Cursor,
         path::Path,
-        process::Stdio,
         time::Duration,
     },
     dir_lock::DirLock,
-    itertools::Itertools as _,
-    semver::{
-        SemVerError,
-        Version,
-    },
-    serde::Deserialize,
+    semver::SemVerError,
     tempfile::NamedTempFile,
     zip::{
         ZipWriter,
         result::ZipError,
         write::FileOptions,
     },
-    crate::github::{
-        Release,
-        Repo,
+    crate::{
+        github::{
+            Release,
+            Repo,
+        },
+        version::version,
     },
 };
 
 #[cfg(windows)] mod github;
+#[cfg(windows)] mod version;
 
 #[derive(Debug, From)]
 enum Error {
@@ -117,36 +115,6 @@ async fn release_client() -> Result<reqwest::Client, Error> {
     headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&format!("token {}", fs::read_to_string("assets/release-token").await?))?);
     headers.insert(reqwest::header::USER_AGENT, reqwest::header::HeaderValue::from_static(concat!("oottracker-release/", env!("CARGO_PKG_VERSION"))));
     Ok(reqwest::Client::builder().default_headers(headers).timeout(Duration::from_secs(600)).build()?)
-}
-
-#[cfg(windows)]
-#[derive(Deserialize)]
-struct Plist {
-    #[serde(rename = "CFBundleShortVersionString")]
-    bundle_short_version_string: Version,
-}
-
-#[cfg(windows)]
-async fn check_cli_version(package: &str, version: &Version) {
-    let cli_output = String::from_utf8(Command::new("cargo").arg("run").arg(format!("--package={}", package)).arg("--").arg("--version").stdout(Stdio::piped()).output().await.expect("failed to run CLI with --version").stdout).expect("CLI version output is invalid UTF-8");
-    let (cli_name, cli_version) = cli_output.split(' ').collect_tuple().expect("no space in CLI version output");
-    assert_eq!(cli_name, package);
-    assert_eq!(*version, cli_version.parse().expect("failed to parse CLI version"));
-}
-
-#[cfg(windows)]
-async fn version() -> Version {
-    let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
-    assert_eq!(version, plist::from_file::<_, Plist>("assets/macos/OoT Tracker.app/Contents/Info.plist").expect("failed to read plist for version check").bundle_short_version_string);
-    assert_eq!(version, ootr::version());
-    assert_eq!(version, ootr_dynamic::version());
-    assert_eq!(version, ootr_static::version()); // also checks ootr-static-derive
-    assert_eq!(version, oottracker::version()); // also checks oottracker-derive
-    assert_eq!(version, oottracker_bizhawk::version());
-    //assert_eq!(version, oottracker_csharp::version()); //TODO
-    check_cli_version("oottracker-gui", &version).await;
-    check_cli_version("oottracker-web", &version).await;
-    version
 }
 
 #[cfg(windows)]
