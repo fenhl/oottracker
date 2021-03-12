@@ -12,6 +12,7 @@ use {
             HashSet,
         },
         fmt,
+        hash::Hash,
         sync::Arc,
     },
     semver::Version,
@@ -27,18 +28,19 @@ pub mod item;
 pub mod model;
 pub mod region;
 
-pub trait RandoErr: fmt::Debug + fmt::Display + Clone {
+pub trait RandoErr: fmt::Debug + fmt::Display + Clone + Send {
     const ITEM_NOT_FOUND: Self;
 }
 
-pub trait Rando {
+pub trait Rando: Sized {
     type Err: RandoErr;
+    type RegionName: Clone + Eq + Hash + From<&'static str> + AsRef<str> + for<'a> PartialEq<&'a str> + fmt::Debug + fmt::Display + Send;
 
     fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
     fn item_table(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
-    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, access::Expr)>>, Self::Err>;
+    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, access::Expr<Self>)>>, Self::Err>;
     fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
-    fn regions(&self) -> Result<Arc<Vec<Arc<Region>>>, Self::Err>;
+    fn regions(&self) -> Result<Arc<Vec<Arc<Region<Self>>>>, Self::Err>;
     fn setting_infos(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
 }
 

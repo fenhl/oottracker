@@ -8,6 +8,7 @@ edition = "2018"
 winres = "0.1"
 
 [dependencies]
+derivative = "2"
 futures = "0.3"
 image = "0.23"
 itertools = "0.10"
@@ -26,16 +27,16 @@ branch = "fields"
 
 [dependencies.iced]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
+rev = "5fc4210270852d8d633a63168d8a166a235236c6"
 features = ["image", "tokio"]
 
 [dependencies.iced_futures]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
+rev = "5fc4210270852d8d633a63168d8a166a235236c6"
 
 [dependencies.iced_native]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
+rev = "5fc4210270852d8d633a63168d8a166a235236c6"
 
 [dependencies.ootr]
 path = "../ootr"

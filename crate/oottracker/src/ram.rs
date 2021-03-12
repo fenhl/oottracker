@@ -169,7 +169,7 @@ impl Ram {
         ]
     }
 
-    pub(crate) fn current_region<R: Rando>(&self, rando: &R) -> Result<RegionLookup, RegionLookupError<R>> { //TODO disambiguate MQ-ness
+    pub(crate) fn current_region<R: Rando>(&self, rando: &R) -> Result<RegionLookup<R>, RegionLookupError<R>> { //TODO disambiguate MQ-ness
         Ok(match Scene::current(self).region(rando, self)? {
             RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, mq)) => {
                 //TODO auto-disambiguate

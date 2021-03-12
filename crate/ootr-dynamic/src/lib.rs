@@ -53,9 +53,9 @@ pub struct Rando<'p> {
     path: PathBuf,
     escaped_items: RefCell<Option<Arc<HashMap<String, Item>>>>,
     item_table: RefCell<Option<Arc<HashMap<String, Item>>>>,
-    logic_helpers: RefCell<Option<Arc<HashMap<String, (Vec<String>, ootr::access::Expr)>>>>,
+    logic_helpers: RefCell<Option<Arc<HashMap<String, (Vec<String>, ootr::access::Expr<Rando<'p>>)>>>>,
     logic_tricks: RefCell<Option<Arc<HashSet<String>>>>,
-    regions: RefCell<Option<Arc<Vec<Arc<Region>>>>>, //TODO glitched support
+    regions: RefCell<Option<Arc<Vec<Arc<Region<Self>>>>>>, //TODO glitched support
     setting_infos: RefCell<Option<Arc<HashSet<String>>>>,
 }
 
@@ -122,6 +122,7 @@ impl ootr::RandoErr for RandoErr {
 
 impl<'p> ootr::Rando for Rando<'p> {
     type Err = RandoErr;
+    type RegionName = String;
 
     fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, RandoErr> {
         if self.escaped_items.borrow().is_none() {
@@ -173,7 +174,7 @@ impl<'p> ootr::Rando for Rando<'p> {
         Ok(Arc::clone(self.item_table.borrow().as_ref().expect("just inserted")))
     }
 
-    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, ootr::access::Expr)>>, RandoErr> {
+    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, ootr::access::Expr<Rando<'p>>)>>, RandoErr> {
         if self.logic_helpers.borrow().is_none() {
             let f = File::open(self.path.join("data").join("LogicHelpers.json"))?;
             let raw_helpers = read_json_lenient_sync::<_, BTreeMap<String, String>>(BufReader::new(f))?;
@@ -214,7 +215,7 @@ impl<'p> ootr::Rando for Rando<'p> {
         Ok(Arc::clone(self.logic_tricks.borrow().as_ref().expect("just inserted")))
     }
 
-    fn regions(&self) -> Result<Arc<Vec<Arc<Region>>>, RandoErr> {
+    fn regions(&self) -> Result<Arc<Vec<Arc<Region<Self>>>>, RandoErr> {
         if self.regions.borrow().is_none() {
             let world_path = self.path.join("data").join("World"); //TODO glitched support
             let mut regions = Vec::default();

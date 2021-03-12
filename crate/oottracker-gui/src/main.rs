@@ -9,6 +9,7 @@ use {
         fmt,
         sync::Arc,
     },
+    derivative::Derivative,
     derive_more::From,
     enum_iterator::IntoEnumIterator,
     iced::{
@@ -56,6 +57,7 @@ use {
     url::Url,
     wheel::FromArc,
     ootr::{
+        Rando,
         check::Check,
         model::{
             DungeonReward,
@@ -87,6 +89,7 @@ use {
 };
 
 mod lang;
+mod logic;
 mod subscriptions;
 
 const CELL_SIZE: u16 = 50;
@@ -188,7 +191,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                     QuestItems::PRELUDE_OF_LIGHT => "prelude",
                     _ => unreachable!(),
                 };
-                match (state.ram.save.quest_items.contains(*song), Check::Location(check.to_string()).checked(state).unwrap_or(false)) {
+                match (state.ram.save.quest_items.contains(*song), Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)) { //TODO allow ootr_dynamic::Rando
                     (false, false) => images::xopar_images_dimmed(song_filename, "png"),
                     (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_check", song_filename), "png"),
                     (true, false) => images::xopar_images(song_filename, "png"),
@@ -273,11 +276,11 @@ impl TrackerCellKindExt for TrackerCellKind {
 }
 
 trait TrackerCellIdExt {
-    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message>;
+    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message<ootr_static::Rando>>; //TODO allow ootr_dynamic::Rando
 }
 
 impl TrackerCellIdExt for TrackerCellId {
-    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message> {
+    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message<ootr_static::Rando>> { //TODO allow ootr_dynamic::Rando
         Button::new(cell_button, self.kind().render(state))
             .on_press(Message::LeftClick(*self))
             .padding(0)
@@ -361,9 +364,10 @@ impl TrackerLayoutExt for TrackerLayout {
     }
 }
 
-#[derive(Debug, Clone)]
-enum Message {
-    CheckStatusErrorStatic(CheckStatusError<ootr_static::Rando>),
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""), Clone(bound = ""))]
+enum Message<R: Rando> {
+    CheckStatusErrorStatic(CheckStatusError<R>),
     ClientDisconnected,
     CloseMenu,
     ConfigError(oottracker::ui::Error),
@@ -374,6 +378,7 @@ enum Message {
     KeyboardModifiers(KeyboardModifiers),
     LeftClick(TrackerCellId),
     LoadConfig(Config),
+    Logic(logic::Message<R>),
     MissingConfig,
     MouseMoved([f32; 2]),
     Nop,
@@ -386,10 +391,10 @@ enum Message {
     SetPort(String),
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
-    UpdateAvailableChecks(HashMap<Check, CheckStatus>),
+    UpdateAvailableChecks(HashMap<Check<R>, CheckStatus>),
 }
 
-impl fmt::Display for Message {
+impl<R: Rando> fmt::Display for Message<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Message::CheckStatusErrorStatic(e) => write!(f, "error calculating checks: {}", e),
@@ -467,7 +472,7 @@ impl ConnectionParams {
         };
     }
 
-    fn view(&mut self) -> Element<'_, Message> {
+    fn view<R: Rando + 'static>(&mut self) -> Element<'_, Message<R>> {
         match self {
             ConnectionParams::RetroArch { port, port_state } => Row::new()
                 .push(Text::new("Port: "))
@@ -481,37 +486,25 @@ impl ConnectionParams {
     }
 }
 
-#[derive(Debug, SmartDefault)]
-struct State {
-    flags: bool,
+#[derive(Debug)]
+struct State<R: Rando + 'static> {
+    flags: Args,
     config: Config,
     connection: Option<Arc<dyn Connection>>,
     keyboard_modifiers: KeyboardModifiers,
     last_cursor_pos: [f32; 2],
     dismiss_welcome_screen_button: Option<button::State>,
-    #[default(default_cell_buttons())]
     cell_buttons: [button::State; 52],
+    rando: Arc<R>,
     model: ModelState,
-    checks: HashMap<Check, CheckStatus>,
-    notification: Option<(bool, Message)>,
+    checks: HashMap<Check<R>, CheckStatus>,
+    logic: logic::State<R>,
+    notification: Option<(bool, Message<R>)>,
     dismiss_notification_button: button::State,
     menu_state: Option<MenuState>,
 }
 
-fn default_cell_buttons() -> [button::State; 52] {
-    [
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-        button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
-    ]
-}
-
-impl State {
+impl<R: Rando + 'static> State<R> {
     fn layout(&self) -> TrackerLayout {
         if self.connection.as_ref().map_or(true, |connection| connection.can_change_state()) {
             TrackerLayout::from(&self.config)
@@ -524,12 +517,12 @@ impl State {
     ///
     /// Implemented as a separate method in case the way this is displayed is changed later, e.g. to allow multiple notifications.
     #[must_use]
-    fn notify(&mut self, message: Message) -> Command<Message> {
+    fn notify(&mut self, message: Message<R>) -> Command<Message<R>> {
         self.notification = Some((false, message));
         Command::none()
     }
 
-    fn save_config(&self) -> Command<Message> {
+    fn save_config(&self) -> Command<Message<R>> {
         let config = self.config.clone();
         async move {
             match config.save().await {
@@ -540,8 +533,38 @@ impl State {
     }
 }
 
-impl From<bool> for State {
-    fn from(flags: bool) -> State {
+impl Default for State<ootr_static::Rando> {
+    fn default() -> State<ootr_static::Rando> {
+        State {
+            flags: Args::default(),
+            config: Config::default(),
+            connection: None,
+            keyboard_modifiers: KeyboardModifiers::default(),
+            last_cursor_pos: [0.0, 0.0],
+            dismiss_welcome_screen_button: None,
+            cell_buttons: [
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+                button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
+            ],
+            rando: Arc::new(ootr_static::Rando),
+            model: ModelState::default(),
+            checks: HashMap::default(),
+            logic: logic::State::default(),
+            notification: None,
+            dismiss_notification_button: button::State::default(),
+            menu_state: None,
+        }
+    }
+}
+
+impl From<Args> for State<ootr_static::Rando> { //TODO include Rando in flags and make this impl generic
+    fn from(flags: Args) -> State<ootr_static::Rando> {
         State {
             flags,
             ..State::default()
@@ -549,12 +572,12 @@ impl From<bool> for State {
     }
 }
 
-impl Application for State {
+impl Application for State<ootr_static::Rando> { //TODO include Rando in flags and make this impl generic
     type Executor = iced::executor::Default;
-    type Message = Message;
-    type Flags = bool;
+    type Message = Message<ootr_static::Rando>;
+    type Flags = Args;
 
-    fn new(flags: bool) -> (State, Command<Message>) {
+    fn new(flags: Args) -> (State<ootr_static::Rando>, Command<Message<ootr_static::Rando>>) {
         (State::from(flags), async {
             match Config::new().await {
                 Ok(Some(config)) => Message::LoadConfig(config),
@@ -572,7 +595,7 @@ impl Application for State {
         }
     }
 
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn update(&mut self, message: Message<ootr_static::Rando>) -> Command<Message<ootr_static::Rando>> {
         match message {
             Message::CheckStatusErrorStatic(_) => return self.notify(message),
             Message::ClientDisconnected => return self.notify(message),
@@ -616,6 +639,7 @@ impl Application for State {
                 0 => self.config = config,
                 v => unimplemented!("config version from the future: {}", v),
             },
+            Message::Logic(msg) => return self.logic.update(msg),
             Message::MissingConfig => self.dismiss_welcome_screen_button = Some(button::State::default()),
             Message::MouseMoved(pos) => self.last_cursor_pos = pos,
             Message::Nop => {}
@@ -641,15 +665,13 @@ impl Application for State {
                         }
                     },
                 }
-                if self.flags {
+                if self.flags.show_available_checks {
+                    let rando = self.rando.clone();
                     let model = self.model.clone();
                     return async move {
-                        tokio::task::spawn_blocking(move || {
-                            let rando = ootr_static::Rando; //TODO allow specifying dynamic Rando path in settings
-                            match checks::status(&rando, &model) {
-                                Ok(status) => Message::UpdateAvailableChecks(status),
-                                Err(e) => Message::CheckStatusErrorStatic(e),
-                            }
+                        tokio::task::spawn_blocking(move || match checks::status(&*rando, &model) {
+                            Ok(status) => Message::UpdateAvailableChecks(status),
+                            Err(e) => Message::CheckStatusErrorStatic(e),
                         }).await.expect("status checks task panicked")
                     }.into()
                 }
@@ -701,7 +723,7 @@ impl Application for State {
         Command::none()
     }
 
-    fn view(&mut self) -> Element<'_, Message> {
+    fn view(&mut self) -> Element<'_, Message<ootr_static::Rando>> {
         let layout = self.layout();
         let mut cell_buttons = self.cell_buttons.iter_mut();
 
@@ -795,10 +817,11 @@ impl Application for State {
                 .height(Length::Units(HEIGHT as u16))
             )
             .width(Length::Fill)
-            .center_x()
-            .center_y()
-            .style(ContainerStyle);
-        if self.flags { // show available checks
+            .style(ContainerStyle)
+            .width(if self.flags.show_logic_tracker { Length::Units(WIDTH as u16 + 2) } else { Length::Fill })
+            .height(if self.flags.show_available_checks { Length::Units(HEIGHT as u16 + 2) } else { Length::Fill })
+            .into();
+        let left_column = if self.flags.show_available_checks {
             let check_status_map = self.checks.iter().map(|(check, status)| (status, check)).into_group_map();
             let mut col = Column::new()
                 .push(Text::new(format!("{} checked", lang::plural(check_status_map.get(&CheckStatus::Checked).map_or(0, Vec::len), "location"))))
@@ -808,17 +831,24 @@ impl Application for State {
                 col = col.push(Text::new(format!("{}", check)));
             }
             Column::new()
-                .push(items_container.height(Length::Units(HEIGHT as u16 + 2)))
+                .push(items_container)
                 .push(col)
                 .into()
         } else {
             items_container
-                .height(Length::Fill)
+        };
+        if self.flags.show_logic_tracker {
+            Row::new()
+                .push(left_column)
+                .push(self.logic.view(&self.rando).map(Message::Logic))
+                .width(Length::Fill)
                 .into()
+        } else {
+            left_column
         }
     }
 
-    fn subscription(&self) -> iced::Subscription<Message> {
+    fn subscription(&self) -> iced::Subscription<Message<ootr_static::Rando>> {
         Subscription::batch(vec![
             iced_native::subscription::events_with(|event, status| match (event, status) {
                 (iced_native::Event::Keyboard(iced_native::keyboard::Event::ModifiersChanged(modifiers)), _) => Some(Message::KeyboardModifiers(modifiers)),
@@ -826,7 +856,7 @@ impl Application for State {
                 (iced_native::Event::Mouse(iced_native::mouse::Event::ButtonReleased(iced_native::mouse::Button::Right)), iced_native::event::Status::Ignored) => Some(Message::RightClick),
                 _ => None,
             }),
-            Subscription::from_recipe(subscriptions::Subscription(self.connection.clone().unwrap_or_else(|| Arc::new(net::NullConnection)))),
+            Subscription::from_recipe(subscriptions::Subscription::new(self.connection.clone().unwrap_or_else(|| Arc::new(net::NullConnection)))),
         ])
     }
 }
@@ -898,10 +928,12 @@ async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn 
     Ok(connection)
 }
 
-#[derive(StructOpt)]
+#[derive(Debug, Default, StructOpt)]
 struct Args {
     #[structopt(long = "checks")]
     show_available_checks: bool,
+    #[structopt(long = "logic")]
+    show_logic_tracker: bool,
 }
 
 #[derive(From)]
@@ -920,18 +952,18 @@ impl fmt::Display for Error {
 }
 
 #[wheel::main]
-fn main(Args { show_available_checks }: Args) -> Result<(), Error> {
+fn main(args: Args) -> Result<(), Error> {
     let icon = images::icon::<DynamicImage>().to_rgba8();
     State::run(Settings {
         window: window::Settings {
-            size: (WIDTH, HEIGHT + if show_available_checks { 400 } else { 0 }),
+            size: (WIDTH + if args.show_logic_tracker { 800 } else { 0 }, HEIGHT + if args.show_logic_tracker || args.show_available_checks { 400 } else { 0 }),
             min_size: Some((WIDTH, HEIGHT)),
-            max_size: if show_available_checks { Some((WIDTH, u32::MAX)) } else { Some((WIDTH, HEIGHT)) },
-            resizable: show_available_checks,
+            max_size: if args.show_logic_tracker || args.show_available_checks { Some((WIDTH, u32::MAX)) } else { Some((WIDTH, HEIGHT)) },
+            resizable: args.show_logic_tracker || args.show_available_checks,
             icon: Some(Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height())?),
             ..window::Settings::default()
         },
-        flags: show_available_checks,
+        flags: args,
         ..Settings::default()
     })?;
     Ok(())

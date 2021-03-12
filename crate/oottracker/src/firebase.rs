@@ -97,7 +97,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             Simple { active, .. } => json!(active(state)),
             SmallKeys { get, .. } => json!(get(&state.ram.save.small_keys)),
             Song { song, .. } => json!(state.ram.save.quest_items.contains(*song)),
-            SongCheck { check, .. } => json!(Check::Location(check.to_string()).checked(state).unwrap_or(false)),
+            SongCheck { check, .. } => json!(Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)), //TODO allow ootr_dynamic::Rando
             Stone(stone) => json!(state.ram.save.quest_items.has(stone)),
             StoneLocation(stone) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone)) {
                 None => 0,
@@ -194,7 +194,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             } else {
                 state.ram.save.quest_items.remove(*song);
             },
-            SongCheck { check, toggle_overlay } => if Check::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? {
+            SongCheck { check, toggle_overlay } => if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? { //TODO allow ootr_dynamic::Rando
                 toggle_overlay(&mut state.ram.save.event_chk_inf);
             },
             Stone(stone) => if value.as_bool().ok_or_else(|| value.clone())? {

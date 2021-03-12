@@ -10,6 +10,7 @@ use {
     async_proto::Protocol,
     quote_value::QuoteValue,
     crate::{
+        Rando,
         access,
         model::Dungeon,
     },
@@ -31,26 +32,27 @@ impl fmt::Display for Mq {
 }
 
 #[derive(Debug, Clone, QuoteValue)]
-pub struct Region {
-    pub name: String,
+#[quote_value(where(R::RegionName: QuoteValue))]
+pub struct Region<R: Rando> {
+    pub name: R::RegionName,
     pub dungeon: Option<(Dungeon, Mq)>,
     pub scene: Option<String>, //TODO use Scene type from oottracker?
     pub hint: Option<String>,
     pub time_passes: bool,
-    pub events: HashMap<String, access::Expr>,
-    pub locations: HashMap<String, access::Expr>,
-    pub exits: HashMap<String, access::Expr>,
+    pub events: HashMap<String, access::Expr<R>>,
+    pub locations: HashMap<String, access::Expr<R>>,
+    pub exits: HashMap<R::RegionName, access::Expr<R>>,
 }
 
-impl PartialEq for Region {
-    fn eq(&self, other: &Region) -> bool {
+impl<R: Rando> PartialEq for Region<R> {
+    fn eq(&self, other: &Region<R>) -> bool {
         self.dungeon == other.dungeon && self.name == other.name
     }
 }
 
-impl Eq for Region {}
+impl<R: Rando> Eq for Region<R> {}
 
-impl Hash for Region {
+impl<R: Rando> Hash for Region<R> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.dungeon.hash(state);

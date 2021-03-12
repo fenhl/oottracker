@@ -336,10 +336,10 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
         #vis #struct_token #name(#(#contents,)*);
 
         impl #name {
-            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
+            pub(crate) fn checked<R: ootr::Rando>(&self, check: &ootr::check::Check<R>) -> Option<bool> {
                 match check {
                     ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
-                        ootr::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
+                        ootr::check::Check::Exit { from, to, .. } => match (id, (from.as_ref(), to.as_ref())) {
                             #(#entrance_prereqs,)*
                             _ => None,
                         },
@@ -757,11 +757,11 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         if let SceneData::RegionName(region_name) = data {
             let scene_name = name.to_lit();
             Some(match region_name {
-                RegionName::One(region_name) => quote!(#scene_name => Ok(Region::new(rando, #region_name)?)),
+                RegionName::One(region_name) => quote!(#scene_name => Ok(Region::new(rando, &#region_name)?)),
                 RegionName::Multiple(f) => quote! {
                     #scene_name => {
                         let f: Box<dyn Fn(&Ram) -> &str + Send + Sync> = Box::new(#f);
-                        Ok(Region::new(rando, f(ram))?)
+                        Ok(Region::new(rando, &f(ram))?)
                     }
                 },
             })
@@ -779,10 +779,10 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         }
 
         impl #name {
-            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
+            pub(crate) fn checked<R: ootr::Rando>(&self, check: &ootr::check::Check<R>) -> Option<bool> {
                 match check {
                     ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
-                        ootr::check::Check::Exit { from, to, .. } => match (id, (&**from, &**to)) {
+                        ootr::check::Check::Exit { from, to, .. } => match (id, (from.as_ref(), to.as_ref())) {
                             #(#entrance_prereqs,)*
                             _ => None,
                         },
@@ -841,7 +841,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                 })
             }
 
-            pub(crate) fn region<R: Rando>(&self, rando: &R, ram: &Ram) -> Result<RegionLookup, RegionLookupError<R>> {
+            pub(crate) fn region<R: ootr::Rando>(&self, rando: &R, ram: &Ram) -> Result<RegionLookup<R>, RegionLookupError<R>> {
                 match self.0 {
                     #(#region_arms,)*
                     _ => RegionLookup::new(self.regions(rando)?),

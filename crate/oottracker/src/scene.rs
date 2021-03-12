@@ -225,7 +225,7 @@ impl Scene {
         Scene::from_id(ram.current_scene_id)
     }
 
-    pub(crate) fn regions<'a, R: Rando>(&self, rando: &'a R) -> Result<Vec<Arc<Region>>, RegionLookupError<R>> {
+    pub(crate) fn regions<'a, R: Rando>(&self, rando: &'a R) -> Result<Vec<Arc<Region<R>>>, RegionLookupError<R>> {
         let name = self.0;
         Ok(
             Region::all(rando)?

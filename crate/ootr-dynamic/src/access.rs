@@ -102,31 +102,31 @@ impl<T> PyResultExt for PyResult<T> {
     }
 }
 
-pub(crate) trait ExprExt {
-    fn parse(rando: &Rando<'_>, ctx: &Check, expr: &str) -> Result<Expr, ParseError>;
-    fn parse_helper(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, args: &[String], expr: &str) -> Result<Expr, ParseError>;
+pub(crate) trait ExprExt<'p> {
+    fn parse(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, expr: &str) -> Result<Expr<Rando<'p>>, ParseError>;
+    fn parse_helper(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, helpers: &HashMap<&str, usize>, args: &[String], expr: &str) -> Result<Expr<Rando<'p>>, ParseError>;
 }
 
-impl ExprExt for Expr {
-    fn parse(rando: &Rando<'_>, ctx: &Check, expr: &str) -> Result<Expr, ParseError> {
+impl<'p> ExprExt<'p> for Expr<Rando<'p>> {
+    fn parse(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, expr: &str) -> Result<Expr<Rando<'p>>, ParseError> {
         let logic_helpers = rando.logic_helpers()?;
         let helpers = logic_helpers.iter().map(|(name, (args, _))| (&**name, args.len())).collect();
         let ast = rando.py.import("ast")?;
         Expr::parse_inner(rando, ctx, &helpers, &mut (0..), ast, ast.call_method1("parse", (expr, ctx.to_string(), "eval")).at("ast.parse in parse")?.getattr("body").at(".body in parse")?, &[])
     }
 
-    fn parse_helper(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, args: &[String], expr: &str) -> Result<Expr, ParseError> {
+    fn parse_helper(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, helpers: &HashMap<&str, usize>, args: &[String], expr: &str) -> Result<Expr<Rando<'p>>, ParseError> {
         let ast = rando.py.import("ast")?;
         Expr::parse_inner(rando, ctx, helpers, &mut (0..), ast, ast.call_method1("parse", (expr, ctx.to_string(), "eval")).at("ast.parse in parse_helper")?.getattr("body").at(".body in parse_helper")?, args)
     }
 }
 
-trait ExprExtPrivate {
-    fn parse_inner(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr, ParseError>;
+trait ExprExtPrivate<'p> {
+    fn parse_inner(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr<Rando<'p>>, ParseError>;
 }
 
-impl ExprExtPrivate for Expr {
-    fn parse_inner(rando: &Rando<'_>, ctx: &Check, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr, ParseError> {
+impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
+    fn parse_inner(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr<Rando<'p>>, ParseError> {
         // based on RuleParser.py as of 4f83414c49ff65ef2eb285667bcb153f11f1f9ef
         Ok(if ast.get("BoolOp")?.downcast::<PyType>()?.is_instance(expr)? {
             if ast.get("And")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {

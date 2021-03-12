@@ -3,6 +3,7 @@
 
 use {
     std::{
+        collections::HashMap,
         fs::{
             self,
             File,
@@ -12,6 +13,7 @@ use {
             Cursor,
             prelude::*,
         },
+        sync::Arc,
     },
     convert_case::{
         Case,
@@ -23,11 +25,12 @@ use {
         GraphQLQuery,
         Response,
     },
+    itertools::Itertools as _,
     proc_macro::TokenStream,
     proc_macro2::Span,
     pyo3::prelude::*,
     quote::quote,
-    quote_value::QuoteValue as _,
+    quote_value::QuoteValue,
     syn::{
         DeriveInput,
         Ident,
@@ -67,6 +70,130 @@ enum Error {
     Rando(ootr_dynamic::RandoErr),
     Reqwest(reqwest::Error),
     Zip(ZipError),
+}
+
+/// A wrapper type around `Expr<ootr_dynamic::Rando>` that's quoted as if it were an `Expr<ootr_static::Rando>`
+struct AccessExprWrapper<'a>(&'a ootr::access::Expr<ootr_dynamic::Rando<'a>>);
+
+impl<'a> QuoteValue for AccessExprWrapper<'a> {
+    fn quote(&self) -> proc_macro2::TokenStream {
+        match self.0 {
+            ootr::access::Expr::All(ref exprs) => {
+                let exprs = exprs.iter().map(AccessExprWrapper).collect_vec().quote();
+                quote!(::ootr::access::Expr::All(#exprs))
+            }
+            ootr::access::Expr::Any(ref exprs) => {
+                let exprs = exprs.iter().map(AccessExprWrapper).collect_vec().quote();
+                quote!(::ootr::access::Expr::Any(#exprs))
+            }
+            ootr::access::Expr::AnonymousEvent(ref at_check, id) => {
+                let at_check = CheckWrapper(at_check).quote();
+                let id = id.quote();
+                quote!(::ootr::access::Expr::AnonymousEvent(#at_check, #id))
+            }
+            ootr::access::Expr::Eq(ref lhs, ref rhs) => {
+                let lhs = Box::new(AccessExprWrapper(lhs)).quote();
+                let rhs = Box::new(AccessExprWrapper(rhs)).quote();
+                quote!(::ootr::access::Expr::Eq(#lhs, #rhs))
+            }
+            ootr::access::Expr::HasDungeonRewards(ref n) => {
+                let n = Box::new(AccessExprWrapper(n)).quote();
+                quote!(::ootr::access::Expr::HasDungeonRewards(#n))
+            }
+            ootr::access::Expr::HasMedallions(ref n) => {
+                let n = Box::new(AccessExprWrapper(n)).quote();
+                quote!(::ootr::access::Expr::HasMedallions(#n))
+            }
+            ootr::access::Expr::HasStones(ref n) => {
+                let n = Box::new(AccessExprWrapper(n)).quote();
+                quote!(::ootr::access::Expr::HasStones(#n))
+            }
+            ootr::access::Expr::Item(ref item, ref count) => {
+                let item = item.quote();
+                let count = Box::new(AccessExprWrapper(count)).quote();
+                quote!(::ootr::access::Expr::Item(#item, #count))
+            }
+            ootr::access::Expr::LogicHelper(ref helper_name, ref exprs) => {
+                let helper_name = helper_name.quote();
+                let exprs = exprs.iter().map(AccessExprWrapper).collect_vec().quote();
+                quote!(::ootr::access::Expr::LogicHelper(#helper_name, #exprs))
+            }
+            ootr::access::Expr::Not(ref expr) => {
+                let expr = Box::new(AccessExprWrapper(expr)).quote();
+                quote!(::ootr::access::Expr::Not(#expr))
+            }
+            _ => self.0.quote(),
+        }
+    }
+}
+
+/// A wrapper type around `Check<ootr_dynamic::Rando>` that's quoted as if it were a `Check<ootr_static::Rando>`
+struct CheckWrapper<'a>(&'a ootr::check::Check<ootr_dynamic::Rando<'a>>);
+
+impl<'a> QuoteValue for CheckWrapper<'a> {
+    fn quote(&self) -> proc_macro2::TokenStream {
+        match self.0 {
+            ootr::check::Check::AnonymousEvent(ref at_check, id) => {
+                let at_check = CheckWrapper(at_check).quote();
+                let id = id.quote();
+                quote!(::ootr::check::Check::AnonymousEvent(#at_check, #id))
+            }
+            ootr::check::Check::Exit { ref from, from_mq, ref to } => {
+                let from = (&from[..]).quote(); // quote as &'static str
+                let from_mq = from_mq.quote();
+                let to = (&to[..]).quote(); // quote as &'static str
+                quote!(::ootr::check::Check::Exit {
+                    from: #from,
+                    from_mq: #from_mq,
+                    to: #to,
+                })
+            }
+            _ => self.0.quote(),
+        }
+    }
+}
+
+/// A wrapper type around `(Vec<String>, Expr<ootr_dynamic::Rando>)` that's quoted as if it were a `(Vec<String>, Expr<ootr_static::Rando>)`
+struct LogicHelperWrapper<'a>(&'a (Vec<String>, ootr::access::Expr<ootr_dynamic::Rando<'a>>));
+
+impl<'a> QuoteValue for LogicHelperWrapper<'a> {
+    fn quote(&self) -> proc_macro2::TokenStream {
+        let (params, expr) = self.0;
+        let params = params.quote();
+        let expr = AccessExprWrapper(expr).quote();
+        quote! { (#params, #expr) }
+    }
+}
+
+/// A wrapper type around `Arc<Region<ootr_dynamic::Rando>>` that's quoted as if it were an `Arc<Region<ootr_static::Rando>>`
+struct RegionWrapper<'a>(&'a Arc<ootr::region::Region<ootr_dynamic::Rando<'a>>>);
+
+impl<'a> QuoteValue for RegionWrapper<'a> {
+    fn quote(&self) -> proc_macro2::TokenStream {
+        let ootr::region::Region { ref name, ref dungeon, ref scene, ref hint, ref time_passes, ref events, ref locations, ref exits } = **self.0;
+        let name = (&name[..]).quote(); // quote as &'static str
+        let dungeon = dungeon.quote();
+        let scene = scene.quote();
+        let hint = hint.quote();
+        let time_passes = time_passes.quote();
+        let events = events.iter().map(|(name, rule)| (name.clone(), AccessExprWrapper(rule))).collect::<HashMap<_, _>>().quote();
+        let locations = locations.iter().map(|(name, rule)| (name.clone(), AccessExprWrapper(rule))).collect::<HashMap<_, _>>().quote();
+        let exits = exits.iter().map(|(name, rule)| (&name[..], AccessExprWrapper(rule))).collect::<HashMap<_, _>>().quote();
+        quote! {
+            ::std::sync::Arc::new(
+                ::ootr::region::Region {
+                    name: #name,
+                    dungeon: #dungeon,
+                    scene: #scene,
+                    hint: #hint,
+                    time_passes: #time_passes,
+                    events: #events,
+                    locations: #locations,
+                    exits: #exits,
+                }
+            )
+        }
+    }
 }
 
 #[proc_macro_derive(Rando)]
@@ -120,16 +247,16 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         let data = vec![
             ("escaped_items", quote!(HashMap<String, Item>), rando.escaped_items()?.quote()),
             ("item_table", quote!(HashMap<String, Item>), rando.item_table()?.quote()),
-            ("logic_helpers", quote!(HashMap<String, (Vec<String>, Expr)>), rando.logic_helpers()?.quote()),
+            ("logic_helpers", quote!(HashMap<String, (Vec<String>, Expr<#ty>)>), Arc::new(rando.logic_helpers()?.iter().map(|(k, v)| (k.clone(), LogicHelperWrapper(v))).collect::<HashMap<_, _>>()).quote()),
             ("logic_tricks", quote!(HashSet<String>), rando.logic_tricks()?.quote()),
-            ("regions", quote!(Vec<Arc<Region>>), rando.regions()?.quote()),
+            ("regions", quote!(Vec<Arc<Region<#ty>>>), Arc::new(rando.regions()?.iter().map(RegionWrapper).collect_vec()).quote()),
             ("setting_infos", quote!(HashSet<String>), rando.setting_infos()?.quote()),
         ];
         Ok::<_, Error>(data)
     })?;
     let screaming_idents = data.iter()
         .map(|(name, _, _)| Ident::new(&name.to_case(Case::ScreamingSnake), Span::call_site()))
-        .collect::<Vec<_>>();
+        .collect_vec();
     let lazy_statics = screaming_idents.iter().zip(&data)
         .map(|(screaming_ident, (_, ty, value))| quote!(static ref #screaming_ident: Arc<#ty> = #value;));
     let trait_fns = screaming_idents.iter().zip(&data)
@@ -146,6 +273,7 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
 
         impl ootr::Rando for #ty {
             type Err = RandoErr;
+            type RegionName = &'static str;
 
             #(#trait_fns)*
         }

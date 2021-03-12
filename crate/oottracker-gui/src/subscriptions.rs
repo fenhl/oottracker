@@ -5,6 +5,7 @@ use {
             Hash as _,
             Hasher,
         },
+        marker::PhantomData,
         sync::Arc,
     },
     futures::{
@@ -12,23 +13,37 @@ use {
         stream::BoxStream,
     },
     iced_futures::subscription::Recipe,
+    ootr::Rando,
     oottracker::net::Connection,
     crate::Message,
 };
 
-pub(crate) struct Subscription(pub(crate) Arc<dyn Connection>);
+pub(crate) struct Subscription<R: Rando + 'static> {
+    conn: Arc<dyn Connection>,
+    _rando: PhantomData<R>,
+}
 
-impl<H: Hasher, I> Recipe<H, I> for Subscription {
-    type Output = Message;
+impl<R: Rando + 'static> Subscription<R> {
+    pub(crate) fn new(conn: Arc<dyn Connection>) -> Subscription<R> {
+        Subscription {
+            conn,
+            _rando: PhantomData,
+        }
+    }
+}
+
+impl<R: Rando + 'static, H: Hasher, I> Recipe<H, I> for Subscription<R> {
+    type Output = Message<R>;
 
     fn hash(&self, state: &mut H) {
         TypeId::of::<Self>().hash(state);
-        self.0.hash().hash(state);
+        self.conn.hash().hash(state);
+        TypeId::of::<R>().hash(state);
     }
 
-    fn stream(self: Box<Self>, _: BoxStream<'_, I>) -> BoxStream<'_, Message> {
+    fn stream(self: Box<Self>, _: BoxStream<'_, I>) -> BoxStream<'_, Message<R>> {
         Box::pin(
-            self.0.packet_stream()
+            self.conn.packet_stream()
                 .map(|result| match result {
                     Ok(packet) => Message::Packet(packet),
                     Err(e) => Message::ConnectionError(e.into()),

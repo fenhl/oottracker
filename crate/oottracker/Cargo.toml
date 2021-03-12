@@ -9,6 +9,7 @@ async-stream = "0.3"
 bitflags = "1"
 byteorder = "1"
 collect-mac = "0.1"
+derivative = "2"
 directories = "3"
 futures = "0.3"
 image = "0.23"
@@ -38,7 +39,7 @@ branch = "refactor/tokio-hyper"
 
 [dependencies.iced]
 git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "8d882d787e6b7fd7c2435f42f82933e2ed904edf"
+rev = "5fc4210270852d8d633a63168d8a166a235236c6"
 
 [dependencies.ootr]
 path = "../ootr"

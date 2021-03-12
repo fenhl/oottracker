@@ -10,6 +10,9 @@ itertools = "0.10"
 [dependencies.ootr]
 path = "../ootr"
 
+[dependencies.ootr-static]
+path = "../ootr-static"
+
 [dependencies.oottracker]
 path = "../oottracker"
 

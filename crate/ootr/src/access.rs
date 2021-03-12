@@ -1,7 +1,9 @@
 use {
     std::borrow::Cow,
+    derivative::Derivative,
     quote_value::QuoteValue,
     crate::{
+        Rando,
         check::Check,
         item::Item,
         model::{
@@ -11,7 +13,7 @@ use {
     },
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, QuoteValue)]
 pub enum ForAge {
     Child,
     Adult,
@@ -19,25 +21,27 @@ pub enum ForAge {
     Either,
 }
 
-#[derive(Debug, Clone, QuoteValue)]
-pub enum Expr {
-    All(Vec<Expr>),
-    Any(Vec<Expr>),
+#[derive(Derivative, QuoteValue)]
+#[derivative(Debug(bound = ""), Clone(bound = ""))]
+#[quote_value(where(R::RegionName: QuoteValue))]
+pub enum Expr<R: Rando> {
+    All(Vec<Expr<R>>),
+    Any(Vec<Expr<R>>),
     Age,
-    AnonymousEvent(Check, usize),
-    Eq(Box<Expr>, Box<Expr>),
+    AnonymousEvent(Check<R>, usize),
+    Eq(Box<Expr<R>>, Box<Expr<R>>),
     Event(String),
     /// used in helper `has_projectile`. Should only compare equal to itself.
     ForAge(ForAge),
-    HasDungeonRewards(Box<Expr>),
-    HasMedallions(Box<Expr>),
-    HasStones(Box<Expr>),
-    Item(Item, Box<Expr>),
+    HasDungeonRewards(Box<Expr<R>>),
+    HasMedallions(Box<Expr<R>>),
+    HasStones(Box<Expr<R>>),
+    Item(Item, Box<Expr<R>>),
     LacsCondition,
     LitInt(u8),
     LitStr(String),
-    LogicHelper(String, Vec<Expr>),
-    Not(Box<Expr>),
+    LogicHelper(String, Vec<Expr<R>>),
+    Not(Box<Expr<R>>),
     /// logic helper parameter
     Param(String),
     Setting(String),
@@ -48,8 +52,8 @@ pub enum Expr {
     True,
 }
 
-impl Expr {
-    pub fn resolve_args<'a>(&'a self, params: &[String], args: &'a [Expr]) -> Cow<'a, Expr> {
+impl<R: Rando> Expr<R> {
+    pub fn resolve_args<'a>(&'a self, params: &[String], args: &'a [Expr<R>]) -> Cow<'a, Expr<R>> {
         match self {
             Expr::All(exprs) => Cow::Owned(Expr::All(exprs.iter().map(|expr| expr.resolve_args(params, args).into_owned()).collect())),
             Expr::Any(exprs) => Cow::Owned(Expr::Any(exprs.iter().map(|expr| expr.resolve_args(params, args).into_owned()).collect())),

@@ -1,7 +1,9 @@
 use {
     std::fmt,
+    derivative::Derivative,
     quote_value::QuoteValue,
     crate::{
+        Rando,
         model::{
             Dungeon,
             Medallion,
@@ -10,16 +12,18 @@ use {
     },
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, QuoteValue)]
-pub enum Check {
+#[derive(Derivative, QuoteValue)]
+#[derivative(Debug(bound = ""), Clone(bound = ""), PartialEq(bound = ""), Eq(bound = ""), Hash(bound = ""))]
+#[quote_value(where(R::RegionName: QuoteValue))]
+pub enum Check<R: Rando> {
     /// Constructed using `at` or `here`.
-    AnonymousEvent(Box<Check>, usize),
+    AnonymousEvent(Box<Check<R>>, usize),
     Event(String),
     /// What's behind an entrance.
     Exit {
-        from: String,
+        from: R::RegionName,
         from_mq: Option<Mq>,
-        to: String,
+        to: R::RegionName,
     },
     /// These are the things the randomizer itself considers checks.
     Location(String),
@@ -32,7 +36,7 @@ pub enum Check {
     Trick(String),
 }
 
-impl fmt::Display for Check {
+impl<R: Rando> fmt::Display for Check<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Check::AnonymousEvent(at_check, id) => write!(f, "requirement {} for {}", id, at_check),

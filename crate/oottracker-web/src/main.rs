@@ -144,7 +144,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                     QuestItems::PRELUDE_OF_LIGHT => "prelude",
                     _ => unreachable!(),
                 };
-                if Check::Location(check.to_string()).checked(state).unwrap_or(false) {
+                if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
                     let css_classes = if state.ram.save.quest_items.contains(*song) { "" } else { "dimmed" };
                     format!(r#"
                         <img class="{}" src="/static/img/xopar-images/{}.png" />

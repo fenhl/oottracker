@@ -241,7 +241,7 @@ pub fn version() -> Version {
                 QuestItems::PRELUDE_OF_LIGHT => "prelude",
                 _ => unreachable!(),
             };
-            match (state.ram.save.quest_items.contains(song), Check::Location(check.to_string()).checked(state).unwrap_or(false)) {
+            match (state.ram.save.quest_items.contains(song), Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)) { //TODO allow ootr_dynamic::Rando
                 (false, false) => format!("xopar_images_dimmed.{}", song_filename),
                 (false, true) => format!("xopar_images_overlay_dimmed.{}_check", song_filename),
                 (true, false) => format!("xopar_images.{}", song_filename),

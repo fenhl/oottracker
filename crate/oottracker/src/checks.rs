@@ -9,6 +9,7 @@ use {
         sync::Arc,
     },
     collect_mac::collect,
+    derivative::Derivative,
     derive_more::From,
     itertools::{
         EitherOrBoth,
@@ -37,7 +38,7 @@ pub trait CheckExt {
     fn checked(&self, model: &ModelState) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
 }
 
-impl CheckExt for Check {
+impl<R: Rando> CheckExt for Check<R> {
     fn checked(&self, model: &ModelState) -> Option<bool> {
         // event and location lists from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
         if let Some(checked) = model.ram.save.event_chk_inf.checked(self) { return Some(checked) }
@@ -46,30 +47,30 @@ impl CheckExt for Check {
         if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) } //TODO adjust for current-scene flags not being stored in save immediately
         match self {
             Check::AnonymousEvent(at_check, id) => match (&**at_check, id) {
-                (Check::Exit { from_mq: None, from, to }, 0) if from == "Death Mountain" && to == "Death Mountain Summit" => Some(
+                (Check::Exit { from_mq: None, from, to }, 0) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_FIRST_BOULDER
                         | crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_SECOND_BOULDER
                     )
                 ),
-                (Check::Exit { from_mq: None, from, to }, 1) if from == "Death Mountain" && to == "Death Mountain Summit" => Some(
+                (Check::Exit { from_mq: None, from, to }, 1) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::BLOW_UP_DC_ENTRANCE
                         | crate::scene::DeathMountainSwitches::PLANT_BEAN
                     )
                 ),
-                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 0) if from == "Deku Tree Lobby" && to == "Deku Tree Basement Backroom" => Some(
+                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 0) if *from == "Deku Tree Lobby" && *to == "Deku Tree Basement Backroom" => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_BURN_FIRST_WEB_TO_BACK_ROOM
                         | crate::scene::DekuTreeSwitches::LIGHT_TORCHES_AFTER_WATER_ROOM
                     )
                 ),
-                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 2) if from == "Deku Tree Lobby" && to == "Deku Tree Basement Backroom" => Some(
+                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 2) if *from == "Deku Tree Lobby" && *to == "Deku Tree Basement Backroom" => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
                 ),
-                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 1) if from == "Deku Tree Lobby" && to == "Deku Tree Boss Room" => Some(
+                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 1) if *from == "Deku Tree Lobby" && *to == "Deku Tree Boss Room" => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
@@ -131,7 +132,7 @@ impl CheckExt for Check {
 
                 _ => panic!("unknown event name: {}", event),
             },
-            Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from, to).is_some()),
+            Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from.as_ref(), to.as_ref()).is_some()),
             Check::Location(loc) => match &loc[..] {
                 "ToT Light Arrows Cutscene" => None, //TODO
                 "DMT Great Fairy Reward" => None, //TODO
@@ -927,7 +928,8 @@ pub enum CheckStatus {
     NotYetReachable, //TODO split into definitely/possibly/not reachable later in order to determine ALR setting
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Derivative, From)]
+#[derivative(Debug(bound = ""), Clone(bound = ""))]
 pub enum CheckStatusError<R: Rando> {
     Io(Arc<io::Error>),
     RegionLookup(RegionLookupError<R>),
@@ -948,7 +950,7 @@ impl<R: Rando> fmt::Display for CheckStatusError<R> {
     }
 }
 
-pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, CheckStatus>, CheckStatusError<R>> {
+pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check<R>, CheckStatus>, CheckStatusError<R>> {
     let mut map = HashMap::default();
     let all_regions = Region::all(rando)?;
     let mut reachable_regions = collect![as HashSet<_>: Region::root(rando)?];
@@ -963,7 +965,7 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, 
     }
     let mut unhandled_reachable_regions = reachable_regions.iter().cloned().collect_vec();
     let mut unhandled_unreachable_regions = all_regions.iter().filter(|region_info| !reachable_regions.contains(*region_info)).collect::<HashSet<_>>();
-    let mut unhandled_unreachable_checks = Vec::<(_, access::Expr)>::default();
+    let mut unhandled_unreachable_checks = Vec::<(_, access::Expr<R>)>::default();
     loop {
         if let Some(region) = unhandled_reachable_regions.pop() {
             for (exit, rule) in &region.exits {
@@ -977,7 +979,7 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check, 
                     if !reachable_regions.iter().any(|region| region.name == *region_behind_exit) {
                         if model.can_access(rando, &rule) == Ok(true) {
                             // exit is checked (i.e. we know what's behind it) and reachable (i.e. we can actually use it), so the region behind it becomes reachable
-                            let region_info = match Region::new(rando, &region_behind_exit)? {
+                            let region_info = match Region::new(rando, region_behind_exit)? {
                                 RegionLookup::Overworld(region)
                                 | RegionLookup::Dungeon(EitherOrBoth::Left(region))
                                 | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => region,
