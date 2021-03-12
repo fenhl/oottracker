@@ -42,6 +42,7 @@ scene_flags! {
                 LIGHT_TORCHES_AFTER_WATER_ROOM /*vanilla*/ = 0x0000_0008,
             },
             room_clear: {
+                SCRUBS_231_PUZZLE = 0x0000_0200,
                 0 for "Deku Tree Lobby" /*vanilla*/ -> "Deku Tree Slingshot Room" = 0x0000_0002,
             },
         },

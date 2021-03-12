@@ -47,6 +47,11 @@ impl<R: Rando> CheckExt for Check<R> {
         if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) } //TODO adjust for current-scene flags not being stored in save immediately
         match self {
             Check::AnonymousEvent(at_check, id) => match (&**at_check, id) {
+                (Check::Event(event), 0) if *event == "Deku Tree Clear" /*vanilla*/ => Some(
+                    model.ram.scene_flags().deku_tree.room_clear.contains(
+                        crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
+                    )
+                ),
                 (Check::Exit { from_mq: None, from, to }, 0) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_FIRST_BOULDER
@@ -73,6 +78,16 @@ impl<R: Rando> CheckExt for Check<R> {
                 (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 1) if *from == "Deku Tree Lobby" && *to == "Deku Tree Boss Room" => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
+                    )
+                ),
+                (Check::Location(loc), 0) if *loc == "Deku Tree Queen Gohma Heart" => Some(
+                    model.ram.scene_flags().deku_tree.room_clear.contains(
+                        crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
+                    )
+                ),
+                (Check::Location(loc), 0) if *loc == "Queen Gohma" => Some(
+                    model.ram.scene_flags().deku_tree.room_clear.contains(
+                        crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
                     )
                 ),
                 (_, _) => None, //TODO make a list of all anonymous events
