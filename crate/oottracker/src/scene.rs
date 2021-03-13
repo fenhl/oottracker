@@ -51,7 +51,8 @@ scene_flags! {
                 0 for "Dodongos Cavern Lobby" /*mq*/ -> "Dodongos Cavern Lower Right Side" = 0x8000_0000,
                 0 for "Dodongos Cavern Lower Right Side" /*mq*/ -> "Dodongos Cavern Bomb Bag Area" = 0x0800_0000, //TODO confirm, logic says this entrance needs slingshot but that doesn't seem to be the case
                 0 for "Dodongos Cavern Lobby" /*vanilla*/ -> "Dodongos Cavern Staircase Room" = 0x0200_0000,
-                0 for "Dodongos Cavern Beginning" /*mq*/ -> "Dodongos Cavern Lobby" = 0x0000_0080,
+                0 for "Dodongos Cavern Lobby" /*vanilla*/ -> "Dodongos Cavern Far Bridge" = 0x0000_0400,
+                0 for "Dodongos Cavern Beginning" /*either*/ -> "Dodongos Cavern Lobby" = 0x0000_0080,
             },
         },
         0x02: "Jabu Jabus Belly" {},
