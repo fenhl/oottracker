@@ -48,7 +48,10 @@ use {
             ItemGetInf,
         },
         item_ids,
-        scene::SceneFlags,
+        scene::{
+            GoldSkulltulas,
+            SceneFlags,
+        },
     },
 };
 
@@ -956,6 +959,7 @@ pub struct Save {
     pub small_keys: SmallKeys,
     pub skull_tokens: u8,
     pub scene_flags: SceneFlags,
+    pub gold_skulltulas: GoldSkulltulas,
     pub big_poes: u8,
     pub event_chk_inf: EventChkInf,
     pub item_get_inf: ItemGetInf,
@@ -1038,6 +1042,7 @@ impl Save {
             small_keys: try_get_offset!("small_keys", 0x00bc, 0x13),
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
+            gold_skulltulas: try_get_offset!("gold_skulltulas", 0x0e9c, 0x18),
             big_poes: (BigEndian::read_u32(get_offset!("big_poes", 0x0ebc, 0x4)) / 100).try_into()?,
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
             item_get_inf: try_get_offset!("item_get_inf", 0x0ef0, 0x8),
@@ -1048,7 +1053,7 @@ impl Save {
 
     pub(crate) fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, big_poes, event_chk_inf, item_get_inf, inf_table, game_mode } = self;
+        let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, gold_skulltulas, big_poes, event_chk_inf, item_get_inf, inf_table, game_mode } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
@@ -1071,6 +1076,7 @@ impl Save {
         buf.splice(0x00bc..0x00cf, Vec::from(small_keys));
         buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
+        buf.splice(0x0e9c..0x0eb4, Vec::from(gold_skulltulas));
         buf.splice(0x0ebc..0x0ec0, u32::from(100 * big_poes).to_be_bytes().iter().copied());
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
         buf.splice(0x0ef0..0x0ef8, Vec::from(item_get_inf));

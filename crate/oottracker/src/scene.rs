@@ -1,4 +1,6 @@
-//! This module contains types representing the permanent scene flags section of save data. The type `SceneFlags` represents that entire section, and the other types appear in its fields.
+//! This module contains types representing the “permanent scene flags” and “gold skulltulas” sections of [save data](crate::save::Save).
+//!
+//! The entry points are the types [`SceneFlags`] and [`GoldSkulltulas`]. All other types appear in their fields.
 
 use {
     std::{
@@ -63,6 +65,9 @@ scene_flags! {
             },
             room_clear: {
                 0 for "Forest Temple NW Outdoors" /*vanilla*/ -> "Forest Temple Outdoors High Balconies" = 0x0000_0400,
+            },
+            gold_skulltulas: {
+                "Forest Temple GS Level Island Courtyard" = 0x04,
             },
         },
         0x04: "Fire Temple" {},

@@ -41,10 +41,11 @@ pub trait CheckExt {
 impl<R: Rando> CheckExt for Check<R> {
     fn checked(&self, model: &ModelState) -> Option<bool> {
         // event and location lists from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
+        if let Some(checked) = model.ram.save.gold_skulltulas.checked(self) { return Some(checked) }
+        if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) }
         if let Some(checked) = model.ram.save.event_chk_inf.checked(self) { return Some(checked) }
         if let Some(checked) = model.ram.save.item_get_inf.checked(self) { return Some(checked) }
         if let Some(checked) = model.ram.save.inf_table.checked(self) { return Some(checked) }
-        if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) } //TODO adjust for current-scene flags not being stored in save immediately
         match self {
             Check::AnonymousEvent(at_check, id) => match (&**at_check, id) {
                 (Check::Event(event), 0) if *event == "Deku Tree Clear" /*vanilla*/ => Some(
@@ -88,6 +89,12 @@ impl<R: Rando> CheckExt for Check<R> {
                 (Check::Location(loc), 0) if *loc == "Queen Gohma" => Some(
                     model.ram.scene_flags().deku_tree.room_clear.contains(
                         crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
+                    )
+                ),
+                // the anonymous event for this skulltula is really just collecting it from a different region with different item requirements
+                (Check::Location(loc), 0) if *loc == "Forest Temple GS Level Island Courtyard" => Some(
+                    model.ram.save.gold_skulltulas.forest_temple.contains(
+                        crate::scene::ForestTempleGoldSkulltulas::FOREST_TEMPLE_GS_LEVEL_ISLAND_COURTYARD
                     )
                 ),
                 (_, _) => None, //TODO make a list of all anonymous events
