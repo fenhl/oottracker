@@ -958,7 +958,13 @@ fn main(args: Args) -> Result<(), Error> {
         window: window::Settings {
             size: (WIDTH + if args.show_logic_tracker { 800 } else { 0 }, HEIGHT + if args.show_logic_tracker || args.show_available_checks { 400 } else { 0 }),
             min_size: Some((WIDTH, HEIGHT)),
-            max_size: if args.show_logic_tracker || args.show_available_checks { Some((WIDTH, u32::MAX)) } else { Some((WIDTH, HEIGHT)) },
+            max_size: if args.show_logic_tracker {
+                None
+            } else if args.show_available_checks {
+                Some((WIDTH, u32::MAX))
+            } else {
+                Some((WIDTH, HEIGHT))
+            },
             resizable: args.show_logic_tracker || args.show_available_checks,
             icon: Some(Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height())?),
             ..window::Settings::default()
