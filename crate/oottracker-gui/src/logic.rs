@@ -136,6 +136,13 @@ pub(crate) struct State<R: Rando + 'static> {
     settings_info: SettingsInfo,
     settings_pick: pick_list::State<SettingsInfoKind>,
     settings_text: text_input::State,
+    starting_inv_btns_row0: [button::State; 11],
+    starting_inv_btns_row1: [button::State; 11],
+    starting_inv_btns_row2: [button::State; 11],
+    starting_inv_btns_row3: [button::State; 7],
+    starting_inv_btns_row4: [button::State; 9],
+    starting_inv_btns_row5: [button::State; 9],
+    starting_inv_btns_row6: [button::State; 4],
 }
 
 impl<R: Rando + 'static> State<R> {
@@ -185,8 +192,15 @@ impl<R: Rando + 'static> State<R> {
                         SettingsInfo::Weights(ref path) => TextInput::new(&mut self.settings_text, "Path to weights file", &path.display().to_string(), Message::EditWeightsPath).padding(5).style(TextInputStyle), //TODO file select/preset support
                     })
                     .spacing(16)
-                ),
-                //TODO starting inventory
+                )
+                .push(Text::new("Starting inventory:")) //TODO on_press for each row
+                .push(Row::with_children(self.starting_inv_btns_row0.iter_mut().zip(vec!["Hearts", "Shadow Medallion", "Light Medallion", "Forest Medallion", "Deku Sticks", "Deku Nuts", "Bombs", "Bow", "Fire Arrows", "Din's Fire", "Bottle"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect()))
+                .push(Row::with_children(self.starting_inv_btns_row1.iter_mut().zip(vec!["Wallet/Rupees", "Spirit Medallion", "Water Medallion", "Fire Medallion", "Slingshot", "Ocarina", "Bombchus", "Hookshot", "Ice Arrows", "Farore's Wind", "Child Trade"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect()))
+                .push(Row::with_children(self.starting_inv_btns_row2.iter_mut().zip(vec!["Tokens", "Kokiri Emerald", "Goron Ruby", "Zora Sapphire", "Boomerang", "Lens of Truth", "Beans", "Hammer", "Light Arrows", "Nayru's Love", "Adult Trade"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect()))
+                .push(Row::with_children(self.starting_inv_btns_row3.iter_mut().zip(vec!["Strength", "Scale", "Magic", "Gerudo Card", "Kokiri Sword", "Adult Start", "Giant's Knife/Biggoron's Sword"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect()))
+                .push(Row::with_children(self.starting_inv_btns_row4.iter_mut().zip(vec!["Zelda's Lullaby", "Epona's Song", "Saria's Song", "Sun's Song", "Song of Time", "Song of Storms", "Deku Shield", "Hylian Shield", "Mirror Shield"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect()))
+                .push(Row::with_children(self.starting_inv_btns_row5.iter_mut().zip(vec!["Minuet", "Bolero", "Serenade", "Requiem", "Nocturne", "Prelude", "Kokiri Tunic", "Goron Tunic", "Zora Tunic"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect()))
+                .push(Row::with_children(self.starting_inv_btns_row6.iter_mut().zip(vec!["Stone of Agony", "Kokiri Boots", "Iron Boots", "Hover Boots"]).map(|(state, label)| Button::new(state, Text::new(label)).into()).collect())),
             "Temple of Time" => col = col
                 .push(Text::new("TODO “read pedestal” UI")),
             "Beyond Door of Time" => col = col
