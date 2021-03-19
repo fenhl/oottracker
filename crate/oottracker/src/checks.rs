@@ -97,6 +97,12 @@ impl<R: Rando> CheckExt for Check<R> {
                         crate::scene::ForestTempleGoldSkulltulas::FOREST_TEMPLE_GS_LEVEL_ISLAND_COURTYARD
                     )
                 ),
+                // the anonymous events for this chest are really just opening it from different regions with different item requirements
+                (Check::Location(loc), 0) | (Check::Location(loc), 1) if *loc == "Forest Temple Raised Island Courtyard Chest" => Some(
+                    model.ram.scene_flags().forest_temple.chests.contains(
+                        crate::scene::ForestTempleChests::FOREST_TEMPLE_RAISED_ISLAND_COURTYARD_CHEST
+                    )
+                ),
                 (_, _) => None, //TODO make a list of all anonymous events
             },
             Check::Event(event) => match &event[..] {
@@ -281,7 +287,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Forest Temple First Stalfos Chest" => None, //TODO
                 "Forest Temple Well Chest" => None, //TODO
                 "Forest Temple Map Chest" => None, //TODO
-                "Forest Temple Raised Island Courtyard Chest" => None, //TODO
                 "Forest Temple Falling Ceiling Room Chest" => None, //TODO
                 "Forest Temple Eye Switch Chest" => None, //TODO
                 "Forest Temple Boss Key Chest" => None, //TODO
@@ -593,7 +598,6 @@ impl<R: Rando> CheckExt for Check<R> {
 
                 "Forest Temple GS Raised Island Courtyard" => None, //TODO
                 "Forest Temple GS First Room" => None, //TODO
-                "Forest Temple GS Level Island Courtyard" => None, //TODO
                 "Forest Temple GS Lobby" => None, //TODO
                 "Forest Temple GS Basement" => None, //TODO
 

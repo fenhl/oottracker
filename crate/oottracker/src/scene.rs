@@ -59,6 +59,9 @@ scene_flags! {
         },
         0x02: "Jabu Jabus Belly" {},
         0x03: "Forest Temple" {
+            chests: {
+                "Forest Temple Raised Island Courtyard Chest" = 0x0000_0020,
+            },
             switches: {
                 BETH_DEFEATED /*vanilla*/ = 0x4000_0000,
                 JOELLE_DEFEATED /*vanilla*/ = 0x2000_0000,
