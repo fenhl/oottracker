@@ -16,6 +16,7 @@ flags_list! {
         3: {
             "ZD Diving Minigame" = 0x0100,
             "Barinade" = 0x0080,
+            "GC Darunias Joy" = 0x0040,
             DELIVER_RUTOS_LETTER = 0x0008,
             "LH Underwater Item" = 0x0002,
         },
@@ -32,7 +33,7 @@ flags_list! {
             "Song from Impa" = 0x0200,
             "Song from Malon" = 0x0100,
             "Song from Saria" = 0x0080,
-            "Sheik at Temple" = 0x0020, // unsure, documented at CloudModding as “Sheik Moved From Sword Pedestal”
+            "Sheik at Temple" = 0x0020,
             "Sheik in Kakariko" = 0x0010,
             "Sheik in Ice Cavern" = 0x0004,
             "Sheik in Crater" = 0x0002,
@@ -57,6 +58,7 @@ flags_list! {
             event "Forest Trial Clear" = 0x0800, //TODO only consider when known by settings knowledge or visual confirmation
         },
         12: {
+            "ToT Light Arrows Cutscene" = 0x0010,
             "LW Gift from Saria" = 0x0002,
         },
         13: {

@@ -162,12 +162,6 @@ impl<R: Rando> CheckExt for Check<R> {
             },
             Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from.as_ref(), to.as_ref()).is_some()),
             Check::Location(loc) => match &loc[..] {
-                "ToT Light Arrows Cutscene" => None, //TODO
-                "DMT Great Fairy Reward" => None, //TODO
-                "DMC Great Fairy Reward" => None, //TODO
-                "OGC Great Fairy Reward" => None, //TODO
-
-                "GC Darunias Joy" => None, //TODO
                 "LH Child Fishing" => None, //TODO
                 "LH Adult Fishing" => None, //TODO
                 "ZD King Zora Thawed" => None, //TODO

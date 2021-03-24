@@ -116,6 +116,13 @@ scene_flags! {
                 "KF Midos Top Left Chest" = 0x0000_0001,
             },
         },
+        0x3b: UpgradeFairyFountain {
+            switches: {
+                "DMT Great Fairy Reward" = 0x0100_0000,
+                "DMC Great Fairy Reward" = 0x0001_0000,
+                "OGC Great Fairy Reward" = 0x0000_0100,
+            },
+        },
         0x3e: Grottos {
             chests: {
                 "DMC Upper Grotto Chest" = 0x0400_0000,
