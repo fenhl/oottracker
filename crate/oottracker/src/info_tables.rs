@@ -78,6 +78,7 @@ flags_list! {
         0: {
             "GF HBA 1500 Points" = 0x80,
             "Kak Shooting Gallery Reward" = 0x40,
+            "Market Shooting Gallery Reward" = 0x20,
             "Kak Anju as Child" = 0x10,
         },
         1: {
@@ -95,6 +96,8 @@ flags_list! {
             "LW Ocarina Memory Game" = 0x80,
             "LW Skull Kid" = 0x40,
             "Kak Man on Roof" = 0x20,
+            "Market Bombchu Bowling Second Prize" = 0x04,
+            "Market Bombchu Bowling First Prize" = 0x02,
             "LH Lab Dive" = 0x01,
         },
         4: {
@@ -110,6 +113,9 @@ flags_list! {
         },
         32: {
             "GC Rolling Goron as Adult" = 0x02,
+        },
+        38: {
+            "ZD King Zora Thawed" = 0x02,
         },
         51: {
             "LW Deku Scrub Near Bridge" = 0x04,
