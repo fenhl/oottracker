@@ -150,14 +150,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Child Water Temple" => None, //TODO
                 "Water Temple Clear" => None, //TODO
 
-                // Ganons Castle
-                "Forest Trial Clear" => None, //TODO
-                "Fire Trial Clear" => None, //TODO
-                "Water Trial Clear" => None, //TODO
-                "Shadow Trial Clear" => None, //TODO
-                "Spirit Trial Clear" => None, //TODO
-                "Light Trial Clear" => None, //TODO
-
                 _ => panic!("unknown event name: {}", event),
             },
             Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from.as_ref(), to.as_ref()).is_some()),
