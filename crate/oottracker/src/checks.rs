@@ -162,12 +162,12 @@ impl<R: Rando> CheckExt for Check<R> {
             },
             Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from.as_ref(), to.as_ref()).is_some()),
             Check::Location(loc) => match &loc[..] {
-                "LH Child Fishing" => None, //TODO
-                "LH Adult Fishing" => None, //TODO
+                "LH Child Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::CHILD_PRIZE_OBTAINED)),
+                "LH Adult Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::ADULT_PRIZE_OBTAINED)),
                 "ZD King Zora Thawed" => None, //TODO
                 "Market Bombchu Bowling First Prize" => None, //TODO
                 "Market Bombchu Bowling Second Prize" => None, //TODO
-                "Market Bombchu Bowling Bombchus" => None, //TODO
+                "Market Bombchu Bowling Bombchus" => None, // repeatable check
                 "ZR Magic Bean Salesman" => None, //TODO
                 "Market Shooting Gallery Reward" => None, //TODO
                 "DMT Biggoron" => None, //TODO
@@ -204,26 +204,26 @@ impl<R: Rando> CheckExt for Check<R> {
 
                 "Pierre" => None, //TODO
                 "Deliver Rutos Letter" => None, //TODO
-                "Master Sword Pedestal" => None, //TODO
+                "Master Sword Pedestal" => None, // repeatable check
 
-                "Deku Baba Sticks" => None, //TODO
-                "Deku Baba Nuts" => None, //TODO
-                "Stick Pot" => None, //TODO
-                "Nut Pot" => None, //TODO
-                "Nut Crate" => None, //TODO
-                "Blue Fire" => None, //TODO
-                "Lone Fish" => None, //TODO
-                "Fish Group" => None, //TODO
-                "Bug Rock" => None, //TODO
-                "Bug Shrub" => None, //TODO
-                "Wandering Bugs" => None, //TODO
-                "Fairy Pot" => None, //TODO
-                "Free Fairies" => None, //TODO
-                "Wall Fairy" => None, //TODO
-                "Butterfly Fairy" => None, //TODO
-                "Gossip Stone Fairy" => None, //TODO
-                "Bean Plant Fairy" => None, //TODO
-                "Fairy Pond" => None, //TODO
+                "Deku Baba Sticks" => None, // repeatable check
+                "Deku Baba Nuts" => None, // repeatable check
+                "Stick Pot" => None, // repeatable check
+                "Nut Pot" => None, // repeatable check
+                "Nut Crate" => None, // repeatable check
+                "Blue Fire" => None, // repeatable check
+                "Lone Fish" => None, // repeatable check
+                "Fish Group" => None, // repeatable check
+                "Bug Rock" => None, // repeatable check
+                "Bug Shrub" => None, // repeatable check
+                "Wandering Bugs" => None, // repeatable check
+                "Fairy Pot" => None, // repeatable check
+                "Free Fairies" => None, // repeatable check
+                "Wall Fairy" => None, // repeatable check
+                "Butterfly Fairy" => None, // repeatable check
+                "Gossip Stone Fairy" => None, // repeatable check
+                "Bean Plant Fairy" => None, // repeatable check
+                "Fairy Pond" => None, // repeatable check
                 "Big Poe Kill" => None, //TODO
 
                 // Deku Tree vanilla
@@ -542,11 +542,11 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Ganons Castle MQ Spirit Trial Invisible Chest" => None, //TODO
                 "Ganons Castle MQ Forest Trial Freestanding Key" => None, //TODO
 
-                "Links Pocket" => None, //TODO check if vanilla or rando, if vanilla check for appropriate flag
+                "Links Pocket" => Some(true), //TODO check if vanilla or rando, if vanilla check for appropriate flag
                 "Queen Gohma" => None, //TODO
                 "Twinrova" => None, //TODO
                 "Bongo Bongo" => None, //TODO
-                "Ganon" => None, //TODO
+                "Ganon" => Some(false), //TODO remember if game has been beaten (relevant for multiworld and go mode)
 
                 "Deku Tree Queen Gohma Heart" => None, //TODO
                 "Dodongos Cavern King Dodongo Heart" => None, //TODO
@@ -886,49 +886,49 @@ impl<R: Rando> CheckExt for Check<R> {
                 "HF Cow Grotto Cow" => None, //TODO
 
                 // These are not actual locations, but are filler spots used for hint reachability
-                "DMC Gossip Stone" => None, //TODO
-                "DMT Gossip Stone" => None, //TODO
-                "Colossus Gossip Stone" => None, //TODO
-                "Dodongos Cavern Gossip Stone" => None, //TODO
-                "GV Gossip Stone" => None, //TODO
-                "GC Maze Gossip Stone" => None, //TODO
-                "GC Medigoron Gossip Stone" => None, //TODO
-                "Graveyard Gossip Stone" => None, //TODO
-                "HC Malon Gossip Stone" => None, //TODO
-                "HC Rock Wall Gossip Stone" => None, //TODO
-                "HC Storms Grotto Gossip Stone" => None, //TODO
-                "HF Cow Grotto Gossip Stone" => None, //TODO
-                "KF Deku Tree Gossip Stone (Left)" => None, //TODO
-                "KF Deku Tree Gossip Stone (Right)" => None, //TODO
-                "KF Gossip Stone" => None, //TODO
-                "LH Lab Gossip Stone" => None, //TODO
-                "LH Gossip Stone (Southeast)" => None, //TODO
-                "LH Gossip Stone (Southwest)" => None, //TODO
-                "LW Gossip Stone" => None, //TODO
-                "SFM Maze Gossip Stone (Lower)" => None, //TODO
-                "SFM Maze Gossip Stone (Upper)" => None, //TODO
-                "SFM Saria Gossip Stone" => None, //TODO
-                "ToT Gossip Stone (Left)" => None, //TODO
-                "ToT Gossip Stone (Left-Center)" => None, //TODO
-                "ToT Gossip Stone (Right)" => None, //TODO
-                "ToT Gossip Stone (Right-Center)" => None, //TODO
-                "ZD Gossip Stone" => None, //TODO
-                "ZF Fairy Gossip Stone" => None, //TODO
-                "ZF Jabu Gossip Stone" => None, //TODO
-                "ZR Near Grottos Gossip Stone" => None, //TODO
-                "ZR Near Domain Gossip Stone" => None, //TODO
+                "DMC Gossip Stone" => None, //TODO check knowledge
+                "DMT Gossip Stone" => None, //TODO check knowledge
+                "Colossus Gossip Stone" => None, //TODO check knowledge
+                "Dodongos Cavern Gossip Stone" => None, //TODO check knowledge
+                "GV Gossip Stone" => None, //TODO check knowledge
+                "GC Maze Gossip Stone" => None, //TODO check knowledge
+                "GC Medigoron Gossip Stone" => None, //TODO check knowledge
+                "Graveyard Gossip Stone" => None, //TODO check knowledge
+                "HC Malon Gossip Stone" => None, //TODO check knowledge
+                "HC Rock Wall Gossip Stone" => None, //TODO check knowledge
+                "HC Storms Grotto Gossip Stone" => None, //TODO check knowledge
+                "HF Cow Grotto Gossip Stone" => None, //TODO check knowledge
+                "KF Deku Tree Gossip Stone (Left)" => None, //TODO check knowledge
+                "KF Deku Tree Gossip Stone (Right)" => None, //TODO check knowledge
+                "KF Gossip Stone" => None, //TODO check knowledge
+                "LH Lab Gossip Stone" => None, //TODO check knowledge
+                "LH Gossip Stone (Southeast)" => None, //TODO check knowledge
+                "LH Gossip Stone (Southwest)" => None, //TODO check knowledge
+                "LW Gossip Stone" => None, //TODO check knowledge
+                "SFM Maze Gossip Stone (Lower)" => None, //TODO check knowledge
+                "SFM Maze Gossip Stone (Upper)" => None, //TODO check knowledge
+                "SFM Saria Gossip Stone" => None, //TODO check knowledge
+                "ToT Gossip Stone (Left)" => None, //TODO check knowledge
+                "ToT Gossip Stone (Left-Center)" => None, //TODO check knowledge
+                "ToT Gossip Stone (Right)" => None, //TODO check knowledge
+                "ToT Gossip Stone (Right-Center)" => None, //TODO check knowledge
+                "ZD Gossip Stone" => None, //TODO check knowledge
+                "ZF Fairy Gossip Stone" => None, //TODO check knowledge
+                "ZF Jabu Gossip Stone" => None, //TODO check knowledge
+                "ZR Near Grottos Gossip Stone" => None, //TODO check knowledge
+                "ZR Near Domain Gossip Stone" => None, //TODO check knowledge
 
-                "HF Near Market Grotto Gossip Stone" => None, //TODO
-                "HF Southeast Grotto Gossip Stone" => None, //TODO
-                "HF Open Grotto Gossip Stone" => None, //TODO
-                "Kak Open Grotto Gossip Stone" => None, //TODO
-                "ZR Open Grotto Gossip Stone" => None, //TODO
-                "KF Storms Grotto Gossip Stone" => None, //TODO
-                "LW Near Shortcuts Grotto Gossip Stone" => None, //TODO
-                "DMT Storms Grotto Gossip Stone" => None, //TODO
-                "DMC Upper Grotto Gossip Stone" => None, //TODO
+                "HF Near Market Grotto Gossip Stone" => None, //TODO check knowledge
+                "HF Southeast Grotto Gossip Stone" => None, //TODO check knowledge
+                "HF Open Grotto Gossip Stone" => None, //TODO check knowledge
+                "Kak Open Grotto Gossip Stone" => None, //TODO check knowledge
+                "ZR Open Grotto Gossip Stone" => None, //TODO check knowledge
+                "KF Storms Grotto Gossip Stone" => None, //TODO check knowledge
+                "LW Near Shortcuts Grotto Gossip Stone" => None, //TODO check knowledge
+                "DMT Storms Grotto Gossip Stone" => None, //TODO check knowledge
+                "DMC Upper Grotto Gossip Stone" => None, //TODO check knowledge
 
-                "Ganondorf Hint" => None, //TODO
+                "Ganondorf Hint" => None, //TODO check knowledge
 
                 _ => panic!("unknown location name: {}", loc),
             },

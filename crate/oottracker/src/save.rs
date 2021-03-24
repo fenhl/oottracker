@@ -872,6 +872,35 @@ impl<'a> From<&'a SmallKeys> for Vec<u8> {
     }
 }
 
+bitflags! {
+    #[derive(Default)]
+    pub struct FishingContext: u32 {
+        const ADULT_PRIZE_OBTAINED = 0x0000_0800;
+        const CHILD_PRIZE_OBTAINED = 0x0000_0400;
+    }
+}
+
+impl TryFrom<Vec<u8>> for FishingContext {
+    type Error = Vec<u8>;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<FishingContext, Vec<u8>> {
+        if raw_data.len() != 4 { return Err(raw_data) }
+        Ok(FishingContext::from_bits_truncate(BigEndian::read_u32(&raw_data)))
+    }
+}
+
+impl<'a> From<&'a FishingContext> for [u8; 4] {
+    fn from(fishing_context: &FishingContext) -> [u8; 4] {
+        fishing_context.bits().to_be_bytes()
+    }
+}
+
+impl<'a> From<&'a FishingContext> for Vec<u8> {
+    fn from(fishing_context: &FishingContext) -> Vec<u8> {
+        <[u8; 4]>::from(fishing_context).into()
+    }
+}
+
 #[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
     #[default] // represented as 0x0000_0000
@@ -961,6 +990,7 @@ pub struct Save {
     pub scene_flags: SceneFlags,
     pub gold_skulltulas: GoldSkulltulas,
     pub big_poes: u8,
+    pub fishing_context: FishingContext,
     pub event_chk_inf: EventChkInf,
     pub item_get_inf: ItemGetInf,
     pub inf_table: InfTable,
@@ -1044,6 +1074,7 @@ impl Save {
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
             gold_skulltulas: try_get_offset!("gold_skulltulas", 0x0e9c, 0x18),
             big_poes: (BigEndian::read_u32(get_offset!("big_poes", 0x0ebc, 0x4)) / 100).try_into()?,
+            fishing_context: try_get_offset!("fishing_context", 0x0ec0, 0x4),
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
             item_get_inf: try_get_offset!("item_get_inf", 0x0ef0, 0x8),
             inf_table: try_get_offset!("inf_table", 0x0ef8, 0x3c),
@@ -1053,7 +1084,11 @@ impl Save {
 
     pub(crate) fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
-        let Save { is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags, gold_skulltulas, big_poes, event_chk_inf, item_get_inf, inf_table, game_mode } = self;
+        let Save {
+            is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades,
+            quest_items, boss_keys, small_keys, skull_tokens, scene_flags, gold_skulltulas,
+            big_poes, fishing_context, event_chk_inf, item_get_inf, inf_table, game_mode,
+        } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
@@ -1078,6 +1113,7 @@ impl Save {
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
         buf.splice(0x0e9c..0x0eb4, Vec::from(gold_skulltulas));
         buf.splice(0x0ebc..0x0ec0, u32::from(100 * big_poes).to_be_bytes().iter().copied());
+        buf.splice(0x0ec0..0x0ec4, Vec::from(fishing_context));
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
         buf.splice(0x0ef0..0x0ef8, Vec::from(item_get_inf));
         buf.splice(0x0ef8..0x0f34, Vec::from(inf_table));
