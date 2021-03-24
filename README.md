@@ -25,3 +25,4 @@ If you run into any problems, you can:
 
 * Big Poe image created for this project by Maplestar.
 * Other item images by [Xopar](https://github.com/matthewkirby), used with permission.
+* Some game data sourced from [the CloudModding wiki](https://wiki.cloudmodding.com/oot) and [RiptideSage's completed checks script](https://github.com/RiptideSage/OoT-CompletedChecks). For my own research, I use [BizHawk](http://tasvideos.org/BizHawk.html) and [the practice rom](https://www.practicerom.com/).
