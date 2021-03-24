@@ -158,7 +158,7 @@ impl<R: Rando> CheckExt for Check<R> {
                 "LH Adult Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::ADULT_PRIZE_OBTAINED)),
                 "Market Bombchu Bowling Bombchus" => None, // repeatable check
                 "ZR Magic Bean Salesman" => None, //TODO make sure this is handled correctly both with and without bean shuffle
-                "DMT Biggoron" => None, //TODO
+                "DMT Biggoron" => Some(model.ram.save.dmt_biggoron_checked),
                 "Market 10 Big Poes" => None, //TODO
                 "GC Rolling Goron as Child" => None, //TODO
                 "LH Sun" => None, //TODO
@@ -212,7 +212,7 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Gossip Stone Fairy" => None, // repeatable check
                 "Bean Plant Fairy" => None, // repeatable check
                 "Fairy Pond" => None, // repeatable check
-                "Big Poe Kill" => None, //TODO
+                "Big Poe Kill" => None, //TODO mark as checked when enough big Poes are collected (sold + in current bottles)
 
                 // Deku Tree vanilla
                 "Deku Tree Map Chest" => None, //TODO

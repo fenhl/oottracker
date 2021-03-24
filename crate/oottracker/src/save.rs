@@ -979,6 +979,7 @@ pub struct Save {
     pub is_adult: bool,
     pub magic: MagicCapacity,
     pub biggoron_sword: bool,
+    pub dmt_biggoron_checked: bool,
     pub inv: Inventory,
     pub inv_amounts: InvAmounts,
     pub equipment: Equipment,
@@ -1063,6 +1064,25 @@ impl Save {
                 1 => true,
                 value => return Err(DecodeError::UnexpectedValue { value, offset: 0x003e, field: "biggoron_sword" }),
             },
+            dmt_biggoron_checked: {
+                bitflags! {
+                    struct DmtBiggoronCheckedFlags: u16 {
+                        const DMT_BIGGORON_CHECKED = 0x0100;
+                    }
+                }
+
+                impl TryFrom<Vec<u8>> for DmtBiggoronCheckedFlags {
+                    type Error = Vec<u8>;
+
+                    fn try_from(raw_data: Vec<u8>) -> Result<DmtBiggoronCheckedFlags, Vec<u8>> {
+                        if raw_data.len() != 2 { return Err(raw_data) }
+                        Ok(DmtBiggoronCheckedFlags::from_bits_truncate(BigEndian::read_u16(&raw_data)))
+                    }
+                }
+
+                let flags: DmtBiggoronCheckedFlags = try_get_offset!("dmt_biggoron_checked", 0x0072, 0x2);
+                flags.contains(DmtBiggoronCheckedFlags::DMT_BIGGORON_CHECKED)
+            },
             inv: try_get_offset!("inv", 0x0074, 0x18),
             inv_amounts: try_get_offset!("inv_amounts", 0x008c, 0xf),
             equipment: try_get_offset!("equipment", 0x009c, 0x2),
@@ -1085,9 +1105,10 @@ impl Save {
     pub(crate) fn to_save_data(&self) -> Vec<u8> {
         let mut buf = vec![0; SIZE];
         let Save {
-            is_adult, time_of_day, magic, biggoron_sword, inv, inv_amounts, equipment, upgrades,
-            quest_items, boss_keys, small_keys, skull_tokens, scene_flags, gold_skulltulas,
-            big_poes, fishing_context, event_chk_inf, item_get_inf, inf_table, game_mode,
+            is_adult, time_of_day, magic, biggoron_sword, dmt_biggoron_checked, inv, inv_amounts,
+            equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags,
+            gold_skulltulas, big_poes, fishing_context, event_chk_inf, item_get_inf, inf_table,
+            game_mode,
         } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
@@ -1102,6 +1123,7 @@ impl Save {
             MagicCapacity::Large => 1,
         };
         buf[0x003e] = if *biggoron_sword { 1 } else { 0 };
+        buf[0x0072] = if *dmt_biggoron_checked { 1 } else { 0 };
         buf.splice(0x0074..0x008c, Vec::from(inv));
         buf.splice(0x008c..0x009b, Vec::from(inv_amounts));
         buf.splice(0x009c..0x009e, Vec::from(equipment));
