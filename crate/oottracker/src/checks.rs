@@ -159,22 +159,10 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Market Bombchu Bowling Bombchus" => None, // repeatable check
                 "ZR Magic Bean Salesman" => None, //TODO make sure this is handled correctly both with and without bean shuffle
                 "DMT Biggoron" => Some(model.ram.save.dmt_biggoron_checked),
-                "Market 10 Big Poes" => None, //TODO
-                "GC Rolling Goron as Child" => None, //TODO
-                "LH Sun" => None, //TODO
-                "GF Gerudo Membership Card" => None, //TODO
-                "Wasteland Bombchu Salesman" => None, //TODO
-                "GC Medigoron" => None, //TODO
+                "Market 10 Big Poes" => None, //TODO figure out how to read point target count from ROM, or read it from the text box
+                "Wasteland Bombchu Salesman" => None, //TODO make sure this is handled correctly both with and without medi/carp shuffle (and according to knowledge)
+                "GC Medigoron" => None, //TODO make sure this is handled correctly both with and without medi/carp shuffle (and according to knowledge)
 
-                "Kak Impas House Freestanding PoH" => None, //TODO
-                "HF Tektite Grotto Freestanding PoH" => None, //TODO
-                "Kak Windmill Freestanding PoH" => None, //TODO
-                "Graveyard Dampe Race Freestanding PoH" => None, //TODO
-                "LLR Freestanding PoH" => None, //TODO
-                "Graveyard Freestanding PoH" => None, //TODO
-                "Graveyard Dampe Gravedigging Tour" => None, //TODO
-                "ZR Near Open Grotto Freestanding PoH" => None, //TODO
-                "ZR Near Domain Freestanding PoH" => None, //TODO
                 "LH Freestanding PoH" => None, //TODO
                 "ZF Iceberg Freestanding PoH" => None, //TODO
                 "ZF Bottom Freestanding PoH" => None, //TODO

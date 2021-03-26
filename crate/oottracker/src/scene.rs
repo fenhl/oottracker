@@ -93,6 +93,9 @@ scene_flags! {
         },
         0x0c: ThievesHideout {
             region_name: "Gerudo Fortress",
+            switches: {
+                "GF Gerudo Membership Card" = 0x0000_0004,
+            },
         },
         0x0d: "Ganons Castle" {},
         0x0e: GanonsCastleTowerCollapsing {
@@ -116,15 +119,20 @@ scene_flags! {
                 "KF Midos Top Left Chest" = 0x0000_0001,
             },
         },
+        0x37: "Kak Impas House" {
+            collectible: {
+                "Kak Impas House Freestanding PoH" = 0x0000_0002,
+            },
+        },
         0x3b: UpgradeFairyFountain {
-            switches: {
+            switches: { //TODO generalize as upgrade Great Fairy rewards depending on knowledge
                 "DMT Great Fairy Reward" = 0x0100_0000,
                 "DMC Great Fairy Reward" = 0x0001_0000,
                 "OGC Great Fairy Reward" = 0x0000_0100,
             },
         },
         0x3e: Grottos {
-            chests: {
+            chests: { //TODO generalize as generic grotto chests depending on knowledge
                 "DMC Upper Grotto Chest" = 0x0400_0000,
                 "DMT Storms Grotto Chest" = 0x0040_0000,
                 "LW Near Shortcuts Grotto Chest" = 0x0010_0000,
@@ -136,6 +144,9 @@ scene_flags! {
                 "HF Open Grotto Chest" = 0x0000_0008,
                 "HF Southeast Grotto Chest" = 0x0000_0004,
                 "HF Near Market Grotto Chest" = 0x0000_0001,
+            },
+            collectible: {
+                "HF Tektite Grotto Freestanding PoH" = 0x0000_0002,
             },
         },
         0x3f: "Graveyard Heart Piece Grave" {
@@ -157,8 +168,17 @@ scene_flags! {
             chests: {
                 "Graveyard Hookshot Chest" = 0x0000_0001,
             },
+            collectible: {
+                "Graveyard Dampe Race Freestanding PoH" = 0x0000_0080,
+                "Kak Windmill Freestanding PoH" = 0x0000_0002,
+            },
             unused: {
                 TRIFORCE_PIECES = 0xffff_ffff,
+            },
+        },
+        0x4c: "LLR Tower" {
+            collectible: {
+                "LLR Freestanding PoH" = 0x0000_0002,
             },
         },
         0x51: "Hyrule Field" {
@@ -169,14 +189,29 @@ scene_flags! {
             },
         },
         0x52: "Kakariko Village" {},
-        0x53: "Zora River" {
+        0x53: "Graveyard" {
+            collectible: {
+                "Graveyard Dampe Gravedigging Tour" = 0x0000_0100,
+                "Graveyard Freestanding PoH" = 0x0000_0010,
+            },
+        },
+        0x54: "Zora River" {
             switches: {
                 0 for "Zora River" -> "ZR Fairy Grotto" = 0x0000_0020,
+            },
+            collectible: {
+                "ZR Near Domain Freestanding PoH" = 0x0000_0800,
+                "ZR Near Open Grotto Freestanding PoH" = 0x0000_0010,
             },
         },
         0x55: "Kokiri Forest" {
             chests: {
                 "KF Kokiri Sword Chest" = 0x0000_0001,
+            },
+        },
+        0x57: "Lake Hylia" {
+            chests: {
+                "LH Sun" = 0x0000_0001,
             },
         },
         0x58: "Zoras Domain" {

@@ -114,6 +114,9 @@ flags_list! {
         32: {
             "GC Rolling Goron as Adult" = 0x02,
         },
+        34: {
+            "GC Rolling Goron as Child" = 0x40,
+        },
         38: {
             "ZD King Zora Thawed" = 0x02,
         },

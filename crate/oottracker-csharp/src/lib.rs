@@ -114,7 +114,7 @@ impl<T> DebugResultExt for DebugResult<T> {
     fn unwrap(self) -> T {
         match self {
             Ok(x) => x,
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         }
     }
 }
