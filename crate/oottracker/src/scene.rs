@@ -213,21 +213,39 @@ scene_flags! {
             chests: {
                 "LH Sun" = 0x0000_0001,
             },
+            collectible: {
+                "LH Freestanding PoH" = 0x4000_0000,
+            },
         },
         0x58: "Zoras Domain" {
             chests: {
                 "ZD Chest" = 0x0000_0001,
             },
         },
+        0x59: "Zoras Fountain" {
+            collectible: {
+                "ZF Bottom Freestanding PoH" = 0x0010_0000,
+                "ZF Iceberg Freestanding PoH" = 0x0000_0002,
+            },
+        },
         0x5a: "Gerudo Valley" {
             chests: {
                 "GV Chest" = 0x0000_0001,
+            },
+            collectible: {
+                "GV Crate Freestanding PoH" = 0x0000_0004,
+                "GV Waterfall Freestanding PoH" = 0x0000_0002,
             },
         },
         0x5b: "Lost Woods" {
             switches: {
                 0 for "LW Beyond Mido" -> "LW Scrubs Grotto" = 0x8000_0000,
                 0 for "Lost Woods" -> "LW Near Shortcuts Grotto" = 0x0002_0000,
+            },
+        },
+        0x5c: "Desert Colossus" {
+            collectible: {
+                "Colossus Freestanding PoH" = 0x0000_2000,
             },
         },
         0x5d: "Gerudo Fortress" {
