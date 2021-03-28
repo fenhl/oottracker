@@ -204,10 +204,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Dodongos Cavern MQ Torch Puzzle Room Chest" => None, //TODO
                 "Dodongos Cavern MQ Under Grave Chest" => None, //TODO
 
-                // Jabu Jabu's Belly vanilla
-                "Jabu Jabus Belly Boomerang Chest" => None, //TODO
-                "Jabu Jabus Belly Map Chest" => None, //TODO
-                "Jabu Jabus Belly Compass Chest" => None, //TODO
                 // Jabu Jabu's Belly MQ
                 "Jabu Jabus Belly MQ First Room Side Chest" => None, //TODO
                 "Jabu Jabus Belly MQ Map Chest" => None, //TODO
@@ -222,19 +218,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Jabu Jabus Belly MQ Boomerang Chest" => None, //TODO
                 "Jabu Jabus Belly MQ Cow" => None, //TODO
 
-                // Forest Temple vanilla
-                "Forest Temple First Room Chest" => None, //TODO
-                "Forest Temple First Stalfos Chest" => None, //TODO
-                "Forest Temple Well Chest" => None, //TODO
-                "Forest Temple Map Chest" => None, //TODO
-                "Forest Temple Falling Ceiling Room Chest" => None, //TODO
-                "Forest Temple Eye Switch Chest" => None, //TODO
-                "Forest Temple Boss Key Chest" => None, //TODO
-                "Forest Temple Floormaster Chest" => None, //TODO
-                "Forest Temple Bow Chest" => None, //TODO
-                "Forest Temple Red Poe Chest" => None, //TODO
-                "Forest Temple Blue Poe Chest" => None, //TODO
-                "Forest Temple Basement Chest" => None, //TODO
                 // Forest Temple MQ
                 "Forest Temple MQ First Room Chest" => None, //TODO
                 "Forest Temple MQ Wolfos Chest" => None, //TODO
@@ -249,21 +232,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Forest Temple MQ Redead Chest" => None, //TODO
                 "Forest Temple MQ Boss Key Chest" => None, //TODO
 
-                // Fire Temple vanilla
-                "Fire Temple Near Boss Chest" => None, //TODO
-                "Fire Temple Flare Dancer Chest" => None, //TODO
-                "Fire Temple Boss Key Chest" => None, //TODO
-                "Fire Temple Big Lava Room Blocked Door Chest" => None, //TODO
-                "Fire Temple Big Lava Room Lower Open Door Chest" => None, //TODO
-                "Fire Temple Boulder Maze Lower Chest" => None, //TODO
-                "Fire Temple Boulder Maze Upper Chest" => None, //TODO
-                "Fire Temple Boulder Maze Side Room Chest" => None, //TODO
-                "Fire Temple Boulder Maze Shortcut Chest" => None, //TODO
-                "Fire Temple Scarecrow Chest" => None, //TODO
-                "Fire Temple Map Chest" => None, //TODO
-                "Fire Temple Compass Chest" => None, //TODO
-                "Fire Temple Highest Goron Chest" => None, //TODO
-                "Fire Temple Megaton Hammer Chest" => None, //TODO
                 // Fire Temple MQ
                 "Fire Temple MQ Near Boss Chest" => None, //TODO
                 "Fire Temple MQ Megaton Hammer Chest" => None, //TODO
@@ -278,17 +246,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Fire Temple MQ Lizalfos Maze Side Room Chest" => None, //TODO
                 "Fire Temple MQ Freestanding Key" => None, //TODO
 
-                // Water Temple vanilla
-                "Water Temple Map Chest" => None, //TODO
-                "Water Temple Compass Chest" => None, //TODO
-                "Water Temple Torches Chest" => None, //TODO
-                "Water Temple Dragon Chest" => None, //TODO
-                "Water Temple Central Bow Target Chest" => None, //TODO
-                "Water Temple Central Pillar Chest" => None, //TODO
-                "Water Temple Cracked Wall Chest" => None, //TODO
-                "Water Temple Boss Key Chest" => None, //TODO
-                "Water Temple Longshot Chest" => None, //TODO
-                "Water Temple River Chest" => None, //TODO
                 // Water Temple MQ
                 "Water Temple MQ Central Pillar Chest" => None, //TODO
                 "Water Temple MQ Boss Key Chest" => None, //TODO
@@ -297,27 +254,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Water Temple MQ Map Chest" => None, //TODO
                 "Water Temple MQ Freestanding Key" => None, //TODO
 
-                // Spirit Temple shared
-                "Spirit Temple Silver Gauntlets Chest" => None, //TODO
-                "Spirit Temple Mirror Shield Chest" => None, //TODO
-                // Spirit Temple vanilla
-                "Spirit Temple Child Bridge Chest" => None, //TODO
-                "Spirit Temple Child Early Torches Chest" => None, //TODO
-                "Spirit Temple Compass Chest" => None, //TODO
-                "Spirit Temple Early Adult Right Chest" => None, //TODO
-                "Spirit Temple First Mirror Left Chest" => None, //TODO
-                "Spirit Temple First Mirror Right Chest" => None, //TODO
-                "Spirit Temple Map Chest" => None, //TODO
-                "Spirit Temple Child Climb North Chest" => None, //TODO
-                "Spirit Temple Child Climb East Chest" => None, //TODO
-                "Spirit Temple Sun Block Room Chest" => None, //TODO
-                "Spirit Temple Statue Room Hand Chest" => None, //TODO
-                "Spirit Temple Statue Room Northeast Chest" => None, //TODO
-                "Spirit Temple Near Four Armos Chest" => None, //TODO
-                "Spirit Temple Hallway Right Invisible Chest" => None, //TODO
-                "Spirit Temple Hallway Left Invisible Chest" => None, //TODO
-                "Spirit Temple Boss Key Chest" => None, //TODO
-                "Spirit Temple Topmost Chest" => None, //TODO
                 // Spirit Temple MQ
                 "Spirit Temple MQ Entrance Front Left Chest" => None, //TODO
                 "Spirit Temple MQ Entrance Back Right Chest" => None, //TODO
@@ -340,24 +276,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Spirit Temple MQ Boss Key Chest" => None, //TODO
                 "Spirit Temple MQ Mirror Puzzle Invisible Chest" => None, //TODO
 
-                // Shadow Temple vanilla
-                "Shadow Temple Map Chest" => None, //TODO
-                "Shadow Temple Hover Boots Chest" => None, //TODO
-                "Shadow Temple Compass Chest" => None, //TODO
-                "Shadow Temple Early Silver Rupee Chest" => None, //TODO
-                "Shadow Temple Invisible Blades Visible Chest" => None, //TODO
-                "Shadow Temple Invisible Blades Invisible Chest" => None, //TODO
-                "Shadow Temple Falling Spikes Lower Chest" => None, //TODO
-                "Shadow Temple Falling Spikes Upper Chest" => None, //TODO
-                "Shadow Temple Falling Spikes Switch Chest" => None, //TODO
-                "Shadow Temple Invisible Spikes Chest" => None, //TODO
-                "Shadow Temple Wind Hint Chest" => None, //TODO
-                "Shadow Temple After Wind Enemy Chest" => None, //TODO
-                "Shadow Temple After Wind Hidden Chest" => None, //TODO
-                "Shadow Temple Spike Walls Left Chest" => None, //TODO
-                "Shadow Temple Boss Key Chest" => None, //TODO
-                "Shadow Temple Invisible Floormaster Chest" => None, //TODO
-                "Shadow Temple Freestanding Key" => None, //TODO
                 // Shadow Temple MQ
                 "Shadow Temple MQ Compass Chest" => None, //TODO
                 "Shadow Temple MQ Hover Boots Chest" => None, //TODO
