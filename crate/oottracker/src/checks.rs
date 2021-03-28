@@ -298,21 +298,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Shadow Temple MQ Near Ship Invisible Chest" => None, //TODO
                 "Shadow Temple MQ Freestanding Key" => None, //TODO
 
-                // Bottom of the Well vanilla
-                "Bottom of the Well Front Left Fake Wall Chest" => None, //TODO
-                "Bottom of the Well Front Center Bombable Chest" => None, //TODO
-                "Bottom of the Well Right Bottom Fake Wall Chest" => None, //TODO
-                "Bottom of the Well Compass Chest" => None, //TODO
-                "Bottom of the Well Center Skulltula Chest" => None, //TODO
-                "Bottom of the Well Back Left Bombable Chest" => None, //TODO
-                "Bottom of the Well Lens of Truth Chest" => None, //TODO
-                "Bottom of the Well Invisible Chest" => None, //TODO
-                "Bottom of the Well Underwater Front Chest" => None, //TODO
-                "Bottom of the Well Underwater Left Chest" => None, //TODO
-                "Bottom of the Well Map Chest" => None, //TODO
-                "Bottom of the Well Fire Keese Chest" => None, //TODO
-                "Bottom of the Well Like Like Chest" => None, //TODO
-                "Bottom of the Well Freestanding Key" => None, //TODO
                 // Bottom of the Well MQ
                 "Bottom of the Well MQ Map Chest" => None, //TODO
                 "Bottom of the Well MQ Lens of Truth Chest" => None, //TODO
@@ -320,40 +305,12 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Bottom of the Well MQ Dead Hand Freestanding Key" => None, //TODO
                 "Bottom of the Well MQ East Inner Room Freestanding Key" => None, //TODO
 
-                // Ice Cavern vanilla
-                "Ice Cavern Map Chest" => None, //TODO
-                "Ice Cavern Compass Chest" => None, //TODO
-                "Ice Cavern Iron Boots Chest" => None, //TODO
-                "Ice Cavern Freestanding PoH" => None, //TODO
                 // Ice Cavern MQ
                 "Ice Cavern MQ Iron Boots Chest" => None, //TODO
                 "Ice Cavern MQ Compass Chest" => None, //TODO
                 "Ice Cavern MQ Map Chest" => None, //TODO
                 "Ice Cavern MQ Freestanding PoH" => None, //TODO
 
-                // Gerudo Training Grounds vanilla
-                "Gerudo Training Grounds Lobby Left Chest" => None, //TODO
-                "Gerudo Training Grounds Lobby Right Chest" => None, //TODO
-                "Gerudo Training Grounds Stalfos Chest" => None, //TODO
-                "Gerudo Training Grounds Beamos Chest" => None, //TODO
-                "Gerudo Training Grounds Hidden Ceiling Chest" => None, //TODO
-                "Gerudo Training Grounds Maze Path First Chest" => None, //TODO
-                "Gerudo Training Grounds Maze Path Second Chest" => None, //TODO
-                "Gerudo Training Grounds Maze Path Third Chest" => None, //TODO
-                "Gerudo Training Grounds Maze Path Final Chest" => None, //TODO
-                "Gerudo Training Grounds Maze Right Central Chest" => None, //TODO
-                "Gerudo Training Grounds Maze Right Side Chest" => None, //TODO
-                "Gerudo Training Grounds Underwater Silver Rupee Chest" => None, //TODO
-                "Gerudo Training Grounds Hammer Room Clear Chest" => None, //TODO
-                "Gerudo Training Grounds Hammer Room Switch Chest" => None, //TODO
-                "Gerudo Training Grounds Eye Statue Chest" => None, //TODO
-                "Gerudo Training Grounds Near Scarecrow Chest" => None, //TODO
-                "Gerudo Training Grounds Before Heavy Block Chest" => None, //TODO
-                "Gerudo Training Grounds Heavy Block First Chest" => None, //TODO
-                "Gerudo Training Grounds Heavy Block Second Chest" => None, //TODO
-                "Gerudo Training Grounds Heavy Block Third Chest" => None, //TODO
-                "Gerudo Training Grounds Heavy Block Fourth Chest" => None, //TODO
-                "Gerudo Training Grounds Freestanding Key" => None, //TODO
                 // Gerudo Training Grounds MQ
                 "Gerudo Training Grounds MQ Lobby Right Chest" => None, //TODO
                 "Gerudo Training Grounds MQ Lobby Left Chest" => None, //TODO
@@ -373,24 +330,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Gerudo Training Grounds MQ Underwater Silver Rupee Chest" => None, //TODO
                 "Gerudo Training Grounds MQ Heavy Block Chest" => None, //TODO
 
-                // Ganon's Castle shared
-                "Ganons Tower Boss Key Chest" => None, //TODO
-                // Ganon's Castle vanilla
-                "Ganons Castle Forest Trial Chest" => None, //TODO
-                "Ganons Castle Water Trial Left Chest" => None, //TODO
-                "Ganons Castle Water Trial Right Chest" => None, //TODO
-                "Ganons Castle Shadow Trial Front Chest" => None, //TODO
-                "Ganons Castle Shadow Trial Golden Gauntlets Chest" => None, //TODO
-                "Ganons Castle Spirit Trial Crystal Switch Chest" => None, //TODO
-                "Ganons Castle Spirit Trial Invisible Chest" => None, //TODO
-                "Ganons Castle Light Trial First Left Chest" => None, //TODO
-                "Ganons Castle Light Trial Second Left Chest" => None, //TODO
-                "Ganons Castle Light Trial Third Left Chest" => None, //TODO
-                "Ganons Castle Light Trial First Right Chest" => None, //TODO
-                "Ganons Castle Light Trial Second Right Chest" => None, //TODO
-                "Ganons Castle Light Trial Third Right Chest" => None, //TODO
-                "Ganons Castle Light Trial Invisible Enemies Chest" => None, //TODO
-                "Ganons Castle Light Trial Lullaby Chest" => None, //TODO
                 // Ganon's Castle MQ
                 "Ganons Castle MQ Water Trial Chest" => None, //TODO
                 "Ganons Castle MQ Forest Trial Eye Switch Chest" => None, //TODO
