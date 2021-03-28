@@ -163,15 +163,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Wasteland Bombchu Salesman" => None, //TODO make sure this is handled correctly both with and without medi/carp shuffle (and according to knowledge)
                 "GC Medigoron" => None, //TODO make sure this is handled correctly both with and without medi/carp shuffle (and according to knowledge)
 
-                "DMT Freestanding PoH" => None, //TODO
-                "DMC Wall Freestanding PoH" => None, //TODO
-                "DMC Volcano Freestanding PoH" => None, //TODO
-                "GC Pot Freestanding PoH" => None, //TODO
-                "GF North F1 Carpenter" => None, //TODO
-                "GF North F2 Carpenter" => None, //TODO
-                "GF South F1 Carpenter" => None, //TODO
-                "GF South F2 Carpenter" => None, //TODO
-
                 "Pierre" => None, //TODO
                 "Deliver Rutos Letter" => None, //TODO
                 "Master Sword Pedestal" => None, // repeatable check

@@ -96,6 +96,12 @@ scene_flags! {
             switches: {
                 "GF Gerudo Membership Card" = 0x0000_0004,
             },
+            collectible: {
+                "GF South F2 Carpenter" = 0x0000_8000,
+                "GF South F1 Carpenter" = 0x0000_4000,
+                "GF North F1 Carpenter" = 0x0000_1000,
+                "GF North F2 Carpenter" = 0x0000_0400,
+            },
         },
         0x0d: "Ganons Castle" {},
         0x0e: GanonsCastleTowerCollapsing {
@@ -273,6 +279,15 @@ scene_flags! {
                 BLOW_UP_DC_ENTRANCE = 0x0000_0010,
                 0 for "Death Mountain Summit" -> "DMT Great Fairy Fountain" = 0x0000_0008,
             },
+            collectible: {
+                "DMT Freestanding PoH" = 0x4000_0000,
+            },
+        },
+        0x61: "Death Mountain Crater" {
+            collectible: {
+                "DMC Volcano Freestanding PoH" = 0x0000_0100,
+                "DMC Wall Freestanding PoH" = 0x0000_0004,
+            },
         },
         0x62: "Goron City" {
             chests: {
@@ -285,6 +300,9 @@ scene_flags! {
                 LW_LEFT_BOULDER = 0x0000_1000,
                 LW_MIDDLE_BOULDER = 0x0000_0800,
                 LW_RIGHT_BOULDER = 0x0000_0100,
+            },
+            collectible: {
+                "GC Pot Freestanding PoH" = 0x8000_0000,
             },
         },
     }
