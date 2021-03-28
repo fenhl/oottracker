@@ -34,6 +34,14 @@ scene_flags! {
         0x00: "Deku Tree" {
             region_name: |_| "Deku Tree Lobby", //TODO return region name based on room number and/or coords, missing regions: Deku Tree Slingshot Room, Deku Tree Basement Backroom, Deku Tree Boss Room
             //TODO region_name_mq
+            chests: {
+                "Deku Tree Compass Room Side Chest" = 0x0000_0040,
+                "Deku Tree Slingshot Room Side Chest" = 0x0000_0020,
+                "Deku Tree Basement Chest" = 0x0000_0010,
+                "Deku Tree Map Chest" = 0x0000_0008,
+                "Deku Tree Compass Chest" = 0x0000_0004,
+                "Deku Tree Slingshot Chest" = 0x0000_0002,
+            },
             switches: {
                 1 for "Deku Tree GS Basement Backroom" = 0x0004_0000,
                 BASEMENT_PUSHED_BLOCK /*vanilla*/ = 0x0001_0000,
@@ -49,6 +57,13 @@ scene_flags! {
             },
         },
         0x01: "Dodongos Cavern" {
+            chests: {
+                "Dodongos Cavern End of Bridge Chest" = 0x0000_0400,
+                "Dodongos Cavern Map Chest" = 0x0000_0100,
+                "Dodongos Cavern Bomb Flower Platform Chest" = 0x0000_0040,
+                "Dodongos Cavern Compass Chest" = 0x0000_0020,
+                "Dodongos Cavern Bomb Bag Chest" = 0x0000_0010,
+            },
             switches: {
                 0 for "Dodongos Cavern Lobby" /*mq*/ -> "Dodongos Cavern Lower Right Side" = 0x8000_0000,
                 0 for "Dodongos Cavern Lower Right Side" /*mq*/ -> "Dodongos Cavern Bomb Bag Area" = 0x0800_0000, //TODO confirm, logic says this entrance needs slingshot but that doesn't seem to be the case
@@ -116,6 +131,11 @@ scene_flags! {
             },
         },
         0x11: "Deku Tree Boss Room" {},
+        0x12: "Dodongos Cavern Boss Area" {
+            chests: {
+                "Dodongos Cavern Boss Room Chest" = 0x0000_0001,
+            },
+        },
         //TODO remaining scenes (https://wiki.cloudmodding.com/oot/Scene_Table/NTSC_1.0)
         0x28: "KF Midos House" {
             chests: {

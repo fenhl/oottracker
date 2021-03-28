@@ -187,13 +187,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Fairy Pond" => None, // repeatable check
                 "Big Poe Kill" => None, //TODO mark as checked when enough big Poes are collected (sold + in current bottles)
 
-                // Deku Tree vanilla
-                "Deku Tree Map Chest" => None, //TODO
-                "Deku Tree Slingshot Chest" => None, //TODO
-                "Deku Tree Slingshot Room Side Chest" => None, //TODO
-                "Deku Tree Compass Chest" => None, //TODO
-                "Deku Tree Compass Room Side Chest" => None, //TODO
-                "Deku Tree Basement Chest" => None, //TODO
                 // Deku Tree MQ
                 "Deku Tree MQ Map Chest" => None, //TODO
                 "Deku Tree MQ Compass Chest" => None, //TODO
@@ -203,14 +196,6 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Deku Tree MQ Before Spinning Log Chest" => None, //TODO
                 "Deku Tree MQ After Spinning Log Chest" => None, //TODO
 
-                // Dodongo's Cavern shared
-                "Dodongos Cavern Boss Room Chest" => None, //TODO
-                // Dodongo's Cavern vanilla
-                "Dodongos Cavern Map Chest" => None, //TODO
-                "Dodongos Cavern Compass Chest" => None, //TODO
-                "Dodongos Cavern Bomb Flower Platform Chest" => None, //TODO
-                "Dodongos Cavern Bomb Bag Chest" => None, //TODO
-                "Dodongos Cavern End of Bridge Chest" => None, //TODO
                 // Dodongo's Cavern MQ
                 "Dodongos Cavern MQ Map Chest" => None, //TODO
                 "Dodongos Cavern MQ Bomb Bag Chest" => None, //TODO
