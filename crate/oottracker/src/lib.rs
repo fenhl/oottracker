@@ -174,6 +174,19 @@ impl ModelState {
     }
 }
 
+pub trait ModelStateView {
+    fn knowledge(&self) -> &Knowledge;
+    fn knowledge_mut(&mut self) -> &mut Knowledge;
+    fn ram(&self) -> &Ram;
+    fn ram_mut(&mut self) -> &mut Ram;
+}
+impl ModelStateView for ModelState {
+    fn knowledge(&self) -> &Knowledge { &self.knowledge }
+    fn ram(&self) -> &Ram { &self.ram }
+    fn knowledge_mut(&mut self) -> &mut Knowledge { &mut self.knowledge }
+    fn ram_mut(&mut self) -> &mut Ram { &mut self.ram }
+}
+
 pub fn version() -> Version {
     let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
     assert_eq!(version, oottracker_derive::version!());

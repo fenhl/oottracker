@@ -9,23 +9,52 @@ body {
 
 .items {
     display: grid;
-    grid-template-columns: 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px 16px;
-    gap: 1px;
-    padding: 1px;
+    gap: 10px;
+    padding: 5px;
     background-color: rgba(0, 0, 0, 0.65);
 }
 
+/* 3-column layouts */
+.items.dungeon-rewards {
+    grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px;
+}
+
+/* 4-column layouts */
+.items.mw-expanded {
+    grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
+}
+
+/* 6-column layouts */
+.items.default {
+    grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
+}
+
+/* 10-column layouts */
+.items.mw-collapsed {
+    grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
+}
+
+.items > div,
 .items > a {
     position: relative;
     text-decoration: none;
 }
 
+.items > div > img,
 .items > a > img {
     position: absolute;
 }
 
 .dimmed {
     opacity: 15%;
+}
+
+.left-dimmed {
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 1) 50%);
+}
+
+.right-dimmed {
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0.15) 50%);
 }
 
 .cols2 {
@@ -35,8 +64,8 @@ body {
 
 .cols2,
 .cols2 img {
-    width: 33px;
-    height: 33px;
+    width: 30px;
+    height: 30px;
 }
 
 .cols2.loc {
@@ -44,8 +73,9 @@ body {
 }
 
 .cols2.loc,
-.cols2.loc img {
-    height: 12px;
+.cols2.loc img,
+.cols2 img.loc {
+    height: 10px;
 }
 
 .cols3 {
@@ -64,8 +94,14 @@ body {
 }
 
 .cols3.loc,
-.cols3.loc img {
+.cols3.loc img,
+.cols3 img.loc {
     height: 18px;
+}
+
+img.loc {
+    position: absolute;
+    bottom: 0;
 }
 
 .count {

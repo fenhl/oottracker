@@ -39,7 +39,7 @@ use {
         Stone,
     },
     crate::{
-        ModelState,
+        ModelStateView,
         info_tables::*,
         save::*,
     },
@@ -186,15 +186,15 @@ pub enum TrackerCellKind {
         left_img: &'static str,
         right_img: &'static str,
         both_img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_left: Box<dyn Fn(&mut ModelState)>,
-        toggle_right: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&dyn ModelStateView) -> (bool, bool)>,
+        toggle_left: Box<dyn Fn(&mut dyn ModelStateView)>,
+        toggle_right: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Count {
         dimmed_img: &'static str,
         img: &'static str,
-        get: Box<dyn Fn(&ModelState) -> u8>,
-        set: Box<dyn Fn(&mut ModelState, u8)>,
+        get: Box<dyn Fn(&dyn ModelStateView) -> u8>,
+        set: Box<dyn Fn(&mut dyn ModelStateView, u8)>,
         max: u8,
         step: u8,
     },
@@ -205,27 +205,27 @@ pub enum TrackerCellKind {
     OptionalOverlay {
         main_img: &'static str,
         overlay_img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&dyn ModelStateView) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut dyn ModelStateView)>,
+        toggle_overlay: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Overlay {
         main_img: &'static str,
         overlay_img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&dyn ModelStateView) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut dyn ModelStateView)>,
+        toggle_overlay: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Sequence {
-        idx: Box<dyn Fn(&ModelState) -> u8>,
-        img: Box<dyn Fn(&ModelState) -> (bool, &'static str)>,
-        increment: Box<dyn Fn(&mut ModelState)>,
-        decrement: Box<dyn Fn(&mut ModelState)>,
+        idx: Box<dyn Fn(&dyn ModelStateView) -> u8>,
+        img: Box<dyn Fn(&dyn ModelStateView) -> (bool, &'static str)>,
+        increment: Box<dyn Fn(&mut dyn ModelStateView)>,
+        decrement: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Simple {
         img: &'static str,
-        active: Box<dyn Fn(&ModelState) -> bool>,
-        toggle: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&dyn ModelStateView) -> bool>,
+        toggle: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     SmallKeys {
         get: Box<dyn Fn(&crate::save::SmallKeys) -> u8>,
@@ -274,6 +274,13 @@ cells! {
         active: Box::new(|_| false), //TODO
         toggle: Box::new(|_| ()), //TODO
     },
+    GoBk: Overlay {
+        main_img: "UNIMPLEMENTED",
+        overlay_img: "UNIMPLEMENTED",
+        active: Box::new(|_| (false, false)), //TODO
+        toggle_main: Box::new(|_| ()), //TODO
+        toggle_overlay: Box::new(|_| ()), //TODO
+    },
     LightMedallionLocation: MedallionLocation(Medallion::Light),
     ForestMedallionLocation: MedallionLocation(Medallion::Forest),
     FireMedallionLocation: MedallionLocation(Medallion::Fire),
@@ -287,7 +294,7 @@ cells! {
     ShadowMedallion: Medallion(Medallion::Shadow),
     SpiritMedallion: Medallion(Medallion::Spirit),
     AdultTrade: Sequence {
-        idx: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+        idx: Box::new(|state| match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => 0,
             AdultTradeItem::PocketEgg => 1,
             AdultTradeItem::PocketCucco => 2,
@@ -301,7 +308,7 @@ cells! {
             AdultTradeItem::Eyedrops => 10,
             AdultTradeItem::ClaimCheck => 11,
         }),
-        img: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+        img: Box::new(|state| match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => (false, "blue_egg"),
             AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
             AdultTradeItem::Cojiro => (true, "cojiro"),
@@ -314,7 +321,7 @@ cells! {
             AdultTradeItem::Eyedrops => (true, "eye_drops"),
             AdultTradeItem::ClaimCheck => (true, "claim_check"),
         }),
-        increment: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
+        increment: Box::new(|state| state.ram_mut().save.inv.adult_trade_item = match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => AdultTradeItem::PocketEgg,
             AdultTradeItem::PocketEgg => AdultTradeItem::PocketCucco,
             AdultTradeItem::PocketCucco => AdultTradeItem::Cojiro,
@@ -328,7 +335,7 @@ cells! {
             AdultTradeItem::Eyedrops => AdultTradeItem::ClaimCheck,
             AdultTradeItem::ClaimCheck => AdultTradeItem::None,
         }),
-        decrement: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
+        decrement: Box::new(|state| state.ram_mut().save.inv.adult_trade_item = match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => AdultTradeItem::ClaimCheck,
             AdultTradeItem::PocketEgg => AdultTradeItem::None,
             AdultTradeItem::PocketCucco => AdultTradeItem::PocketEgg,
@@ -344,7 +351,7 @@ cells! {
         }),
     },
     AdultTradeNoChicken: Sequence {
-        idx: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+        idx: Box::new(|state| match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => 0,
             AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => 1,
             AdultTradeItem::Cojiro => 2,
@@ -357,7 +364,7 @@ cells! {
             AdultTradeItem::Eyedrops => 9,
             AdultTradeItem::ClaimCheck => 10,
         }),
-        img: Box::new(|state| match state.ram.save.inv.adult_trade_item {
+        img: Box::new(|state| match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => (false, "blue_egg"),
             AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
             AdultTradeItem::Cojiro => (true, "cojiro"),
@@ -370,7 +377,7 @@ cells! {
             AdultTradeItem::Eyedrops => (true, "eye_drops"),
             AdultTradeItem::ClaimCheck => (true, "claim_check"),
         }),
-        increment: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
+        increment: Box::new(|state| state.ram_mut().save.inv.adult_trade_item = match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => AdultTradeItem::PocketEgg,
             AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::Cojiro,
             AdultTradeItem::Cojiro => AdultTradeItem::OddMushroom,
@@ -383,7 +390,7 @@ cells! {
             AdultTradeItem::Eyedrops => AdultTradeItem::ClaimCheck,
             AdultTradeItem::ClaimCheck => AdultTradeItem::None,
         }),
-        decrement: Box::new(|state| state.ram.save.inv.adult_trade_item = match state.ram.save.inv.adult_trade_item {
+        decrement: Box::new(|state| state.ram_mut().save.inv.adult_trade_item = match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => AdultTradeItem::ClaimCheck,
             AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => AdultTradeItem::None,
             AdultTradeItem::Cojiro => AdultTradeItem::PocketEgg,
@@ -400,16 +407,16 @@ cells! {
     Skulltula: Count {
         dimmed_img: "golden_skulltula",
         img: "skulls",
-        get: Box::new(|state| state.ram.save.skull_tokens),
-        set: Box::new(|state, value| state.ram.save.skull_tokens = value),
+        get: Box::new(|state| state.ram().save.skull_tokens),
+        set: Box::new(|state, value| state.ram_mut().save.skull_tokens = value),
         max: 100,
         step: 1,
     },
     SkulltulaTens: Count {
         dimmed_img: "golden_skulltula",
         img: "skulls",
-        get: Box::new(|state| state.ram.save.skull_tokens),
-        set: Box::new(|state, value| state.ram.save.skull_tokens = value),
+        get: Box::new(|state| state.ram().save.skull_tokens),
+        set: Box::new(|state, value| state.ram_mut().save.skull_tokens = value),
         max: 50,
         step: 10,
     },
@@ -422,172 +429,196 @@ cells! {
     Bottle: OptionalOverlay {
         main_img: "bottle",
         overlay_img: "letter",
-        active: Box::new(|state| (state.ram.save.inv.emptiable_bottles() > 0, state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
-        toggle_main: Box::new(|state| state.ram.save.inv.set_emptiable_bottles(if state.ram.save.inv.emptiable_bottles() > 0 { 0 } else { 1 })),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
+        active: Box::new(|state| (state.ram().save.inv.emptiable_bottles() > 0, state.ram().save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
+        toggle_main: Box::new(|state| {
+            let new_val = if state.ram().save.inv.emptiable_bottles() > 0 { 0 } else { 1 };
+            state.ram_mut().save.inv.set_emptiable_bottles(new_val);
+        }),
+        toggle_overlay: Box::new(|state| state.ram_mut().save.inv.toggle_rutos_letter()),
     },
     NumBottles: Count {
         dimmed_img: "bottle",
         img: "UNIMPLEMENTED",
-        get: Box::new(|state| state.ram.save.inv.emptiable_bottles()),
-        set: Box::new(|state, value| state.ram.save.inv.set_emptiable_bottles(value)),
+        get: Box::new(|state| state.ram().save.inv.emptiable_bottles()),
+        set: Box::new(|state, value| state.ram_mut().save.inv.set_emptiable_bottles(value)),
         max: 4,
         step: 1,
     },
     RutosLetter: Simple {
         img: "UNIMPLEMENTED",
-        active: Box::new(|state| state.ram.save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered
-        toggle: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
+        active: Box::new(|state| state.ram().save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered
+        toggle: Box::new(|state| state.ram_mut().save.inv.toggle_rutos_letter()),
     },
     Scale: Sequence {
-        idx: Box::new(|state| match state.ram.save.upgrades.scale() {
+        idx: Box::new(|state| match state.ram().save.upgrades.scale() {
             Upgrades::SILVER_SCALE => 1,
             Upgrades::GOLD_SCALE => 2,
             _ => 0,
         }),
-        img: Box::new(|state| match state.ram.save.upgrades.scale() {
+        img: Box::new(|state| match state.ram().save.upgrades.scale() {
             Upgrades::SILVER_SCALE => (true, "silver_scale"),
             Upgrades::GOLD_SCALE => (true, "gold_scale"),
             _ => (false, "silver_scale"),
         }),
-        increment: Box::new(|state| state.ram.save.upgrades.set_scale(match state.ram.save.upgrades.scale() {
-            Upgrades::SILVER_SCALE => Upgrades::GOLD_SCALE,
-            Upgrades::GOLD_SCALE => Upgrades::NONE,
-            _ => Upgrades::SILVER_SCALE,
-        })),
-        decrement: Box::new(|state| state.ram.save.upgrades.set_scale(match state.ram.save.upgrades.scale() {
-            Upgrades::SILVER_SCALE => Upgrades::NONE,
-            Upgrades::GOLD_SCALE => Upgrades::SILVER_SCALE,
-            _ => Upgrades::GOLD_SCALE,
-        })),
+        increment: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.scale() {
+                Upgrades::SILVER_SCALE => Upgrades::GOLD_SCALE,
+                Upgrades::GOLD_SCALE => Upgrades::NONE,
+                _ => Upgrades::SILVER_SCALE,
+            };
+            state.ram_mut().save.upgrades.set_scale(new_val);
+        }),
+        decrement: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.scale() {
+                Upgrades::SILVER_SCALE => Upgrades::NONE,
+                Upgrades::GOLD_SCALE => Upgrades::SILVER_SCALE,
+                _ => Upgrades::GOLD_SCALE,
+            };
+            state.ram_mut().save.upgrades.set_scale(new_val);
+        }),
     },
     Slingshot: Simple {
         img: "slingshot",
-        active: Box::new(|state| state.ram.save.inv.slingshot),
+        active: Box::new(|state| state.ram().save.inv.slingshot),
         toggle: Box::new(|state| {
-            state.ram.save.inv.slingshot = !state.ram.save.inv.slingshot;
-            state.ram.save.upgrades.set_bullet_bag(if state.ram.save.inv.slingshot { Upgrades::BULLET_BAG_30 } else { Upgrades::NONE });
+            state.ram_mut().save.inv.slingshot = !state.ram().save.inv.slingshot;
+            let new_bullet_bag = if state.ram().save.inv.slingshot { Upgrades::BULLET_BAG_30 } else { Upgrades::NONE };
+            state.ram_mut().save.upgrades.set_bullet_bag(new_bullet_bag);
         }),
     },
     BulletBag: Sequence {
-        idx: Box::new(|state| match state.ram.save.upgrades.bullet_bag() {
+        idx: Box::new(|state| match state.ram().save.upgrades.bullet_bag() {
             Upgrades::BULLET_BAG_30 => 1,
             Upgrades::BULLET_BAG_40 => 2,
             Upgrades::BULLET_BAG_50 => 3,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram.save.inv.slingshot, "slingshot")),
+        img: Box::new(|state| (state.ram().save.inv.slingshot, "slingshot")),
         increment: Box::new(|state| {
-            state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
+            let new_bullet_bag = match state.ram().save.upgrades.bullet_bag() {
                 Upgrades::BULLET_BAG_30 => Upgrades::BULLET_BAG_40,
                 Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_50,
                 Upgrades::BULLET_BAG_50 => Upgrades::NONE,
                 _ => Upgrades::BULLET_BAG_30,
-            });
-            state.ram.save.inv.slingshot = state.ram.save.upgrades.bullet_bag() != Upgrades::NONE;
+            };
+            state.ram_mut().save.upgrades.set_bullet_bag(new_bullet_bag);
+            state.ram_mut().save.inv.slingshot = state.ram().save.upgrades.bullet_bag() != Upgrades::NONE;
         }),
         decrement: Box::new(|state| {
-            state.ram.save.upgrades.set_bullet_bag(match state.ram.save.upgrades.bullet_bag() {
+            let new_bullet_bag = match state.ram().save.upgrades.bullet_bag() {
                 Upgrades::BULLET_BAG_30 => Upgrades::NONE,
                 Upgrades::BULLET_BAG_40 => Upgrades::BULLET_BAG_30,
                 Upgrades::BULLET_BAG_50 => Upgrades::BULLET_BAG_40,
                 _ => Upgrades::BULLET_BAG_50,
-            });
-            state.ram.save.inv.slingshot = state.ram.save.upgrades.bullet_bag() != Upgrades::NONE;
+            };
+            state.ram_mut().save.upgrades.set_bullet_bag(new_bullet_bag);
+            state.ram_mut().save.inv.slingshot = state.ram().save.upgrades.bullet_bag() != Upgrades::NONE;
         }),
     },
     Bombs: Overlay {
         main_img: "bomb_bag",
         overlay_img: "bombchu",
-        active: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, state.ram.save.inv.bombchus)),
-        toggle_main: Box::new(|state| if state.ram.save.upgrades.bomb_bag() == Upgrades::NONE {
-            state.ram.save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG_20);
+        active: Box::new(|state| (state.ram().save.upgrades.bomb_bag() != Upgrades::NONE, state.ram().save.inv.bombchus)),
+        toggle_main: Box::new(|state| if state.ram().save.upgrades.bomb_bag() == Upgrades::NONE {
+            state.ram_mut().save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG_20);
         } else {
-            state.ram.save.upgrades.set_bomb_bag(Upgrades::NONE)
+            state.ram_mut().save.upgrades.set_bomb_bag(Upgrades::NONE);
         }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.bombchus = !state.ram.save.inv.bombchus),
+        toggle_overlay: Box::new(|state| state.ram_mut().save.inv.bombchus = !state.ram().save.inv.bombchus),
     },
     BombBag: Sequence {
-        idx: Box::new(|state| match state.ram.save.upgrades.bomb_bag() {
+        idx: Box::new(|state| match state.ram().save.upgrades.bomb_bag() {
             Upgrades::BOMB_BAG_20 => 1,
             Upgrades::BOMB_BAG_30 => 2,
             Upgrades::BOMB_BAG_40 => 3,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram.save.upgrades.bomb_bag() != Upgrades::NONE, "bomb_bag")),
-        increment: Box::new(|state| state.ram.save.upgrades.set_bomb_bag(match state.ram.save.upgrades.bomb_bag() {
-            Upgrades::BOMB_BAG_20 => Upgrades::BOMB_BAG_30,
-            Upgrades::BOMB_BAG_30 => Upgrades::BOMB_BAG_40,
-            Upgrades::BOMB_BAG_40 => Upgrades::NONE,
-            _ => Upgrades::BOMB_BAG_20,
-        })),
-        decrement: Box::new(|state| state.ram.save.upgrades.set_bomb_bag(match state.ram.save.upgrades.bomb_bag() {
-            Upgrades::BOMB_BAG_20 => Upgrades::NONE,
-            Upgrades::BOMB_BAG_30 => Upgrades::BOMB_BAG_20,
-            Upgrades::BOMB_BAG_40 => Upgrades::BOMB_BAG_30,
-            _ => Upgrades::BOMB_BAG_40,
-        })),
+        img: Box::new(|state| (state.ram().save.upgrades.bomb_bag() != Upgrades::NONE, "bomb_bag")),
+        increment: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.bomb_bag() {
+                Upgrades::BOMB_BAG_20 => Upgrades::BOMB_BAG_30,
+                Upgrades::BOMB_BAG_30 => Upgrades::BOMB_BAG_40,
+                Upgrades::BOMB_BAG_40 => Upgrades::NONE,
+                _ => Upgrades::BOMB_BAG_20,
+            };
+            state.ram_mut().save.upgrades.set_bomb_bag(new_val);
+        }),
+        decrement: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.bomb_bag() {
+                Upgrades::BOMB_BAG_20 => Upgrades::NONE,
+                Upgrades::BOMB_BAG_30 => Upgrades::BOMB_BAG_20,
+                Upgrades::BOMB_BAG_40 => Upgrades::BOMB_BAG_30,
+                _ => Upgrades::BOMB_BAG_40,
+            };
+            state.ram_mut().save.upgrades.set_bomb_bag(new_val);
+        }),
     },
     Bombchus: Simple {
         img: "UNIMPLEMENTED",
-        active: Box::new(|state| state.ram.save.inv.bombchus),
-        toggle: Box::new(|state| state.ram.save.inv.bombchus = !state.ram.save.inv.bombchus),
+        active: Box::new(|state| state.ram().save.inv.bombchus),
+        toggle: Box::new(|state| state.ram_mut().save.inv.bombchus = !state.ram().save.inv.bombchus),
     },
     Boomerang: Simple {
         img: "boomerang",
-        active: Box::new(|state| state.ram.save.inv.boomerang),
-        toggle: Box::new(|state| state.ram.save.inv.boomerang = !state.ram.save.inv.boomerang),
+        active: Box::new(|state| state.ram().save.inv.boomerang),
+        toggle: Box::new(|state| state.ram_mut().save.inv.boomerang = !state.ram().save.inv.boomerang),
     },
     Strength: Sequence {
-        idx: Box::new(|state| match state.ram.save.upgrades.strength() {
+        idx: Box::new(|state| match state.ram().save.upgrades.strength() {
             Upgrades::GORON_BRACELET => 1,
             Upgrades::SILVER_GAUNTLETS => 2,
             Upgrades::GOLD_GAUNTLETS => 3,
             _ => 0,
         }),
-        img: Box::new(|state| match state.ram.save.upgrades.strength() {
+        img: Box::new(|state| match state.ram().save.upgrades.strength() {
             Upgrades::GORON_BRACELET => (true, "goron_bracelet"),
             Upgrades::SILVER_GAUNTLETS => (true, "silver_gauntlets"),
             Upgrades::GOLD_GAUNTLETS => (true, "gold_gauntlets"),
             _ => (false, "goron_bracelet"),
         }),
-        increment: Box::new(|state| state.ram.save.upgrades.set_strength(match state.ram.save.upgrades.strength() {
-            Upgrades::GORON_BRACELET => Upgrades::SILVER_GAUNTLETS,
-            Upgrades::SILVER_GAUNTLETS => Upgrades::GOLD_GAUNTLETS,
-            Upgrades::GOLD_GAUNTLETS => Upgrades::NONE,
-            _ => Upgrades::GORON_BRACELET,
-        })),
-        decrement: Box::new(|state| state.ram.save.upgrades.set_strength(match state.ram.save.upgrades.strength() {
-            Upgrades::GORON_BRACELET => Upgrades::NONE,
-            Upgrades::SILVER_GAUNTLETS => Upgrades::GORON_BRACELET,
-            Upgrades::GOLD_GAUNTLETS => Upgrades::SILVER_GAUNTLETS,
-            _ => Upgrades::GOLD_GAUNTLETS,
-        })),
+        increment: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.strength() {
+                Upgrades::GORON_BRACELET => Upgrades::SILVER_GAUNTLETS,
+                Upgrades::SILVER_GAUNTLETS => Upgrades::GOLD_GAUNTLETS,
+                Upgrades::GOLD_GAUNTLETS => Upgrades::NONE,
+                _ => Upgrades::GORON_BRACELET,
+            };
+            state.ram_mut().save.upgrades.set_strength(new_val);
+        }),
+        decrement: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.strength() {
+                Upgrades::GORON_BRACELET => Upgrades::NONE,
+                Upgrades::SILVER_GAUNTLETS => Upgrades::GORON_BRACELET,
+                Upgrades::GOLD_GAUNTLETS => Upgrades::SILVER_GAUNTLETS,
+                _ => Upgrades::GOLD_GAUNTLETS,
+            };
+            state.ram_mut().save.upgrades.set_strength(new_val);
+        }),
     },
     Magic: Overlay {
         main_img: "magic",
         overlay_img: "lens",
-        active: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, state.ram.save.inv.lens)),
-        toggle_main: Box::new(|state| if state.ram.save.magic == MagicCapacity::None {
-            state.ram.save.magic = MagicCapacity::Small;
+        active: Box::new(|state| (state.ram().save.magic != MagicCapacity::None, state.ram().save.inv.lens)),
+        toggle_main: Box::new(|state| if state.ram().save.magic == MagicCapacity::None {
+            state.ram_mut().save.magic = MagicCapacity::Small;
         } else {
-            state.ram.save.magic = MagicCapacity::None;
+            state.ram_mut().save.magic = MagicCapacity::None;
         }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
+        toggle_overlay: Box::new(|state| state.ram_mut().save.inv.lens = !state.ram().save.inv.lens),
     },
     MagicCapacity: Sequence {
-        idx: Box::new(|state| match state.ram.save.magic {
+        idx: Box::new(|state| match state.ram().save.magic {
             MagicCapacity::None => 0,
             MagicCapacity::Small => 1,
             MagicCapacity::Large => 2,
         }),
-        img: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, "magic")),
-        increment: Box::new(|state| state.ram.save.magic = match state.ram.save.magic {
+        img: Box::new(|state| (state.ram().save.magic != MagicCapacity::None, "magic")),
+        increment: Box::new(|state| state.ram_mut().save.magic = match state.ram().save.magic {
             MagicCapacity::None => MagicCapacity::Small,
             MagicCapacity::Small => MagicCapacity::Large,
             MagicCapacity::Large => MagicCapacity::None,
         }),
-        decrement: Box::new(|state| state.ram.save.magic = match state.ram.save.magic {
+        decrement: Box::new(|state| state.ram_mut().save.magic = match state.ram().save.magic {
             MagicCapacity::None => MagicCapacity::Large,
             MagicCapacity::Small => MagicCapacity::None,
             MagicCapacity::Large => MagicCapacity::Small,
@@ -595,49 +626,49 @@ cells! {
     },
     Lens: Simple {
         img: "lens",
-        active: Box::new(|state| state.ram.save.inv.lens),
-        toggle: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
+        active: Box::new(|state| state.ram().save.inv.lens),
+        toggle: Box::new(|state| state.ram_mut().save.inv.lens = !state.ram().save.inv.lens),
     },
     Spells: Composite {
         left_img: "dins_fire",
         right_img: "faores_wind",
         both_img: "composite_magic",
-        active: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
-        toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
-        toggle_right: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
+        active: Box::new(|state| (state.ram().save.inv.dins_fire, state.ram().save.inv.farores_wind)),
+        toggle_left: Box::new(|state| state.ram_mut().save.inv.dins_fire = !state.ram().save.inv.dins_fire),
+        toggle_right: Box::new(|state| state.ram_mut().save.inv.farores_wind = !state.ram().save.inv.farores_wind),
     },
     DinsFire: Simple {
         img: "dins_fire",
-        active: Box::new(|state| state.ram.save.inv.dins_fire),
-        toggle: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
+        active: Box::new(|state| state.ram().save.inv.dins_fire),
+        toggle: Box::new(|state| state.ram_mut().save.inv.dins_fire = !state.ram().save.inv.dins_fire),
     },
     FaroresWind: Simple {
         img: "faores_wind",
-        active: Box::new(|state| state.ram.save.inv.farores_wind),
-        toggle: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
+        active: Box::new(|state| state.ram().save.inv.farores_wind),
+        toggle: Box::new(|state| state.ram_mut().save.inv.farores_wind = !state.ram().save.inv.farores_wind),
     },
     NayrusLove: Simple {
         img: "UNIMPLEMENTED", //TODO
-        active: Box::new(|state| state.ram.save.inv.nayrus_love),
-        toggle: Box::new(|state| state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love),
+        active: Box::new(|state| state.ram().save.inv.nayrus_love),
+        toggle: Box::new(|state| state.ram_mut().save.inv.nayrus_love = !state.ram().save.inv.nayrus_love),
     },
     Hookshot: Sequence {
-        idx: Box::new(|state| match state.ram.save.inv.hookshot {
+        idx: Box::new(|state| match state.ram().save.inv.hookshot {
             Hookshot::None => 0,
             Hookshot::Hookshot => 1,
             Hookshot::Longshot => 2,
         }),
-        img: Box::new(|state| match state.ram.save.inv.hookshot {
+        img: Box::new(|state| match state.ram().save.inv.hookshot {
             Hookshot::None => (false, "hookshot"),
             Hookshot::Hookshot => (true, "hookshot_accessible"),
             Hookshot::Longshot => (true, "longshot_accessible"),
         }),
-        increment: Box::new(|state| state.ram.save.inv.hookshot = match state.ram.save.inv.hookshot {
+        increment: Box::new(|state| state.ram_mut().save.inv.hookshot = match state.ram().save.inv.hookshot {
             Hookshot::None => Hookshot::Hookshot,
             Hookshot::Hookshot => Hookshot::Longshot,
             Hookshot::Longshot => Hookshot::None,
         }),
-        decrement: Box::new(|state| state.ram.save.inv.hookshot = match state.ram.save.inv.hookshot {
+        decrement: Box::new(|state| state.ram_mut().save.inv.hookshot = match state.ram().save.inv.hookshot {
             Hookshot::None => Hookshot::Longshot,
             Hookshot::Hookshot => Hookshot::None,
             Hookshot::Longshot => Hookshot::Hookshot,
@@ -646,93 +677,96 @@ cells! {
     Bow: OptionalOverlay {
         main_img: "bow",
         overlay_img: "ice_arrows",
-        active: Box::new(|state| (state.ram.save.inv.bow, state.ram.save.inv.ice_arrows)),
+        active: Box::new(|state| (state.ram().save.inv.bow, state.ram().save.inv.ice_arrows)),
         toggle_main: Box::new(|state| {
-            state.ram.save.inv.bow = !state.ram.save.inv.bow;
-            state.ram.save.upgrades.set_quiver(if state.ram.save.inv.bow { Upgrades::QUIVER_30 } else { Upgrades::NONE });
+            state.ram_mut().save.inv.bow = !state.ram().save.inv.bow;
+            let new_quiver = if state.ram().save.inv.bow { Upgrades::QUIVER_30 } else { Upgrades::NONE };
+            state.ram_mut().save.upgrades.set_quiver(new_quiver);
         }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
+        toggle_overlay: Box::new(|state| state.ram_mut().save.inv.ice_arrows = !state.ram().save.inv.ice_arrows),
     },
     IceArrows: Simple {
         img: "ice_trap",
-        active: Box::new(|state| state.ram.save.inv.ice_arrows),
-        toggle: Box::new(|state| state.ram.save.inv.ice_arrows = !state.ram.save.inv.ice_arrows),
+        active: Box::new(|state| state.ram().save.inv.ice_arrows),
+        toggle: Box::new(|state| state.ram_mut().save.inv.ice_arrows = !state.ram().save.inv.ice_arrows),
     },
     Quiver: Sequence {
-        idx: Box::new(|state| match state.ram.save.upgrades.quiver() {
+        idx: Box::new(|state| match state.ram().save.upgrades.quiver() {
             Upgrades::QUIVER_30 => 1,
             Upgrades::QUIVER_40 => 2,
             Upgrades::QUIVER_50 => 3,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram.save.inv.bow, "bow")),
+        img: Box::new(|state| (state.ram().save.inv.bow, "bow")),
         increment: Box::new(|state| {
-            state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
+            let new_quiver = match state.ram().save.upgrades.quiver() {
                 Upgrades::QUIVER_30 => Upgrades::QUIVER_40,
                 Upgrades::QUIVER_40 => Upgrades::QUIVER_50,
                 Upgrades::QUIVER_50 => Upgrades::NONE,
                 _ => Upgrades::QUIVER_30,
-            });
-            state.ram.save.inv.bow = state.ram.save.upgrades.quiver() != Upgrades::NONE;
+            };
+            state.ram_mut().save.upgrades.set_quiver(new_quiver);
+            state.ram_mut().save.inv.bow = state.ram().save.upgrades.quiver() != Upgrades::NONE;
         }),
         decrement: Box::new(|state| {
-            state.ram.save.upgrades.set_quiver(match state.ram.save.upgrades.quiver() {
+            let new_quiver = match state.ram().save.upgrades.quiver() {
                 Upgrades::QUIVER_30 => Upgrades::NONE,
                 Upgrades::QUIVER_40 => Upgrades::QUIVER_30,
                 Upgrades::QUIVER_50 => Upgrades::QUIVER_40,
                 _ => Upgrades::QUIVER_50,
-            });
-            state.ram.save.inv.bow = state.ram.save.upgrades.quiver() != Upgrades::NONE;
+            };
+            state.ram_mut().save.upgrades.set_quiver(new_quiver);
+            state.ram_mut().save.inv.bow = state.ram().save.upgrades.quiver() != Upgrades::NONE;
         }),
     },
     Arrows: Composite {
         left_img: "fire_arrows",
         right_img: "light_arrows",
         both_img: "composite_arrows",
-        active: Box::new(|state| (state.ram.save.inv.fire_arrows, state.ram.save.inv.light_arrows)),
-        toggle_left: Box::new(|state| state.ram.save.inv.fire_arrows = !state.ram.save.inv.fire_arrows),
-        toggle_right: Box::new(|state| state.ram.save.inv.light_arrows = !state.ram.save.inv.light_arrows),
+        active: Box::new(|state| (state.ram().save.inv.fire_arrows, state.ram().save.inv.light_arrows)),
+        toggle_left: Box::new(|state| state.ram_mut().save.inv.fire_arrows = !state.ram().save.inv.fire_arrows),
+        toggle_right: Box::new(|state| state.ram_mut().save.inv.light_arrows = !state.ram().save.inv.light_arrows),
     },
     FireArrows: Simple {
         img: "fire_arrows",
-        active: Box::new(|state| state.ram.save.inv.fire_arrows),
-        toggle: Box::new(|state| state.ram.save.inv.fire_arrows = !state.ram.save.inv.fire_arrows),
+        active: Box::new(|state| state.ram().save.inv.fire_arrows),
+        toggle: Box::new(|state| state.ram_mut().save.inv.fire_arrows = !state.ram().save.inv.fire_arrows),
     },
     LightArrows: Simple {
         img: "light_arrows",
-        active: Box::new(|state| state.ram.save.inv.light_arrows),
-        toggle: Box::new(|state| state.ram.save.inv.light_arrows = !state.ram.save.inv.light_arrows),
+        active: Box::new(|state| state.ram().save.inv.light_arrows),
+        toggle: Box::new(|state| state.ram_mut().save.inv.light_arrows = !state.ram().save.inv.light_arrows),
     },
     Hammer: Simple {
         img: "hammer",
-        active: Box::new(|state| state.ram.save.inv.hammer),
-        toggle: Box::new(|state| state.ram.save.inv.hammer = !state.ram.save.inv.hammer),
+        active: Box::new(|state| state.ram().save.inv.hammer),
+        toggle: Box::new(|state| state.ram_mut().save.inv.hammer = !state.ram().save.inv.hammer),
     },
     Boots: Composite {
         left_img: "iron_boots",
         right_img: "hover_boots",
         both_img: "composite_boots",
-        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::IRON_BOOTS), state.ram.save.equipment.contains(Equipment::HOVER_BOOTS))),
-        toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::IRON_BOOTS)),
-        toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::HOVER_BOOTS)),
+        active: Box::new(|state| (state.ram().save.equipment.contains(Equipment::IRON_BOOTS), state.ram().save.equipment.contains(Equipment::HOVER_BOOTS))),
+        toggle_left: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::IRON_BOOTS)),
+        toggle_right: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::HOVER_BOOTS)),
     },
     IronBoots: Simple {
         img: "iron_boots",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::IRON_BOOTS)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::IRON_BOOTS)),
+        active: Box::new(|state| state.ram().save.equipment.contains(Equipment::IRON_BOOTS)),
+        toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::IRON_BOOTS)),
     },
     HoverBoots: Simple {
         img: "hover_boots",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::HOVER_BOOTS)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::HOVER_BOOTS)),
+        active: Box::new(|state| state.ram().save.equipment.contains(Equipment::HOVER_BOOTS)),
+        toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::HOVER_BOOTS)),
     },
     MirrorShield: Simple {
         img: "mirror_shield",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::MIRROR_SHIELD)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::MIRROR_SHIELD)),
+        active: Box::new(|state| state.ram().save.equipment.contains(Equipment::MIRROR_SHIELD)),
+        toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::MIRROR_SHIELD)),
     },
     ChildTrade: Sequence {
-        idx: Box::new(|state| match state.ram.save.inv.child_trade_item {
+        idx: Box::new(|state| match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => 0,
             ChildTradeItem::WeirdEgg => 1,
             ChildTradeItem::Chicken => 2,
@@ -743,7 +777,7 @@ cells! {
             ChildTradeItem::BunnyHood => 7,
             ChildTradeItem::MaskOfTruth => 8,
         }),
-        img: Box::new(|state| match state.ram.save.inv.child_trade_item {
+        img: Box::new(|state| match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => (false, "white_egg"),
             ChildTradeItem::WeirdEgg => (true, "white_egg"),
             ChildTradeItem::Chicken => (true, "white_chicken"),
@@ -754,7 +788,7 @@ cells! {
             ChildTradeItem::BunnyHood => (true, "bunny_hood"),
             ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
         }),
-        increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+        increment: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => ChildTradeItem::WeirdEgg,
             ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
             ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
@@ -765,7 +799,7 @@ cells! {
             ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
             ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
         }),
-        decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+        decrement: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
             ChildTradeItem::WeirdEgg => ChildTradeItem::None,
             ChildTradeItem::Chicken => ChildTradeItem::WeirdEgg,
@@ -778,7 +812,7 @@ cells! {
         }),
     },
     ChildTradeNoChicken: Sequence {
-        idx: Box::new(|state| match state.ram.save.inv.child_trade_item {
+        idx: Box::new(|state| match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => 0,
             ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => 1,
             ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => 2, //TODO for SOLD OUT, check trade quest progress
@@ -788,7 +822,7 @@ cells! {
             ChildTradeItem::BunnyHood => 6,
             ChildTradeItem::MaskOfTruth => 7,
         }),
-        img: Box::new(|state| match state.ram.save.inv.child_trade_item {
+        img: Box::new(|state| match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => (false, "white_egg"),
             ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => (true, "white_egg"),
             ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
@@ -798,7 +832,7 @@ cells! {
             ChildTradeItem::BunnyHood => (true, "bunny_hood"),
             ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
         }),
-        increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+        increment: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => ChildTradeItem::WeirdEgg,
             ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => ChildTradeItem::ZeldasLetter,
             ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::KeatonMask, //TODO for SOLD OUT, check trade quest progress
@@ -808,7 +842,7 @@ cells! {
             ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
             ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
         }),
-        decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+        decrement: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
             ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => ChildTradeItem::None,
             ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => ChildTradeItem::WeirdEgg, //TODO for SOLD OUT, check trade quest progress
@@ -820,7 +854,7 @@ cells! {
         }),
     },
     ChildTradeSoldOut: Sequence {
-        idx: Box::new(|state| match state.ram.save.inv.child_trade_item {
+        idx: Box::new(|state| match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => 0,
             ChildTradeItem::WeirdEgg => 1,
             ChildTradeItem::Chicken => 2,
@@ -836,7 +870,7 @@ cells! {
             //TODO bunny hood sold => 12
             ChildTradeItem::MaskOfTruth => 13,
         }),
-        img: Box::new(|state| match state.ram.save.inv.child_trade_item {
+        img: Box::new(|state| match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => (false, "white_egg"),
             ChildTradeItem::WeirdEgg => (true, "white_egg"),
             ChildTradeItem::Chicken => (true, "white_chicken"),
@@ -852,7 +886,7 @@ cells! {
             //TODO bunny hood sold => SOLD OUT
             ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
         }),
-        increment: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+        increment: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             //TODO consider sold-out states
             ChildTradeItem::None => ChildTradeItem::WeirdEgg,
             ChildTradeItem::WeirdEgg => ChildTradeItem::Chicken,
@@ -864,7 +898,7 @@ cells! {
             ChildTradeItem::BunnyHood => ChildTradeItem::MaskOfTruth,
             ChildTradeItem::MaskOfTruth => ChildTradeItem::None,
         }),
-        decrement: Box::new(|state| state.ram.save.inv.child_trade_item = match state.ram.save.inv.child_trade_item {
+        decrement: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             //TODO consider sold-out states
             ChildTradeItem::None => ChildTradeItem::MaskOfTruth,
             ChildTradeItem::WeirdEgg => ChildTradeItem::None,
@@ -880,57 +914,57 @@ cells! {
     Ocarina: Overlay {
         main_img: "ocarina",
         overlay_img: "scarecrow",
-        active: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
-        toggle_main: Box::new(|state| state.ram.save.inv.ocarina = !state.ram.save.inv.ocarina),
-        toggle_overlay: Box::new(|state| state.ram.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)), //TODO make sure free scarecrow knowledge is toggled off properly
+        active: Box::new(|state| (state.ram().save.inv.ocarina, state.ram().save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
+        toggle_main: Box::new(|state| state.ram_mut().save.inv.ocarina = !state.ram().save.inv.ocarina),
+        toggle_overlay: Box::new(|state| state.ram_mut().save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)), //TODO make sure free scarecrow knowledge is toggled off properly
     },
     Beans: Simple { //TODO overlay with number bought if autotracker is on & shuffle beans is off
         img: "beans",
-        active: Box::new(|state| state.ram.save.inv.beans),
-        toggle: Box::new(|state| state.ram.save.inv.beans = !state.ram.save.inv.beans),
+        active: Box::new(|state| state.ram().save.inv.beans),
+        toggle: Box::new(|state| state.ram_mut().save.inv.beans = !state.ram().save.inv.beans),
     },
     SwordCard: Composite {
         left_img: "kokiri_sword",
         right_img: "gerudo_card",
         both_img: "composite_ksword_gcard",
-        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD))),
-        toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
-        toggle_right: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
+        active: Box::new(|state| (state.ram().save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram().save.quest_items.contains(QuestItems::GERUDO_CARD))),
+        toggle_left: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::KOKIRI_SWORD)),
+        toggle_right: Box::new(|state| state.ram_mut().save.quest_items.toggle(QuestItems::GERUDO_CARD)),
     },
     KokiriSword: Simple {
         img: "kokiri_sword",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
+        active: Box::new(|state| state.ram().save.equipment.contains(Equipment::KOKIRI_SWORD)),
+        toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::KOKIRI_SWORD)),
     },
     Tunics: Composite {
         left_img: "goron_tunic",
         right_img: "zora_tunic",
         both_img: "composite_tunics",
-        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::GORON_TUNIC), state.ram.save.equipment.contains(Equipment::ZORA_TUNIC))),
-        toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::GORON_TUNIC)),
-        toggle_right: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
+        active: Box::new(|state| (state.ram().save.equipment.contains(Equipment::GORON_TUNIC), state.ram().save.equipment.contains(Equipment::ZORA_TUNIC))),
+        toggle_left: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::GORON_TUNIC)),
+        toggle_right: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::ZORA_TUNIC)),
     },
     GoronTunic: Simple {
         img: "goron_tunic",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::GORON_TUNIC)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::GORON_TUNIC)),
+        active: Box::new(|state| state.ram().save.equipment.contains(Equipment::GORON_TUNIC)),
+        toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::GORON_TUNIC)),
     },
     ZoraTunic: Simple {
         img: "zora_tunic",
-        active: Box::new(|state| state.ram.save.equipment.contains(Equipment::ZORA_TUNIC)),
-        toggle: Box::new(|state| state.ram.save.equipment.toggle(Equipment::ZORA_TUNIC)),
+        active: Box::new(|state| state.ram().save.equipment.contains(Equipment::ZORA_TUNIC)),
+        toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::ZORA_TUNIC)),
     },
     Triforce: Count {
         dimmed_img: "triforce",
         img: "force",
-        get: Box::new(|state| state.ram.save.triforce_pieces()),
-        set: Box::new(|state, value| state.ram.save.set_triforce_pieces(value)),
+        get: Box::new(|state| state.ram().save.triforce_pieces()),
+        set: Box::new(|state, value| state.ram_mut().save.set_triforce_pieces(value)),
         max: 100,
         step: 1,
     },
     BigPoeTriforce: BigPoeTriforce,
     TriforceOneAndFives: Sequence {
-        idx: Box::new(|state| match state.ram.save.triforce_pieces() {
+        idx: Box::new(|state| match state.ram().save.triforce_pieces() {
             0 => 0,
             1..=4 => 1,
             5..=9 => 2,
@@ -946,39 +980,45 @@ cells! {
             55..=59 => 12,
             _ => 13,
         }),
-        img: Box::new(|state| (state.ram.save.triforce_pieces() > 0, "triforce")), //TODO images from count?
-        increment: Box::new(|state| state.ram.save.set_triforce_pieces(match state.ram.save.triforce_pieces() {
-            0 => 1,
-            1..=4 => 5,
-            5..=9 => 10,
-            10..=14 => 15,
-            15..=19 => 20,
-            20..=24 => 25,
-            25..=29 => 30,
-            30..=34 => 35,
-            35..=39 => 40,
-            40..=44 => 45,
-            45..=49 => 50,
-            50..=54 => 55,
-            55..=59 => 60,
-            _ => 0,
-        })),
-        decrement: Box::new(|state| state.ram.save.set_triforce_pieces(match state.ram.save.triforce_pieces() {
-            0 => 60,
-            1..=4 => 0,
-            5..=9 => 1,
-            10..=14 => 5,
-            15..=19 => 10,
-            20..=24 => 15,
-            25..=29 => 20,
-            30..=34 => 25,
-            35..=39 => 30,
-            40..=44 => 35,
-            45..=49 => 40,
-            50..=54 => 45,
-            55..=59 => 50,
-            _ => 55,
-        })),
+        img: Box::new(|state| (state.ram().save.triforce_pieces() > 0, "triforce")), //TODO images from count?
+        increment: Box::new(|state| {
+            let new_val = match state.ram().save.triforce_pieces() {
+                0 => 1,
+                1..=4 => 5,
+                5..=9 => 10,
+                10..=14 => 15,
+                15..=19 => 20,
+                20..=24 => 25,
+                25..=29 => 30,
+                30..=34 => 35,
+                35..=39 => 40,
+                40..=44 => 45,
+                45..=49 => 50,
+                50..=54 => 55,
+                55..=59 => 60,
+                _ => 0,
+            };
+            state.ram_mut().save.set_triforce_pieces(new_val);
+        }),
+        decrement: Box::new(|state| {
+            let new_val = match state.ram().save.triforce_pieces() {
+                0 => 60,
+                1..=4 => 0,
+                5..=9 => 1,
+                10..=14 => 5,
+                15..=19 => 10,
+                20..=24 => 15,
+                25..=29 => 20,
+                30..=34 => 25,
+                35..=39 => 30,
+                40..=44 => 35,
+                45..=49 => 40,
+                50..=54 => 45,
+                55..=59 => 50,
+                _ => 55,
+            };
+            state.ram_mut().save.set_triforce_pieces(new_val);
+        }),
     },
     ZeldasLullaby: Song {
         song: QuestItems::ZELDAS_LULLABY,
@@ -1180,37 +1220,43 @@ cells! {
     },
     BiggoronSword: Simple {
         img: "UNIMPLEMENTED",
-        active: Box::new(|state| state.ram.save.biggoron_sword && state.ram.save.equipment.contains(Equipment::GIANTS_KNIFE)),
-        toggle: Box::new(|state| if state.ram.save.biggoron_sword && state.ram.save.equipment.contains(Equipment::GIANTS_KNIFE) {
-            state.ram.save.biggoron_sword = false;
-            state.ram.save.equipment.remove(Equipment::GIANTS_KNIFE);
+        active: Box::new(|state| state.ram().save.biggoron_sword && state.ram().save.equipment.contains(Equipment::GIANTS_KNIFE)),
+        toggle: Box::new(|state| if state.ram().save.biggoron_sword && state.ram().save.equipment.contains(Equipment::GIANTS_KNIFE) {
+            state.ram_mut().save.biggoron_sword = false;
+            state.ram_mut().save.equipment.remove(Equipment::GIANTS_KNIFE);
         } else {
-            state.ram.save.biggoron_sword = true;
-            state.ram.save.equipment.insert(Equipment::GIANTS_KNIFE);
+            state.ram_mut().save.biggoron_sword = true;
+            state.ram_mut().save.equipment.insert(Equipment::GIANTS_KNIFE);
         }),
     },
     WalletNoTycoon: Sequence {
-        idx: Box::new(|state| match state.ram.save.upgrades.wallet() {
+        idx: Box::new(|state| match state.ram().save.upgrades.wallet() {
             Upgrades::ADULTS_WALLET => 1,
             Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => 2,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram.save.upgrades.wallet() != Upgrades::NONE, "UNIMPLEMENTED")),
-        increment: Box::new(|state| state.ram.save.upgrades.set_wallet(match state.ram.save.upgrades.wallet() {
-            Upgrades::ADULTS_WALLET => Upgrades::GIANTS_WALLET,
-            Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::NONE,
-            _ => Upgrades::ADULTS_WALLET,
-        })),
-        decrement: Box::new(|state| state.ram.save.upgrades.set_wallet(match state.ram.save.upgrades.wallet() {
-            Upgrades::ADULTS_WALLET => Upgrades::NONE,
-            Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::ADULTS_WALLET,
-            _ => Upgrades::GIANTS_WALLET,
-        })),
+        img: Box::new(|state| (state.ram().save.upgrades.wallet() != Upgrades::NONE, "UNIMPLEMENTED")),
+        increment: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.wallet() {
+                Upgrades::ADULTS_WALLET => Upgrades::GIANTS_WALLET,
+                Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::NONE,
+                _ => Upgrades::ADULTS_WALLET,
+            };
+            state.ram_mut().save.upgrades.set_wallet(new_val);
+        }),
+        decrement: Box::new(|state| {
+            let new_val = match state.ram().save.upgrades.wallet() {
+                Upgrades::ADULTS_WALLET => Upgrades::NONE,
+                Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::ADULTS_WALLET,
+                _ => Upgrades::GIANTS_WALLET,
+            };
+            state.ram_mut().save.upgrades.set_wallet(new_val);
+        }),
     },
     StoneOfAgony: Simple {
         img: "UNIMPLEMENTED",
-        active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::STONE_OF_AGONY)),
-        toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::STONE_OF_AGONY)),
+        active: Box::new(|state| state.ram().save.quest_items.contains(QuestItems::STONE_OF_AGONY)),
+        toggle: Box::new(|state| state.ram_mut().save.quest_items.toggle(QuestItems::STONE_OF_AGONY)),
     },
 }
 

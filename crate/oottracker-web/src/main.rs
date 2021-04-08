@@ -6,14 +6,11 @@ use {
     std::{
         collections::HashMap,
         convert::TryInto as _,
-        io,
     },
     itertools::Itertools as _,
     rocket::{
         State,
         response::{
-            Debug,
-            NamedFile,
             Redirect,
             content::Html,
             status::NotFound,
@@ -35,7 +32,10 @@ use {
         },
     },
     oottracker::{
+        Knowledge,
         ModelState,
+        ModelStateView,
+        Ram,
         checks::CheckExt as _,
         save::QuestItems,
         ui::{
@@ -45,23 +45,24 @@ use {
                 self,
                 *,
             },
-            TrackerLayout,
         },
+    },
+    crate::restream::{
+        DoubleTrackerLayout,
+        RestreamState,
+        TrackerLayout,
     },
 };
 
-#[rocket::get("/")]
-async fn index() -> Result<NamedFile, Debug<io::Error>> {
-    Ok(NamedFile::open("assets/web/index.html").await?)
-}
+mod restream;
 
 trait TrackerCellKindExt {
-    fn render(&self, state: &ModelState) -> String;
-    fn click(&self, state: &mut ModelState);
+    fn render(&self, state: &dyn ModelStateView) -> String;
+    fn click(&self, state: &mut dyn ModelStateView);
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
-    fn render(&self, state: &ModelState) -> String {
+    fn render(&self, state: &dyn ModelStateView) -> String {
         match self {
             Composite { left_img, right_img, both_img, active, .. } => {
                 let is_active = active(state);
@@ -86,11 +87,11 @@ impl TrackerCellKindExt for TrackerCellKind {
             }
             Medallion(med) => {
                 let img_filename = format!("{}_medallion", med.element().to_ascii_lowercase());
-                let css_classes = if state.ram.save.quest_items.has(*med) { "" } else { "dimmed" };
+                let css_classes = if state.ram().save.quest_items.has(*med) { "" } else { "dimmed" };
                 format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
             }
             MedallionLocation(med) => {
-                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
+                let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
                 let img_filename = match location {
                     None => "unknown_text",
                     Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
@@ -145,13 +146,13 @@ impl TrackerCellKindExt for TrackerCellKind {
                     _ => unreachable!(),
                 };
                 if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
-                    let css_classes = if state.ram.save.quest_items.contains(*song) { "" } else { "dimmed" };
+                    let css_classes = if state.ram().save.quest_items.contains(*song) { "" } else { "dimmed" };
                     format!(r#"
                         <img class="{}" src="/static/img/xopar-images/{}.png" />
                         <img src="/static/img/xopar-overlays/check.png" />
                     "#, css_classes, song_filename)
                 } else {
-                    let css_classes = if state.ram.save.quest_items.contains(*song) { "" } else { "dimmed" };
+                    let css_classes = if state.ram().save.quest_items.contains(*song) { "" } else { "dimmed" };
                     format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, song_filename)
                 }
             }
@@ -161,11 +162,11 @@ impl TrackerCellKindExt for TrackerCellKind {
                     Stone::GoronRuby => "goron_ruby",
                     Stone::ZoraSapphire => "zora_sapphire",
                 };
-                let css_classes = if state.ram.save.quest_items.has(*stone) { "" } else { "dimmed" };
+                let css_classes = if state.ram().save.quest_items.has(*stone) { "" } else { "dimmed" };
                 format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, stone_filename)
             }
             StoneLocation(stone) => {
-                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
+                let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
                 let img_filename = match location {
                     None => "unknown_text",
                     Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
@@ -185,7 +186,7 @@ impl TrackerCellKindExt for TrackerCellKind {
         }
     }
 
-    fn click(&self, state: &mut ModelState) {
+    fn click(&self, state: &mut dyn ModelStateView) {
         match self {
             Composite { active, toggle_left, toggle_right, .. } | Overlay { active, toggle_main: toggle_left, toggle_overlay: toggle_right, .. } => {
                 let (left, _) = active(state);
@@ -197,61 +198,65 @@ impl TrackerCellKindExt for TrackerCellKind {
                 let current = get(state);
                 if current == *max { set(state, 0) } else { set(state, current + 1) }
             }
-            Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
-            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
+            Medallion(med) => state.ram_mut().save.quest_items.toggle(QuestItems::from(med)),
+            MedallionLocation(med) => state.knowledge_mut().dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
             Sequence { increment, .. } => increment(state),
-            Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
-            Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
-            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            Song { song: quest_item, .. } => state.ram_mut().save.quest_items.toggle(*quest_item),
+            Stone(stone) => state.ram_mut().save.quest_items.toggle(QuestItems::from(stone)),
+            StoneLocation(stone) => state.knowledge_mut().dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
             BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
 }
 
 trait TrackerCellIdExt {
-    fn view(&self, room_name: &str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> String;
+    fn view(&self, room_name: &str, cell_id: u8, state: &dyn ModelStateView, colspan: u8, loc: bool) -> String;
 }
 
 impl TrackerCellIdExt for TrackerCellId {
-    fn view(&self, room_name: &str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> String {
+    fn view(&self, room_name: &str, cell_id: u8, state: &dyn ModelStateView, colspan: u8, loc: bool) -> String {
         let content = self.kind().render(state);
         let css_classes = if loc { format!("cols{} loc", colspan) } else { format!("cols{}", colspan) };
-        format!(r#"<a href="/{}/click/{}" class="{}">{}</a>"#, room_name, cell_id, css_classes, content) //TODO click action
+        format!(r#"<a href="/{}/click/{}" class="{}">{}</a>"#, room_name, cell_id, css_classes, content) //TODO click action for JS, put link in a noscript tag
     }
 }
 
-fn cells(layout: TrackerLayout) -> impl Iterator<Item = (TrackerCellId, u8, bool)> {
-    layout.meds.into_iter().map(|med| (TrackerCellId::med_location(med), 3, true))
-        .chain(layout.meds.into_iter().map(|med| (TrackerCellId::from(med), 3, false)))
-        .chain(vec![
-            (layout.row2[0], 3, false),
-            (layout.row2[1], 3, false),
-            (TrackerCellId::KokiriEmeraldLocation, 2, true),
-            (TrackerCellId::GoronRubyLocation, 2, true),
-            (TrackerCellId::ZoraSapphireLocation, 2, true),
-            (layout.row2[2], 3, false),
-            (layout.row2[3], 3, false),
-            (TrackerCellId::KokiriEmerald, 2, false),
-            (TrackerCellId::GoronRuby, 2, false),
-            (TrackerCellId::ZoraSapphire, 2, false),
-        ])
-        .chain(layout.rest.iter().flat_map(|row|
-            row.iter().map(|&cell| (cell, 3, false))
-        ).collect_vec())
-        .chain(layout.warp_songs.into_iter().map(|med| (TrackerCellId::warp_song(med), 3, false)))
+fn double_view(restream: &mut RestreamState, runner1: &str, runner2: &str, reward: DungeonReward) -> Option<String> {
+    let img_filename = match reward {
+        DungeonReward::Medallion(med) => format!("{}_medallion", med.element().to_ascii_lowercase()),
+        DungeonReward::Stone(Stone::KokiriEmerald) => format!("kokiri_emerald"),
+        DungeonReward::Stone(Stone::GoronRuby) => format!("goron_ruby"),
+        DungeonReward::Stone(Stone::ZoraSapphire) => format!("zora_sapphire"),
+    };
+    let runner1_has = restream.runner(runner1)?.ram().save.quest_items.has(reward);
+    let runner2 = restream.runner(runner2)?;
+    let css_classes = match (runner1_has, runner2.ram().save.quest_items.has(reward)) {
+        (false, false) => "dimmed",
+        (false, true) => "left-dimmed",
+        (true, false) => "right-dimmed",
+        (true, true) => "",
+    };
+    let location = runner2.knowledge().dungeon_reward_locations.get(&reward);
+    let loc_img_filename = match location {
+        None => "unknown_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+        Some(DungeonRewardLocation::LinksPocket) => "free_text",
+    };
+    let loc_css_classes = if location.is_some() { "" } else { "dimmed" };
+    Some(format!(r#"<div class="cols3">
+        <img class="{}" src="/static/img/xopar-images/{}.png" />
+        <img class="loc {}" src="/static/img/xopar-images/{}.png" />
+    </div>"#, css_classes, img_filename, loc_css_classes, loc_img_filename)) //TODO overlay with location knowledge
 }
 
-#[rocket::get("/<name>")]
-async fn room(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String) -> Html<String> {
-    let html_layout = {
-        let mut rooms = rooms.lock().await;
-        let room = rooms.entry(name.clone()).or_default();
-        let layout = TrackerLayout::default();
-        cells(layout)
-            .enumerate()
-            .map(|(cell_id, (cell, colspan, loc))| cell.view(&name, cell_id.try_into().expect("too many cells"), room, colspan, loc))
-            .join("\n")
-    };
+fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
     Html(format!(r#"
         <!DOCTYPE html>
         <html>
@@ -264,7 +269,7 @@ async fn room(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String
                 <link rel="stylesheet" href="/static/common.css" />
             </head>
             <body>
-                <div class="items">
+                <div class="items {}">
                     {}
                 </div>
                 <footer>
@@ -272,16 +277,92 @@ async fn room(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String
                 </footer>
             </body>
         </html>
-    "#, html_layout))
+    "#, layout_name, html_layout))
 }
 
-#[rocket::get("/<name>/click/<cell_id>")]
+#[rocket::get("/")]
+fn index() -> Html<String> {
+    Html(format!(include_str!("../../../assets/web/index.html"), env!("CARGO_PKG_VERSION")))
+}
+
+#[rocket::get("/restream/<restreamer>/<runner>")]
+async fn restream_room_input(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner: String) -> Option<Html<String>> {
+    let html_layout = {
+        let mut restreams = restreams.lock().await;
+        let restream = restreams.get_mut(&restreamer)?;
+        let layout = restream.layout();
+        let model_state_view = restream.runner(&runner)?;
+        let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
+        layout.cells()
+            .enumerate()
+            .map(|(cell_id, (cell, colspan, loc))| cell.view(&pseudo_name, cell_id.try_into().expect("too many cells"), &model_state_view, colspan, loc))
+            .join("\n")
+    };
+    Some(tracker_page("default", html_layout))
+}
+
+#[rocket::get("/restream/<restreamer>/<runner>/<layout>")]
+async fn restream_room_view(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Html<String>> {
+    let html_layout = {
+        let mut restreams = restreams.lock().await;
+        let restream = restreams.get_mut(&restreamer)?;
+        let model_state_view = restream.runner(&runner)?;
+        let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
+        layout.cells()
+            .enumerate()
+            .map(|(cell_id, (cell, colspan, loc))| cell.view(&pseudo_name, cell_id.try_into().expect("too many cells"), &model_state_view, colspan, loc))
+            .join("\n")
+    };
+    Some(tracker_page(&layout.to_string(), html_layout))
+}
+
+#[rocket::get("/restream/<restreamer>/<runner>/<layout>/click/<cell_id>")]
+async fn restream_click(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner: String, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
+    {
+        let mut restreams = restreams.lock().await;
+        let restream = restreams.get_mut(&restreamer).ok_or(NotFound("No such restream"))?;
+        let mut model_state_view = restream.runner(&runner).ok_or(NotFound("No such runner"))?;
+        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(&mut model_state_view);
+    }
+    Ok(Redirect::to(rocket::uri!(restream_room_view: restreamer, runner, layout)))
+}
+
+#[rocket::get("/restream/<restreamer>/<runner1>/<layout>/with/<runner2>")]
+async fn restream_double_room_layout(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Html<String>> {
+    let html_layout = {
+        let mut restreams = restreams.lock().await;
+        let restream = restreams.get_mut(&restreamer)?;
+        layout.cells()
+            .into_iter()
+            .map(|reward| double_view(restream, &runner1, &runner2, reward))
+            .collect::<Option<Vec<_>>>()?
+            .into_iter()
+            .join("\n")
+    };
+    Some(tracker_page(&layout.to_string(), html_layout))
+}
+
+#[rocket::get("/room/<name>")]
+async fn room(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String) -> Html<String> {
+    let html_layout = {
+        let mut rooms = rooms.lock().await;
+        let room = rooms.entry(name.clone()).or_default();
+        let layout = TrackerLayout::default();
+        layout.cells()
+            .enumerate()
+            .map(|(cell_id, (cell, colspan, loc))| cell.view(&name, cell_id.try_into().expect("too many cells"), room, colspan, loc))
+            .join("\n")
+    };
+    tracker_page("default", html_layout)
+}
+
+#[rocket::get("/room/<name>/click/<cell_id>")]
 async fn click(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
     {
         let mut rooms = rooms.lock().await;
         let room = rooms.entry(name.clone()).or_default();
         let layout = TrackerLayout::default();
-        cells(layout).nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(room);
+        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(room);
     }
     Ok(Redirect::to(rocket::uri!(room: name)))
 }
@@ -297,9 +378,24 @@ async fn main(Args {}: Args) -> Result<(), rocket::error::Error> {
         ..rocket::Config::default()
     })
     .manage(Mutex::<HashMap<String, ModelState>>::default())
+    .manage({
+        //TODO remove hardcoded restream, allow configuring active restreams somehow
+        let mut map = HashMap::new();
+        let multiworld_3v3 = vec![
+            (Knowledge::default(), vec![(format!("a1"), Ram::default()), (format!("b1"), Ram::default())].into_iter().collect()),
+            (Knowledge::default(), vec![(format!("a2"), Ram::default()), (format!("b2"), Ram::default())].into_iter().collect()),
+            (Knowledge::default(), vec![(format!("a3"), Ram::default()), (format!("b3"), Ram::default())].into_iter().collect()),
+        ];
+        map.insert(format!("fenhl"), RestreamState::new(multiworld_3v3));
+        Mutex::new(map)
+    })
     .mount("/static", StaticFiles::new(crate_relative!("../../assets/web/static"), rocket_contrib::serve::Options::None))
     .mount("/", rocket::routes![
         index,
+        restream_room_input,
+        restream_room_view,
+        restream_click,
+        restream_double_room_layout,
         room,
         click,
     ])
