@@ -5,8 +5,19 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
 [dependencies]
+futures = "0.3"
 itertools = "0.10"
 smart-default = "0.6"
+warp = "0.3"
+
+[dependencies.async-proto]
+version = "0.7"
+features = ["warp"]
+
+[dependencies.derive_more]
+version = "0.99"
+default-features = false
+features = ["from"]
 
 [dependencies.ootr]
 path = "../ootr"

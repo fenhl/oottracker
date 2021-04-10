@@ -3,6 +3,7 @@ use {
         collections::HashMap,
         fmt,
     },
+    async_proto::Protocol,
     itertools::Itertools as _,
     rocket::{
         http::uri::{
@@ -13,6 +14,7 @@ use {
         request::FromParam,
     },
     smart_default::SmartDefault,
+    tokio::sync::watch::*,
     ootr::model::{
         DungeonReward,
         Medallion,
@@ -26,20 +28,25 @@ use {
 };
 
 pub(crate) struct RestreamState {
-    worlds: Vec<(Knowledge, HashMap<String, Ram>)>,
+    worlds: Vec<(Sender<()>, Receiver<()>, Knowledge, HashMap<String, Ram>)>,
 }
 
 impl RestreamState {
-    pub(crate) fn new(worlds: Vec<(Knowledge, HashMap<String, Ram>)>) -> RestreamState {
-        RestreamState { worlds }
+    pub(crate) fn new(worlds: impl IntoIterator<Item = (Knowledge, HashMap<String, Ram>)>) -> RestreamState {
+        RestreamState {
+            worlds: worlds.into_iter().map(|(knowledge, players)| {
+                let (tx, rx) = channel(());
+                (tx, rx, knowledge, players)
+            }).collect(),
+        }
     }
 
     pub(crate) fn layout(&self) -> TrackerLayout {
         TrackerLayout::default() //TODO allow restreamer to set different tracker layouts
     }
 
-    pub(crate) fn runner(&mut self, runner: &str) -> Option<ModelStateView<'_>> {
-        self.worlds.iter_mut().filter_map(|(knowledge, players)| players.get_mut(runner).map(move |ram| ModelStateView { knowledge, ram })).next()
+    pub(crate) fn runner(&mut self, runner: &str) -> Option<(&Sender<()>, &Receiver<()>, ModelStateView<'_>)> {
+        self.worlds.iter_mut().filter_map(|(tx, rx, knowledge, players)| players.get_mut(runner).map(move |ram| (&*tx, &*rx, ModelStateView { knowledge, ram }))).next()
     }
 }
 
@@ -55,7 +62,7 @@ impl<'a> oottracker::ModelStateView for ModelStateView<'a> {
     fn ram_mut(&mut self) -> &mut Ram { self.ram }
 }
 
-#[derive(SmartDefault)]
+#[derive(SmartDefault, Protocol)]
 pub(crate) enum TrackerLayout {
     #[default]
     Default,

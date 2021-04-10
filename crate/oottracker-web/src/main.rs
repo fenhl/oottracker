@@ -4,24 +4,32 @@
 
 use {
     std::{
+        borrow::Cow,
         collections::HashMap,
-        convert::TryInto as _,
+        fmt,
+        pin::Pin,
+        sync::Arc,
     },
-    itertools::Itertools as _,
-    rocket::{
-        State,
-        response::{
-            Redirect,
-            content::Html,
-            status::NotFound,
-        },
+    async_proto::{
+        Protocol,
+        ReadError,
+        WriteError,
     },
-    rocket_contrib::serve::{
-        StaticFiles,
-        crate_relative,
+    derive_more::From,
+    futures::future::{
+        Future,
+        FutureExt as _,
+        TryFutureExt as _,
     },
     structopt::StructOpt,
-    tokio::sync::Mutex,
+    tokio::{
+        io::{
+            AsyncRead,
+            AsyncWrite,
+        },
+        sync::Mutex,
+    },
+    warp::Filter as _,
     ootr::{
         check::Check,
         model::{
@@ -40,97 +48,205 @@ use {
         save::QuestItems,
         ui::{
             DungeonRewardLocationExt as _,
-            TrackerCellId,
             TrackerCellKind::{
                 self,
                 *,
             },
         },
     },
-    crate::restream::{
-        DoubleTrackerLayout,
-        RestreamState,
-        TrackerLayout,
-    },
+    crate::restream::RestreamState,
 };
 
+mod http;
 mod restream;
+mod websocket;
+
+type Restreams = Arc<Mutex<HashMap<String, RestreamState>>>;
+type Rooms = Arc<Mutex<HashMap<String, ModelState>>>;
+
+#[derive(Clone, Copy, PartialEq, Eq, Protocol)]
+enum CellStyle {
+    Normal,
+    Dimmed,
+    LeftDimmed,
+    RightDimmed,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum CellOverlay<'a> {
+    None,
+    Count(u8),
+    Image(Cow<'a, str>),
+}
+
+impl<'a> CellOverlay<'a> {
+    fn into_owned(self) -> CellOverlay<'static> {
+        match self {
+            CellOverlay::None => CellOverlay::None,
+            CellOverlay::Count(count) => CellOverlay::Count(count),
+            CellOverlay::Image(overlay_img) => CellOverlay::Image(Cow::Owned(overlay_img.into_owned())),
+        }
+    }
+}
+
+impl Protocol for CellOverlay<'static> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Self, ReadError>> + Send + 'a>> {
+        Box::pin(async move {
+            Ok(match u8::read(stream).await? {
+                0 => CellOverlay::None,
+                1 => CellOverlay::Count(u8::read(stream).await?),
+                2 => CellOverlay::Image(Cow::read(stream).await?),
+                n => return Err(ReadError::UnknownVariant(n)),
+            })
+        })
+    }
+
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
+        Box::pin(async move {
+            match self {
+                CellOverlay::None => 0u8.write(sink).await?,
+                CellOverlay::Count(count) => {
+                    1u8.write(sink).await?;
+                    count.write(sink).await?;
+                }
+                CellOverlay::Image(overlay_img) => {
+                    2u8.write(sink).await?;
+                    overlay_img.write(sink).await?;
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct CellRender<'a> {
+    img_filename: Cow<'a, str>,
+    style: CellStyle,
+    overlay: CellOverlay<'a>,
+}
+
+impl<'a> CellRender<'a> {
+    fn into_owned(self) -> CellRender<'static> {
+        CellRender {
+            img_filename: Cow::Owned(self.img_filename.into_owned()),
+            style: self.style,
+            overlay: self.overlay.into_owned(),
+        }
+    }
+
+    fn to_html(&self) -> String {
+        let css_classes = match self.style {
+            CellStyle::Normal => "",
+            CellStyle::Dimmed => "dimmed",
+            CellStyle::LeftDimmed => "left-dimmed",
+            CellStyle::RightDimmed => "right-dimmed",
+        };
+        let overlay = match self.overlay {
+            CellOverlay::None => String::default(),
+            CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
+            CellOverlay::Image(ref overlay_img) => format!(r#"<img src="/static/img/xopar-overlays/{}.png" />"#, overlay_img),
+        };
+        format!(r#"<img class="{}" src="/static/img/xopar-images/{}" />{}"#, css_classes, self.img_filename, overlay)
+    }
+}
+
+impl Protocol for CellRender<'static> {
+    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Self, ReadError>> + Send + 'a>> {
+        Box::pin(async move {
+            Ok(CellRender {
+                img_filename: Cow::read(stream).await?,
+                style: CellStyle::read(stream).await?,
+                overlay: CellOverlay::read(stream).await?,
+            })
+        })
+    }
+
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
+        Box::pin(async move {
+            self.img_filename.write(sink).await?;
+            self.style.write(sink).await?;
+            self.overlay.write(sink).await?;
+            Ok(())
+        })
+    }
+}
 
 trait TrackerCellKindExt {
-    fn render(&self, state: &dyn ModelStateView) -> String;
+    fn render(&self, state: &dyn ModelStateView) -> CellRender<'_>;
     fn click(&self, state: &mut dyn ModelStateView);
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
-    fn render(&self, state: &dyn ModelStateView) -> String {
+    fn render(&self, state: &dyn ModelStateView) -> CellRender<'_> {
         match self {
             Composite { left_img, right_img, both_img, active, .. } => {
                 let is_active = active(state);
-                let img_filename = match is_active {
-                    (false, false) | (true, true) => both_img,
-                    (false, true) => right_img,
-                    (true, false) => left_img,
-                };
-                let css_classes = if let (false, false) = is_active { "dimmed" } else { "" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
+                CellRender {
+                    img_filename: Cow::Borrowed(*match is_active {
+                        (false, false) | (true, true) => both_img,
+                        (false, true) => right_img,
+                        (true, false) => left_img,
+                    }),
+                    style: if let (false, false) = is_active { CellStyle::Dimmed } else { CellStyle::Normal },
+                    overlay: CellOverlay::None,
+                }
             }
             Count { dimmed_img, get, .. } => {
                 let count = get(state);
                 if count == 0 {
-                    format!(r#"<img class="dimmed" src="/static/img/xopar-images/{}.png" />"#, dimmed_img)
+                    CellRender { img_filename: Cow::Borrowed(dimmed_img), style: CellStyle::Dimmed, overlay: CellOverlay::None }
                 } else {
-                    format!(r#"
-                        <img src="/static/img/xopar-images/{}.png" />
-                        <span class="count">{}</span>
-                    "#, dimmed_img, count)
+                    CellRender { img_filename: Cow::Borrowed(dimmed_img), style: CellStyle::Normal, overlay: CellOverlay::Count(count) }
                 }
             }
-            Medallion(med) => {
-                let img_filename = format!("{}_medallion", med.element().to_ascii_lowercase());
-                let css_classes = if state.ram().save.quest_items.has(*med) { "" } else { "dimmed" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
-            }
+            Medallion(med) => CellRender {
+                img_filename: Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
+                style: if state.ram().save.quest_items.has(*med) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
             MedallionLocation(med) => {
                 let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
-                let img_filename = match location {
-                    None => "unknown_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
-                    Some(DungeonRewardLocation::LinksPocket) => "free_text",
-                };
-                let css_classes = if location.is_some() { "" } else { "dimmed" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
+                CellRender {
+                    img_filename: Cow::Borrowed(match location {
+                        None => "unknown_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+                        Some(DungeonRewardLocation::LinksPocket) => "free_text",
+                    }),
+                    style: if location.is_some() { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::None,
+                }
             }
             OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => {
                 let (main_active, overlay_active) = active(state);
-                if overlay_active {
-                    let css_classes = if main_active { "" } else { "dimmed" };
-                    format!(r#"
-                        <img class="{}" src="/static/img/xopar-images/{}.png" />
-                        <img src="/static/img/xopar-overlays/{}.png" />
-                    "#, css_classes, main_img, overlay_img)
-                } else {
-                    let css_classes = if main_active { "" } else { "dimmed" };
-                    format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, main_img)
+                CellRender {
+                    img_filename: Cow::Borrowed(main_img),
+                    style: if main_active { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: if overlay_active { CellOverlay::Image(Cow::Borrowed(overlay_img)) } else { CellOverlay::None },
                 }
             }
             Sequence { img, .. } => {
                 let (is_active, img_filename) = img(state);
-                let css_classes = if is_active { "" } else { "dimmed" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
+                CellRender {
+                    img_filename: Cow::Borrowed(img_filename),
+                    style: if is_active { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::None,
+                }
             }
-            Simple { img, active, .. } => {
-                let css_classes = if active(state) { "" } else { "dimmed" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img)
-            }
-            Song { song, check, .. } => {
-                let song_filename = match *song {
+            Simple { img, active, .. } => CellRender {
+                img_filename: Cow::Borrowed(img),
+                style: if active(state) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
+            Song { song, check, .. } => CellRender {
+                img_filename: Cow::Borrowed(match *song {
                     QuestItems::ZELDAS_LULLABY => "lullaby",
                     QuestItems::EPONAS_SONG => "epona",
                     QuestItems::SARIAS_SONG => "saria",
@@ -144,44 +260,42 @@ impl TrackerCellKindExt for TrackerCellKind {
                     QuestItems::REQUIEM_OF_SPIRIT => "requiem",
                     QuestItems::PRELUDE_OF_LIGHT => "prelude",
                     _ => unreachable!(),
-                };
-                if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
-                    let css_classes = if state.ram().save.quest_items.contains(*song) { "" } else { "dimmed" };
-                    format!(r#"
-                        <img class="{}" src="/static/img/xopar-images/{}.png" />
-                        <img src="/static/img/xopar-overlays/check.png" />
-                    "#, css_classes, song_filename)
+                }),
+                style: if state.ram().save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                    CellOverlay::Image(Cow::Borrowed("check"))
                 } else {
-                    let css_classes = if state.ram().save.quest_items.contains(*song) { "" } else { "dimmed" };
-                    format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, song_filename)
-                }
-            }
-            Stone(stone) => {
-                let stone_filename = match *stone {
+                    CellOverlay::None
+                },
+            },
+            Stone(stone) => CellRender {
+                img_filename: Cow::Borrowed(match *stone {
                     Stone::KokiriEmerald => "kokiri_emerald",
                     Stone::GoronRuby => "goron_ruby",
                     Stone::ZoraSapphire => "zora_sapphire",
-                };
-                let css_classes = if state.ram().save.quest_items.has(*stone) { "" } else { "dimmed" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, stone_filename)
-            }
+                }),
+                style: if state.ram().save.quest_items.has(*stone) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
             StoneLocation(stone) => {
                 let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
-                let img_filename = match location {
-                    None => "unknown_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
-                    Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
-                    Some(DungeonRewardLocation::LinksPocket) => "free_text",
-                };
-                let css_classes = if location.is_some() { "" } else { "dimmed" };
-                format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, css_classes, img_filename)
-            }
+                CellRender {
+                    img_filename: Cow::Borrowed(match location {
+                        None => "unknown_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+                        Some(DungeonRewardLocation::LinksPocket) => "free_text",
+                    }),
+                    style: if location.is_some() { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::None,
+                }
+            },
             BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
@@ -209,195 +323,51 @@ impl TrackerCellKindExt for TrackerCellKind {
     }
 }
 
-trait TrackerCellIdExt {
-    fn view(&self, room_name: &str, cell_id: u8, state: &dyn ModelStateView, colspan: u8, loc: bool) -> String;
+#[derive(Debug, From)]
+enum Error {
+    Read(ReadError),
+    Rocket(rocket::error::Error),
+    Task(tokio::task::JoinError),
 }
 
-impl TrackerCellIdExt for TrackerCellId {
-    fn view(&self, room_name: &str, cell_id: u8, state: &dyn ModelStateView, colspan: u8, loc: bool) -> String {
-        let content = self.kind().render(state);
-        let css_classes = if loc { format!("cols{} loc", colspan) } else { format!("cols{}", colspan) };
-        format!(r#"<a href="/{}/click/{}" class="{}">{}</a>"#, room_name, cell_id, css_classes, content) //TODO click action for JS, put link in a noscript tag
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Read(e) => write!(f, "read error: {}", e),
+            Error::Rocket(e) => write!(f, "rocket error: {}", e),
+            Error::Task(e) => write!(f, "task error: {}", e),
+        }
     }
-}
-
-fn double_view(restream: &mut RestreamState, runner1: &str, runner2: &str, reward: DungeonReward) -> Option<String> {
-    let img_filename = match reward {
-        DungeonReward::Medallion(med) => format!("{}_medallion", med.element().to_ascii_lowercase()),
-        DungeonReward::Stone(Stone::KokiriEmerald) => format!("kokiri_emerald"),
-        DungeonReward::Stone(Stone::GoronRuby) => format!("goron_ruby"),
-        DungeonReward::Stone(Stone::ZoraSapphire) => format!("zora_sapphire"),
-    };
-    let runner1_has = restream.runner(runner1)?.ram().save.quest_items.has(reward);
-    let runner2 = restream.runner(runner2)?;
-    let css_classes = match (runner1_has, runner2.ram().save.quest_items.has(reward)) {
-        (false, false) => "dimmed",
-        (false, true) => "left-dimmed",
-        (true, false) => "right-dimmed",
-        (true, true) => "",
-    };
-    let location = runner2.knowledge().dungeon_reward_locations.get(&reward);
-    let loc_img_filename = match location {
-        None => "unknown_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
-        Some(DungeonRewardLocation::LinksPocket) => "free_text",
-    };
-    let loc_css_classes = if location.is_some() { "" } else { "dimmed" };
-    Some(format!(r#"<div class="cols3">
-        <img class="{}" src="/static/img/xopar-images/{}.png" />
-        <img class="loc {}" src="/static/img/xopar-images/{}.png" />
-    </div>"#, css_classes, img_filename, loc_css_classes, loc_img_filename)) //TODO overlay with location knowledge
-}
-
-fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
-    Html(format!(r#"
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="utf-8" />
-                <title>OoT Tracker</title>
-                <meta name="author" content="Fenhl" /> <!--TODO generate from Cargo.toml? -->
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <!--TODO favicon -->
-                <link rel="stylesheet" href="/static/common.css" />
-            </head>
-            <body>
-                <div class="items {}">
-                    {}
-                </div>
-                <footer>
-                    <a href="https://fenhl.net/disc">disclaimer / Impressum</a>
-                </footer>
-            </body>
-        </html>
-    "#, layout_name, html_layout))
-}
-
-#[rocket::get("/")]
-fn index() -> Html<String> {
-    Html(format!(include_str!("../../../assets/web/index.html"), env!("CARGO_PKG_VERSION")))
-}
-
-#[rocket::get("/restream/<restreamer>/<runner>")]
-async fn restream_room_input(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner: String) -> Option<Html<String>> {
-    let html_layout = {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer)?;
-        let layout = restream.layout();
-        let model_state_view = restream.runner(&runner)?;
-        let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-        layout.cells()
-            .enumerate()
-            .map(|(cell_id, (cell, colspan, loc))| cell.view(&pseudo_name, cell_id.try_into().expect("too many cells"), &model_state_view, colspan, loc))
-            .join("\n")
-    };
-    Some(tracker_page("default", html_layout))
-}
-
-#[rocket::get("/restream/<restreamer>/<runner>/<layout>")]
-async fn restream_room_view(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Html<String>> {
-    let html_layout = {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer)?;
-        let model_state_view = restream.runner(&runner)?;
-        let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-        layout.cells()
-            .enumerate()
-            .map(|(cell_id, (cell, colspan, loc))| cell.view(&pseudo_name, cell_id.try_into().expect("too many cells"), &model_state_view, colspan, loc))
-            .join("\n")
-    };
-    Some(tracker_page(&layout.to_string(), html_layout))
-}
-
-#[rocket::get("/restream/<restreamer>/<runner>/<layout>/click/<cell_id>")]
-async fn restream_click(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner: String, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
-    {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer).ok_or(NotFound("No such restream"))?;
-        let mut model_state_view = restream.runner(&runner).ok_or(NotFound("No such runner"))?;
-        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(&mut model_state_view);
-    }
-    Ok(Redirect::to(rocket::uri!(restream_room_view: restreamer, runner, layout)))
-}
-
-#[rocket::get("/restream/<restreamer>/<runner1>/<layout>/with/<runner2>")]
-async fn restream_double_room_layout(restreams: State<'_, Mutex<HashMap<String, RestreamState>>>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Html<String>> {
-    let html_layout = {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer)?;
-        layout.cells()
-            .into_iter()
-            .map(|reward| double_view(restream, &runner1, &runner2, reward))
-            .collect::<Option<Vec<_>>>()?
-            .into_iter()
-            .join("\n")
-    };
-    Some(tracker_page(&layout.to_string(), html_layout))
-}
-
-#[rocket::get("/room/<name>")]
-async fn room(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String) -> Html<String> {
-    let html_layout = {
-        let mut rooms = rooms.lock().await;
-        let room = rooms.entry(name.clone()).or_default();
-        let layout = TrackerLayout::default();
-        layout.cells()
-            .enumerate()
-            .map(|(cell_id, (cell, colspan, loc))| cell.view(&name, cell_id.try_into().expect("too many cells"), room, colspan, loc))
-            .join("\n")
-    };
-    tracker_page("default", html_layout)
-}
-
-#[rocket::get("/room/<name>/click/<cell_id>")]
-async fn click(rooms: State<'_, Mutex<HashMap<String, ModelState>>>, name: String, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
-    {
-        let mut rooms = rooms.lock().await;
-        let room = rooms.entry(name.clone()).or_default();
-        let layout = TrackerLayout::default();
-        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(room);
-    }
-    Ok(Redirect::to(rocket::uri!(room: name)))
 }
 
 #[derive(StructOpt)]
 struct Args {} // for --help/--version support
 
 #[wheel::main]
-async fn main(Args {}: Args) -> Result<(), rocket::error::Error> {
-    rocket::custom(rocket::Config {
-        port: 24807,
-        //TODO configure secret_key for release mode
-        ..rocket::Config::default()
-    })
-    .manage(Mutex::<HashMap<String, ModelState>>::default())
-    .manage({
+async fn main(Args {}: Args) -> Result<(), Error> {
+    let rooms = Rooms::default();
+    let restreams = {
         //TODO remove hardcoded restream, allow configuring active restreams somehow
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         let multiworld_3v3 = vec![
             (Knowledge::default(), vec![(format!("a1"), Ram::default()), (format!("b1"), Ram::default())].into_iter().collect()),
             (Knowledge::default(), vec![(format!("a2"), Ram::default()), (format!("b2"), Ram::default())].into_iter().collect()),
             (Knowledge::default(), vec![(format!("a3"), Ram::default()), (format!("b3"), Ram::default())].into_iter().collect()),
         ];
         map.insert(format!("fenhl"), RestreamState::new(multiworld_3v3));
-        Mutex::new(map)
-    })
-    .mount("/static", StaticFiles::new(crate_relative!("../../assets/web/static"), rocket_contrib::serve::Options::None))
-    .mount("/", rocket::routes![
-        index,
-        restream_room_input,
-        restream_room_view,
-        restream_click,
-        restream_double_room_layout,
-        room,
-        click,
-    ])
-    .launch().await
+        Restreams::new(Mutex::new(map))
+    };
+    let websocket_task = {
+        let rooms = Rooms::clone(&rooms);
+        let restreams = Restreams::clone(&restreams);
+        let handler = warp::ws().and_then(move |ws| websocket::ws_handler(Rooms::clone(&rooms), Restreams::clone(&restreams), ws));
+        tokio::spawn(warp::serve(handler).run(([127, 0, 0, 1], 24808))).err_into()
+    };
+    let rocket_task = tokio::spawn(http::rocket(rooms, restreams).launch()).map(|res| match res {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(Error::from(e)),
+        Err(e) => Err(Error::from(e)),
+    });
+    let ((), ()) = tokio::try_join!(websocket_task, rocket_task)?;
+    Ok(())
 }
