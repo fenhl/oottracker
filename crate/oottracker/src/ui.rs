@@ -1397,7 +1397,7 @@ impl ImageDir {
             (ImageDir::Xopar, ImageDirContext::Dimmed) => "xopar-images-dimmed",
             (ImageDir::Extra, ImageDirContext::Dimmed) => "extra-images-dimmed",
             (ImageDir::Xopar, ImageDirContext::OverlayOnly) => "xopar-overlays",
-            (ImageDir::Extra, ImageDirContext::OverlayOnly) => unimplemented!(),
+            (ImageDir::Extra, ImageDirContext::OverlayOnly) => "extra-images",
         }
     }
 }
@@ -1420,7 +1420,7 @@ impl ImageInfo {
             (ImageDir::Extra, ImageDirContext::Count(count)) => images::extra_images_count(&format!("{}_{}", self.name, count)),
             (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(self.name),
             (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(self.name),
-            (_, ImageDirContext::OverlayOnly) => unimplemented!(),
+            (_, ImageDirContext::OverlayOnly) => images::extra_images(self.name),
         }
     }
 
