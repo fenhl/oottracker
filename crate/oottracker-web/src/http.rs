@@ -52,7 +52,7 @@ fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
                 <title>OoT Tracker</title>
                 <meta name="author" content="Fenhl" /> <!--TODO generate from Cargo.toml? -->
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <!--TODO favicon -->
+                <link rel="icon" type="image/vnd.microsoft.icon" href="/static/img/icon.ico" />
                 <link rel="stylesheet" href="/static/common.css" />
             </head>
             <body>
