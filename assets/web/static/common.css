@@ -25,7 +25,8 @@ body {
 }
 
 /* 6-column layouts */
-.items.default {
+.items.default,
+.items.mw-edit {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 

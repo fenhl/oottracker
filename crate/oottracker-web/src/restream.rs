@@ -68,6 +68,7 @@ pub(crate) enum TrackerLayout {
     Default,
     MultiworldExpanded,
     MultiworldCollapsed,
+    MultiworldEdit,
 }
 
 impl TrackerLayout {
@@ -110,6 +111,17 @@ impl TrackerLayout {
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms, Hookshot, Bow, Hammer, Magic,
                 Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude, MirrorShield, Boots, Arrows, Tunics, //TODO replace tunics with wallets once images exist
             ].into_iter().map(|cell| (cell, 3, false))),
+            TrackerLayout::MultiworldEdit => Box::new(vec![
+                KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, LightMedallionLocation, ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation,
+            ].into_iter().map(|cell| (cell, 2, true)).chain(vec![
+                KokiriEmerald, GoronRuby, ZoraSapphire, LightMedallion, ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion,
+            ].into_iter().map(|cell| (cell, 2, false))).chain(vec![
+                KokiriSword, Bottle, Skulltula, Scale, Tunics, GoBk, //TODO replace tunics with wallets once images exist
+                Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
+                Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
+                ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
+                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude, MirrorShield,
+            ].into_iter().map(|cell| (cell, 3, false))))
         }
     }
 }
@@ -122,6 +134,7 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "default" => TrackerLayout::Default,
             "mw-expanded" => TrackerLayout::MultiworldExpanded,
             "mw-collapsed" => TrackerLayout::MultiworldCollapsed,
+            "mw-edit" => TrackerLayout::MultiworldEdit,
             _ => return Err(()),
         })
     }
@@ -135,6 +148,7 @@ impl fmt::Display for TrackerLayout {
             TrackerLayout::Default => write!(f, "default"),
             TrackerLayout::MultiworldExpanded => write!(f, "mw-expanded"),
             TrackerLayout::MultiworldCollapsed => write!(f, "mw-collapsed"),
+            TrackerLayout::MultiworldEdit => write!(f, "mw-edit"),
         }
     }
 }

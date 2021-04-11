@@ -92,6 +92,9 @@ sock.addEventListener('open', function(event) {
         case 'mw-collapsed':
             layout = 2;
             break;
+        case 'mw-edit':
+            layout = 3;
+            break;
         default:
             throw 'unknown layout';
     }
