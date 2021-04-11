@@ -43,12 +43,16 @@ function updateCell(cellID, data, offset) {
             break;
         case 2:
             // Image
+            const overlayDirLen = Number(view.getBigUint64(offset));
+            offset += 8;
+            const overlayDir = utf8decoder.decode(data.slice(offset, offset + overlayDirLen));
+            offset += overlayDirLen;
             const overlayImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
             offset += overlayImgLen;
             let imgOverlay = document.createElement('img');
-            imgOverlay.setAttribute('src', '/static/img/xopar-overlays/' + overlayImg + '.png');
+            imgOverlay.setAttribute('src', '/static/img/' + overlayDir + '/' + overlayImg + '.png');
             elt.append(imgOverlay);
             break;
         default:
