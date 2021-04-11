@@ -126,7 +126,8 @@ async fn restream_double_room_layout(restreams: State<'_, Restreams>, restreamer
             .map(|reward| render_double_cell(restream, &runner1, &runner2, reward))
             .collect::<Option<Vec<_>>>()?
             .into_iter()
-            .map(|render| render.to_html())
+            .enumerate()
+            .map(|(cell_id, render)| format!(r#"<div id="cell{}" class="cols3">{}</div>"#, cell_id, render.to_html()))
             .join("\n")
     };
     Some(tracker_page(&layout.to_string(), html_layout))
