@@ -147,7 +147,7 @@ impl<'a> CellRender<'a> {
             CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
             CellOverlay::Image(ref overlay_img) => format!(r#"<img src="/static/img/xopar-overlays/{}.png" />"#, overlay_img),
         };
-        format!(r#"<img class="{}" src="/static/img/xopar-images/{}" />{}"#, css_classes, self.img_filename, overlay)
+        format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />{}"#, css_classes, self.img_filename, overlay)
     }
 }
 

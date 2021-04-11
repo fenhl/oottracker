@@ -8,7 +8,7 @@ function updateCell(cellID, data, offset) {
     offset += 4;
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
     offset += imgFilenameLen;
-    mainImg.setAttribute('src', '/static/img/xopar-images/' + imgFilename);
+    mainImg.setAttribute('src', '/static/img/xopar-images/' + imgFilename + '.png');
     switch (view.getUint8(offset++)) {
         case 0:
             // Normal
@@ -36,10 +36,10 @@ function updateCell(cellID, data, offset) {
         case 1:
             // Count
             const count = view.getUint8(offset++);
-            let overlay = document.createElement('span');
-            overlay.setAttribute('class', 'count');
-            overlay.append('' + count);
-            elt.append(overlay);
+            let countOverlay = document.createElement('span');
+            countOverlay.setAttribute('class', 'count');
+            countOverlay.append('' + count);
+            elt.append(countOverlay);
             break;
         case 2:
             // Image
@@ -47,9 +47,9 @@ function updateCell(cellID, data, offset) {
             offset += 4;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
             offset += overlayImgLen;
-            let overlay = document.createElement('img');
-            overlay.setAttribute('src', overlayImg);
-            elt.append(overlay);
+            let imgOverlay = document.createElement('img');
+            imgOverlay.setAttribute('src', '/static/img/xopar-overlays/' + overlayImg + '.png');
+            elt.append(imgOverlay);
             break;
         default:
             throw 'unexpected CellOverlay variant';
@@ -57,7 +57,7 @@ function updateCell(cellID, data, offset) {
     return offset;
 }
 
-const sock = WebSocket("wss://oottracker.fenhl.net/websocket");
+const sock = new WebSocket("wss://oottracker.fenhl.net/websocket");
 const utf8decoder = new TextDecoder();
 const utf8encoder = new TextEncoder();
 
