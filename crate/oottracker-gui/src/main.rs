@@ -120,60 +120,59 @@ impl TrackerCellKindExt for TrackerCellKind {
     fn render(&self, state: &ModelState) -> Image {
         match self {
             BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
-                images::xopar_images_count(&format!("force_{}", state.ram.save.triforce_pieces()), "png")
+                images::xopar_images_count(&format!("force_{}", state.ram.save.triforce_pieces()))
             } else if state.ram.save.big_poes > 0 { //TODO show dimmed Triforce icon if it's known that it's TH
-                images::extra_images_count(&format!("poes_{}", state.ram.save.big_poes), "png")
+                images::extra_images_count(&format!("poes_{}", state.ram.save.big_poes))
             } else {
-                images::extra_images_dimmed("big_poe", "png")
+                images::extra_images_dimmed("big_poe")
             },
             Composite { left_img, right_img, both_img, active, .. } => match active(state) {
-                (false, false) => images::xopar_images_dimmed(both_img, "png"),
-                (false, true) => images::xopar_images(right_img, "png"),
-                (true, false) => images::xopar_images(left_img, "png"),
-                (true, true) => images::xopar_images(both_img, "png"),
+                (false, false) => both_img.embedded(ImageDirContext::Dimmed),
+                (false, true) => right_img.embedded(ImageDirContext::Normal),
+                (true, false) => left_img.embedded(ImageDirContext::Normal),
+                (true, true) => both_img.embedded(ImageDirContext::Normal),
             },
             Count { dimmed_img, img, get, .. } => {
                 let count = get(state);
                 if count == 0 {
-                    images::xopar_images_dimmed(dimmed_img, "png")
+                    dimmed_img.embedded(ImageDirContext::Dimmed)
                 } else {
-                    images::xopar_images_count(&format!("{}_{}", img, count), "png")
+                    img.embedded(ImageDirContext::Count(count))
                 }
             }
             Medallion(med) => {
                 let med_filename = format!("{}_medallion", med.element().to_ascii_lowercase());
                 if state.ram.save.quest_items.has(*med) {
-                    images::xopar_images::<Image>(&med_filename, "png")
+                    images::xopar_images::<Image>(&med_filename)
                 } else {
-                    images::xopar_images_dimmed(&med_filename, "png")
+                    images::xopar_images_dimmed(&med_filename)
                 }
             }
             MedallionLocation(med) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med)) {
-                None => images::xopar_images_dimmed::<Image>("unknown_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text", "png"),
-                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text", "png"),
+                None => images::xopar_images_dimmed::<Image>("unknown_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text"),
+                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text"),
             }.width(Length::Units(CELL_SIZE)),
             OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => match active(state) {
-                (false, false) => images::xopar_images_dimmed(main_img, "png"),
-                (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_{}", main_img, overlay_img), "png"),
-                (true, false) => images::xopar_images(main_img, "png"),
-                (true, true) => images::xopar_images_overlay(&format!("{}_{}", main_img, overlay_img), "png"),
+                (false, false) => main_img.embedded(ImageDirContext::Dimmed),
+                (true, false) => main_img.embedded(ImageDirContext::Normal),
+                (main_active, true) => main_img.with_overlay(overlay_img).embedded(main_active),
             },
             Sequence { img, .. } => match img(state) {
-                (false, img) => images::xopar_images_dimmed(img, "png"),
-                (true, img) => images::xopar_images(img, "png"),
+                (false, img) => img.embedded(ImageDirContext::Dimmed),
+                (true, img) => img.embedded(ImageDirContext::Normal),
             },
             Simple { img, active, .. } => if active(state) {
-                images::xopar_images(img, "png")
+                img.embedded(ImageDirContext::Normal)
             } else {
-                images::xopar_images_dimmed(img, "png")
+                img.embedded(ImageDirContext::Dimmed)
             },
             Song { song, check, .. } => {
                 let song_filename = match *song {
@@ -192,10 +191,10 @@ impl TrackerCellKindExt for TrackerCellKind {
                     _ => unreachable!(),
                 };
                 match (state.ram.save.quest_items.contains(*song), Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)) { //TODO allow ootr_dynamic::Rando
-                    (false, false) => images::xopar_images_dimmed(song_filename, "png"),
-                    (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_check", song_filename), "png"),
-                    (true, false) => images::xopar_images(song_filename, "png"),
-                    (true, true) => images::xopar_images_overlay(&format!("{}_check", song_filename), "png"),
+                    (false, false) => images::xopar_images_dimmed(song_filename),
+                    (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_check", song_filename)),
+                    (true, false) => images::xopar_images(song_filename),
+                    (true, true) => images::xopar_images_overlay(&format!("{}_check", song_filename)),
                 }
             }
             Stone(stone) => {
@@ -205,22 +204,22 @@ impl TrackerCellKindExt for TrackerCellKind {
                     Stone::ZoraSapphire => "zora_sapphire",
                 };
                 if state.ram.save.quest_items.has(*stone) {
-                    images::xopar_images::<Image>(stone_filename, "png")
+                    images::xopar_images::<Image>(stone_filename)
                 } else {
-                    images::xopar_images_dimmed(stone_filename, "png")
+                    images::xopar_images_dimmed(stone_filename)
                 }.width(Length::Units(STONE_SIZE))
             }
             StoneLocation(stone) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone)) {
-                None => images::xopar_images_dimmed::<Image>("unknown_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text", "png"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text", "png"),
-                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text", "png"),
+                None => images::xopar_images_dimmed::<Image>("unknown_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text"),
+                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text"),
+                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text"),
             }.width(Length::Units(STONE_SIZE)),
             BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }

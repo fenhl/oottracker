@@ -3,10 +3,6 @@ use {
         collections::HashMap,
         fmt,
         io,
-        path::{
-            Path,
-            PathBuf,
-        },
         sync::Arc,
         vec,
     },
@@ -183,16 +179,16 @@ pub enum TrackerCellKind {
         toggle: Box<dyn Fn(&mut BossKeys)>,
     },
     Composite {
-        left_img: &'static str,
-        right_img: &'static str,
-        both_img: &'static str,
+        left_img: ImageInfo,
+        right_img: ImageInfo,
+        both_img: ImageInfo,
         active: Box<dyn Fn(&dyn ModelStateView) -> (bool, bool)>,
         toggle_left: Box<dyn Fn(&mut dyn ModelStateView)>,
         toggle_right: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Count {
-        dimmed_img: &'static str,
-        img: &'static str,
+        dimmed_img: ImageInfo,
+        img: ImageInfo,
         get: Box<dyn Fn(&dyn ModelStateView) -> u8>,
         set: Box<dyn Fn(&mut dyn ModelStateView, u8)>,
         max: u8,
@@ -203,27 +199,27 @@ pub enum TrackerCellKind {
     MedallionLocation(Medallion),
     Mq(Dungeon),
     OptionalOverlay {
-        main_img: &'static str,
-        overlay_img: &'static str,
+        main_img: ImageInfo,
+        overlay_img: ImageInfo,
         active: Box<dyn Fn(&dyn ModelStateView) -> (bool, bool)>,
         toggle_main: Box<dyn Fn(&mut dyn ModelStateView)>,
         toggle_overlay: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Overlay {
-        main_img: &'static str,
-        overlay_img: &'static str,
+        main_img: ImageInfo,
+        overlay_img: ImageInfo,
         active: Box<dyn Fn(&dyn ModelStateView) -> (bool, bool)>,
         toggle_main: Box<dyn Fn(&mut dyn ModelStateView)>,
         toggle_overlay: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Sequence {
         idx: Box<dyn Fn(&dyn ModelStateView) -> u8>,
-        img: Box<dyn Fn(&dyn ModelStateView) -> (bool, &'static str)>,
+        img: Box<dyn Fn(&dyn ModelStateView) -> (bool, ImageInfo)>,
         increment: Box<dyn Fn(&mut dyn ModelStateView)>,
         decrement: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
     Simple {
-        img: &'static str,
+        img: ImageInfo,
         active: Box<dyn Fn(&dyn ModelStateView) -> bool>,
         toggle: Box<dyn Fn(&mut dyn ModelStateView)>,
     },
@@ -270,13 +266,13 @@ macro_rules! cells {
 
 cells! {
     GoMode: Simple {
-        img: "UNIMPLEMENTED",
+        img: ImageInfo { dir: ImageDir::Extra, name: "go_mode" },
         active: Box::new(|_| false), //TODO
         toggle: Box::new(|_| ()), //TODO
     },
     GoBk: Overlay {
-        main_img: "UNIMPLEMENTED",
-        overlay_img: "UNIMPLEMENTED",
+        main_img: ImageInfo { dir: ImageDir::Extra, name: "go_mode" },
+        overlay_img: ImageInfo { dir: ImageDir::Extra, name: "bk_mode" },
         active: Box::new(|_| (false, false)), //TODO
         toggle_main: Box::new(|_| ()), //TODO
         toggle_overlay: Box::new(|_| ()), //TODO
@@ -309,17 +305,17 @@ cells! {
             AdultTradeItem::ClaimCheck => 11,
         }),
         img: Box::new(|state| match state.ram().save.inv.adult_trade_item {
-            AdultTradeItem::None => (false, "blue_egg"),
-            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
-            AdultTradeItem::Cojiro => (true, "cojiro"),
-            AdultTradeItem::OddMushroom => (true, "odd_mushroom"),
-            AdultTradeItem::OddPotion => (true, "odd_poultice"),
-            AdultTradeItem::PoachersSaw => (true, "poachers_saw"),
-            AdultTradeItem::BrokenSword => (true, "broken_sword"),
-            AdultTradeItem::Prescription => (true, "prescription"),
-            AdultTradeItem::EyeballFrog => (true, "eyeball_frog"),
-            AdultTradeItem::Eyedrops => (true, "eye_drops"),
-            AdultTradeItem::ClaimCheck => (true, "claim_check"),
+            AdultTradeItem::None => (false, ImageInfo::new("blue_egg")),
+            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, ImageInfo::new("blue_egg")),
+            AdultTradeItem::Cojiro => (true, ImageInfo::new("cojiro")),
+            AdultTradeItem::OddMushroom => (true, ImageInfo::new("odd_mushroom")),
+            AdultTradeItem::OddPotion => (true, ImageInfo::new("odd_poultice")),
+            AdultTradeItem::PoachersSaw => (true, ImageInfo::new("poachers_saw")),
+            AdultTradeItem::BrokenSword => (true, ImageInfo::new("broken_sword")),
+            AdultTradeItem::Prescription => (true, ImageInfo::new("prescription")),
+            AdultTradeItem::EyeballFrog => (true, ImageInfo::new("eyeball_frog")),
+            AdultTradeItem::Eyedrops => (true, ImageInfo::new("eye_drops")),
+            AdultTradeItem::ClaimCheck => (true, ImageInfo::new("claim_check")),
         }),
         increment: Box::new(|state| state.ram_mut().save.inv.adult_trade_item = match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => AdultTradeItem::PocketEgg,
@@ -365,17 +361,17 @@ cells! {
             AdultTradeItem::ClaimCheck => 10,
         }),
         img: Box::new(|state| match state.ram().save.inv.adult_trade_item {
-            AdultTradeItem::None => (false, "blue_egg"),
-            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, "blue_egg"),
-            AdultTradeItem::Cojiro => (true, "cojiro"),
-            AdultTradeItem::OddMushroom => (true, "odd_mushroom"),
-            AdultTradeItem::OddPotion => (true, "odd_poultice"),
-            AdultTradeItem::PoachersSaw => (true, "poachers_saw"),
-            AdultTradeItem::BrokenSword => (true, "broken_sword"),
-            AdultTradeItem::Prescription => (true, "prescription"),
-            AdultTradeItem::EyeballFrog => (true, "eyeball_frog"),
-            AdultTradeItem::Eyedrops => (true, "eye_drops"),
-            AdultTradeItem::ClaimCheck => (true, "claim_check"),
+            AdultTradeItem::None => (false, ImageInfo::new("blue_egg")),
+            AdultTradeItem::PocketEgg | AdultTradeItem::PocketCucco => (true, ImageInfo::new("blue_egg")),
+            AdultTradeItem::Cojiro => (true, ImageInfo::new("cojiro")),
+            AdultTradeItem::OddMushroom => (true, ImageInfo::new("odd_mushroom")),
+            AdultTradeItem::OddPotion => (true, ImageInfo::new("odd_poultice")),
+            AdultTradeItem::PoachersSaw => (true, ImageInfo::new("poachers_saw")),
+            AdultTradeItem::BrokenSword => (true, ImageInfo::new("broken_sword")),
+            AdultTradeItem::Prescription => (true, ImageInfo::new("prescription")),
+            AdultTradeItem::EyeballFrog => (true, ImageInfo::new("eyeball_frog")),
+            AdultTradeItem::Eyedrops => (true, ImageInfo::new("eye_drops")),
+            AdultTradeItem::ClaimCheck => (true, ImageInfo::new("claim_check")),
         }),
         increment: Box::new(|state| state.ram_mut().save.inv.adult_trade_item = match state.ram().save.inv.adult_trade_item {
             AdultTradeItem::None => AdultTradeItem::PocketEgg,
@@ -405,16 +401,16 @@ cells! {
         }),
     },
     Skulltula: Count {
-        dimmed_img: "golden_skulltula",
-        img: "skulls",
+        dimmed_img: ImageInfo::new("golden_skulltula"),
+        img: ImageInfo::new("skulls"),
         get: Box::new(|state| state.ram().save.skull_tokens),
         set: Box::new(|state, value| state.ram_mut().save.skull_tokens = value),
         max: 100,
         step: 1,
     },
     SkulltulaTens: Count {
-        dimmed_img: "golden_skulltula",
-        img: "skulls",
+        dimmed_img: ImageInfo::new("golden_skulltula"),
+        img: ImageInfo::new("skulls"),
         get: Box::new(|state| state.ram().save.skull_tokens),
         set: Box::new(|state, value| state.ram_mut().save.skull_tokens = value),
         max: 50,
@@ -427,8 +423,8 @@ cells! {
     ZoraSapphireLocation: StoneLocation(Stone::ZoraSapphire),
     ZoraSapphire: Stone(Stone::ZoraSapphire),
     Bottle: OptionalOverlay {
-        main_img: "bottle",
-        overlay_img: "letter",
+        main_img: ImageInfo::new("bottle"),
+        overlay_img: ImageInfo::new("letter"),
         active: Box::new(|state| (state.ram().save.inv.emptiable_bottles() > 0, state.ram().save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
         toggle_main: Box::new(|state| {
             let new_val = if state.ram().save.inv.emptiable_bottles() > 0 { 0 } else { 1 };
@@ -437,15 +433,15 @@ cells! {
         toggle_overlay: Box::new(|state| state.ram_mut().save.inv.toggle_rutos_letter()),
     },
     NumBottles: Count {
-        dimmed_img: "bottle",
-        img: "UNIMPLEMENTED",
+        dimmed_img: ImageInfo::new("bottle"),
+        img: ImageInfo::new("UNIMPLEMENTED"), //TODO make images for 1–4 bottles
         get: Box::new(|state| state.ram().save.inv.emptiable_bottles()),
         set: Box::new(|state, value| state.ram_mut().save.inv.set_emptiable_bottles(value)),
         max: 4,
         step: 1,
     },
     RutosLetter: Simple {
-        img: "UNIMPLEMENTED",
+        img: ImageInfo::new("UNIMPLEMENTED"),
         active: Box::new(|state| state.ram().save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered
         toggle: Box::new(|state| state.ram_mut().save.inv.toggle_rutos_letter()),
     },
@@ -456,9 +452,9 @@ cells! {
             _ => 0,
         }),
         img: Box::new(|state| match state.ram().save.upgrades.scale() {
-            Upgrades::SILVER_SCALE => (true, "silver_scale"),
-            Upgrades::GOLD_SCALE => (true, "gold_scale"),
-            _ => (false, "silver_scale"),
+            Upgrades::SILVER_SCALE => (true, ImageInfo::new("silver_scale")),
+            Upgrades::GOLD_SCALE => (true, ImageInfo::new("gold_scale")),
+            _ => (false, ImageInfo::new("silver_scale")),
         }),
         increment: Box::new(|state| {
             let new_val = match state.ram().save.upgrades.scale() {
@@ -478,7 +474,7 @@ cells! {
         }),
     },
     Slingshot: Simple {
-        img: "slingshot",
+        img: ImageInfo::new("slingshot"),
         active: Box::new(|state| state.ram().save.inv.slingshot),
         toggle: Box::new(|state| {
             state.ram_mut().save.inv.slingshot = !state.ram().save.inv.slingshot;
@@ -493,7 +489,7 @@ cells! {
             Upgrades::BULLET_BAG_50 => 3,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram().save.inv.slingshot, "slingshot")),
+        img: Box::new(|state| (state.ram().save.inv.slingshot, ImageInfo::new("slingshot"))),
         increment: Box::new(|state| {
             let new_bullet_bag = match state.ram().save.upgrades.bullet_bag() {
                 Upgrades::BULLET_BAG_30 => Upgrades::BULLET_BAG_40,
@@ -516,8 +512,8 @@ cells! {
         }),
     },
     Bombs: Overlay {
-        main_img: "bomb_bag",
-        overlay_img: "bombchu",
+        main_img: ImageInfo::new("bomb_bag"),
+        overlay_img: ImageInfo::new("bombchu"),
         active: Box::new(|state| (state.ram().save.upgrades.bomb_bag() != Upgrades::NONE, state.ram().save.inv.bombchus)),
         toggle_main: Box::new(|state| if state.ram().save.upgrades.bomb_bag() == Upgrades::NONE {
             state.ram_mut().save.upgrades.set_bomb_bag(Upgrades::BOMB_BAG_20);
@@ -533,7 +529,7 @@ cells! {
             Upgrades::BOMB_BAG_40 => 3,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram().save.upgrades.bomb_bag() != Upgrades::NONE, "bomb_bag")),
+        img: Box::new(|state| (state.ram().save.upgrades.bomb_bag() != Upgrades::NONE, ImageInfo::new("bomb_bag"))),
         increment: Box::new(|state| {
             let new_val = match state.ram().save.upgrades.bomb_bag() {
                 Upgrades::BOMB_BAG_20 => Upgrades::BOMB_BAG_30,
@@ -554,12 +550,12 @@ cells! {
         }),
     },
     Bombchus: Simple {
-        img: "UNIMPLEMENTED",
+        img: ImageInfo::new("UNIMPLEMENTED"),
         active: Box::new(|state| state.ram().save.inv.bombchus),
         toggle: Box::new(|state| state.ram_mut().save.inv.bombchus = !state.ram().save.inv.bombchus),
     },
     Boomerang: Simple {
-        img: "boomerang",
+        img: ImageInfo::new("boomerang"),
         active: Box::new(|state| state.ram().save.inv.boomerang),
         toggle: Box::new(|state| state.ram_mut().save.inv.boomerang = !state.ram().save.inv.boomerang),
     },
@@ -571,10 +567,10 @@ cells! {
             _ => 0,
         }),
         img: Box::new(|state| match state.ram().save.upgrades.strength() {
-            Upgrades::GORON_BRACELET => (true, "goron_bracelet"),
-            Upgrades::SILVER_GAUNTLETS => (true, "silver_gauntlets"),
-            Upgrades::GOLD_GAUNTLETS => (true, "gold_gauntlets"),
-            _ => (false, "goron_bracelet"),
+            Upgrades::GORON_BRACELET => (true, ImageInfo::new("goron_bracelet")),
+            Upgrades::SILVER_GAUNTLETS => (true, ImageInfo::new("silver_gauntlets")),
+            Upgrades::GOLD_GAUNTLETS => (true, ImageInfo::new("gold_gauntlets")),
+            _ => (false, ImageInfo::new("goron_bracelet")),
         }),
         increment: Box::new(|state| {
             let new_val = match state.ram().save.upgrades.strength() {
@@ -596,8 +592,8 @@ cells! {
         }),
     },
     Magic: Overlay {
-        main_img: "magic",
-        overlay_img: "lens",
+        main_img: ImageInfo::new("magic"),
+        overlay_img: ImageInfo::new("lens"),
         active: Box::new(|state| (state.ram().save.magic != MagicCapacity::None, state.ram().save.inv.lens)),
         toggle_main: Box::new(|state| if state.ram().save.magic == MagicCapacity::None {
             state.ram_mut().save.magic = MagicCapacity::Small;
@@ -612,7 +608,7 @@ cells! {
             MagicCapacity::Small => 1,
             MagicCapacity::Large => 2,
         }),
-        img: Box::new(|state| (state.ram().save.magic != MagicCapacity::None, "magic")),
+        img: Box::new(|state| (state.ram().save.magic != MagicCapacity::None, ImageInfo::new("magic"))),
         increment: Box::new(|state| state.ram_mut().save.magic = match state.ram().save.magic {
             MagicCapacity::None => MagicCapacity::Small,
             MagicCapacity::Small => MagicCapacity::Large,
@@ -625,30 +621,30 @@ cells! {
         }),
     },
     Lens: Simple {
-        img: "lens",
+        img: ImageInfo::new("lens"),
         active: Box::new(|state| state.ram().save.inv.lens),
         toggle: Box::new(|state| state.ram_mut().save.inv.lens = !state.ram().save.inv.lens),
     },
     Spells: Composite {
-        left_img: "dins_fire",
-        right_img: "faores_wind",
-        both_img: "composite_magic",
+        left_img: ImageInfo::new("dins_fire"),
+        right_img: ImageInfo::new("faores_wind"),
+        both_img: ImageInfo::new("composite_magic"),
         active: Box::new(|state| (state.ram().save.inv.dins_fire, state.ram().save.inv.farores_wind)),
         toggle_left: Box::new(|state| state.ram_mut().save.inv.dins_fire = !state.ram().save.inv.dins_fire),
         toggle_right: Box::new(|state| state.ram_mut().save.inv.farores_wind = !state.ram().save.inv.farores_wind),
     },
     DinsFire: Simple {
-        img: "dins_fire",
+        img: ImageInfo::new("dins_fire"),
         active: Box::new(|state| state.ram().save.inv.dins_fire),
         toggle: Box::new(|state| state.ram_mut().save.inv.dins_fire = !state.ram().save.inv.dins_fire),
     },
     FaroresWind: Simple {
-        img: "faores_wind",
+        img: ImageInfo::new("faores_wind"),
         active: Box::new(|state| state.ram().save.inv.farores_wind),
         toggle: Box::new(|state| state.ram_mut().save.inv.farores_wind = !state.ram().save.inv.farores_wind),
     },
     NayrusLove: Simple {
-        img: "UNIMPLEMENTED", //TODO
+        img: ImageInfo { dir: ImageDir::Extra, name: "nayrus_love" },
         active: Box::new(|state| state.ram().save.inv.nayrus_love),
         toggle: Box::new(|state| state.ram_mut().save.inv.nayrus_love = !state.ram().save.inv.nayrus_love),
     },
@@ -659,9 +655,9 @@ cells! {
             Hookshot::Longshot => 2,
         }),
         img: Box::new(|state| match state.ram().save.inv.hookshot {
-            Hookshot::None => (false, "hookshot"),
-            Hookshot::Hookshot => (true, "hookshot_accessible"),
-            Hookshot::Longshot => (true, "longshot_accessible"),
+            Hookshot::None => (false, ImageInfo::new("hookshot")),
+            Hookshot::Hookshot => (true, ImageInfo::new("hookshot_accessible")),
+            Hookshot::Longshot => (true, ImageInfo::new("longshot_accessible")),
         }),
         increment: Box::new(|state| state.ram_mut().save.inv.hookshot = match state.ram().save.inv.hookshot {
             Hookshot::None => Hookshot::Hookshot,
@@ -675,8 +671,8 @@ cells! {
         }),
     },
     Bow: OptionalOverlay {
-        main_img: "bow",
-        overlay_img: "ice_arrows",
+        main_img: ImageInfo::new("bow"),
+        overlay_img: ImageInfo::new("ice_arrows"),
         active: Box::new(|state| (state.ram().save.inv.bow, state.ram().save.inv.ice_arrows)),
         toggle_main: Box::new(|state| {
             state.ram_mut().save.inv.bow = !state.ram().save.inv.bow;
@@ -686,7 +682,7 @@ cells! {
         toggle_overlay: Box::new(|state| state.ram_mut().save.inv.ice_arrows = !state.ram().save.inv.ice_arrows),
     },
     IceArrows: Simple {
-        img: "ice_trap",
+        img: ImageInfo::new("ice_trap"),
         active: Box::new(|state| state.ram().save.inv.ice_arrows),
         toggle: Box::new(|state| state.ram_mut().save.inv.ice_arrows = !state.ram().save.inv.ice_arrows),
     },
@@ -697,7 +693,7 @@ cells! {
             Upgrades::QUIVER_50 => 3,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram().save.inv.bow, "bow")),
+        img: Box::new(|state| (state.ram().save.inv.bow, ImageInfo::new("bow"))),
         increment: Box::new(|state| {
             let new_quiver = match state.ram().save.upgrades.quiver() {
                 Upgrades::QUIVER_30 => Upgrades::QUIVER_40,
@@ -720,48 +716,48 @@ cells! {
         }),
     },
     Arrows: Composite {
-        left_img: "fire_arrows",
-        right_img: "light_arrows",
-        both_img: "composite_arrows",
+        left_img: ImageInfo::new("fire_arrows"),
+        right_img: ImageInfo::new("light_arrows"),
+        both_img: ImageInfo::new("composite_arrows"),
         active: Box::new(|state| (state.ram().save.inv.fire_arrows, state.ram().save.inv.light_arrows)),
         toggle_left: Box::new(|state| state.ram_mut().save.inv.fire_arrows = !state.ram().save.inv.fire_arrows),
         toggle_right: Box::new(|state| state.ram_mut().save.inv.light_arrows = !state.ram().save.inv.light_arrows),
     },
     FireArrows: Simple {
-        img: "fire_arrows",
+        img: ImageInfo::new("fire_arrows"),
         active: Box::new(|state| state.ram().save.inv.fire_arrows),
         toggle: Box::new(|state| state.ram_mut().save.inv.fire_arrows = !state.ram().save.inv.fire_arrows),
     },
     LightArrows: Simple {
-        img: "light_arrows",
+        img: ImageInfo::new("light_arrows"),
         active: Box::new(|state| state.ram().save.inv.light_arrows),
         toggle: Box::new(|state| state.ram_mut().save.inv.light_arrows = !state.ram().save.inv.light_arrows),
     },
     Hammer: Simple {
-        img: "hammer",
+        img: ImageInfo::new("hammer"),
         active: Box::new(|state| state.ram().save.inv.hammer),
         toggle: Box::new(|state| state.ram_mut().save.inv.hammer = !state.ram().save.inv.hammer),
     },
     Boots: Composite {
-        left_img: "iron_boots",
-        right_img: "hover_boots",
-        both_img: "composite_boots",
+        left_img: ImageInfo::new("iron_boots"),
+        right_img: ImageInfo::new("hover_boots"),
+        both_img: ImageInfo::new("composite_boots"),
         active: Box::new(|state| (state.ram().save.equipment.contains(Equipment::IRON_BOOTS), state.ram().save.equipment.contains(Equipment::HOVER_BOOTS))),
         toggle_left: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::IRON_BOOTS)),
         toggle_right: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::HOVER_BOOTS)),
     },
     IronBoots: Simple {
-        img: "iron_boots",
+        img: ImageInfo::new("iron_boots"),
         active: Box::new(|state| state.ram().save.equipment.contains(Equipment::IRON_BOOTS)),
         toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::IRON_BOOTS)),
     },
     HoverBoots: Simple {
-        img: "hover_boots",
+        img: ImageInfo::new("hover_boots"),
         active: Box::new(|state| state.ram().save.equipment.contains(Equipment::HOVER_BOOTS)),
         toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::HOVER_BOOTS)),
     },
     MirrorShield: Simple {
-        img: "mirror_shield",
+        img: ImageInfo::new("mirror_shield"),
         active: Box::new(|state| state.ram().save.equipment.contains(Equipment::MIRROR_SHIELD)),
         toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::MIRROR_SHIELD)),
     },
@@ -778,15 +774,15 @@ cells! {
             ChildTradeItem::MaskOfTruth => 8,
         }),
         img: Box::new(|state| match state.ram().save.inv.child_trade_item {
-            ChildTradeItem::None => (false, "white_egg"),
-            ChildTradeItem::WeirdEgg => (true, "white_egg"),
-            ChildTradeItem::Chicken => (true, "white_chicken"),
-            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
-            ChildTradeItem::KeatonMask => (true, "keaton_mask"),
-            ChildTradeItem::SkullMask => (true, "skull_mask"),
-            ChildTradeItem::SpookyMask => (true, "spooky_mask"),
-            ChildTradeItem::BunnyHood => (true, "bunny_hood"),
-            ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
+            ChildTradeItem::None => (false, ImageInfo::new("white_egg")),
+            ChildTradeItem::WeirdEgg => (true, ImageInfo::new("white_egg")),
+            ChildTradeItem::Chicken => (true, ImageInfo::new("white_chicken")),
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, ImageInfo::new("zelda_letter")), //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => (true, ImageInfo::new("keaton_mask")),
+            ChildTradeItem::SkullMask => (true, ImageInfo::new("skull_mask")),
+            ChildTradeItem::SpookyMask => (true, ImageInfo::new("spooky_mask")),
+            ChildTradeItem::BunnyHood => (true, ImageInfo::new("bunny_hood")),
+            ChildTradeItem::MaskOfTruth => (true, ImageInfo::new("mask_of_truth")),
         }),
         increment: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => ChildTradeItem::WeirdEgg,
@@ -823,14 +819,14 @@ cells! {
             ChildTradeItem::MaskOfTruth => 7,
         }),
         img: Box::new(|state| match state.ram().save.inv.child_trade_item {
-            ChildTradeItem::None => (false, "white_egg"),
-            ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => (true, "white_egg"),
-            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
-            ChildTradeItem::KeatonMask => (true, "keaton_mask"),
-            ChildTradeItem::SkullMask => (true, "skull_mask"),
-            ChildTradeItem::SpookyMask => (true, "spooky_mask"),
-            ChildTradeItem::BunnyHood => (true, "bunny_hood"),
-            ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
+            ChildTradeItem::None => (false, ImageInfo::new("white_egg")),
+            ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken => (true, ImageInfo::new("white_egg")),
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, ImageInfo::new("zelda_letter")), //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::KeatonMask => (true, ImageInfo::new("keaton_mask")),
+            ChildTradeItem::SkullMask => (true, ImageInfo::new("skull_mask")),
+            ChildTradeItem::SpookyMask => (true, ImageInfo::new("spooky_mask")),
+            ChildTradeItem::BunnyHood => (true, ImageInfo::new("bunny_hood")),
+            ChildTradeItem::MaskOfTruth => (true, ImageInfo::new("mask_of_truth")),
         }),
         increment: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             ChildTradeItem::None => ChildTradeItem::WeirdEgg,
@@ -871,20 +867,20 @@ cells! {
             ChildTradeItem::MaskOfTruth => 13,
         }),
         img: Box::new(|state| match state.ram().save.inv.child_trade_item {
-            ChildTradeItem::None => (false, "white_egg"),
-            ChildTradeItem::WeirdEgg => (true, "white_egg"),
-            ChildTradeItem::Chicken => (true, "white_chicken"),
-            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, "zelda_letter"), //TODO for SOLD OUT, check trade quest progress
+            ChildTradeItem::None => (false, ImageInfo::new("white_egg")),
+            ChildTradeItem::WeirdEgg => (true, ImageInfo::new("white_egg")),
+            ChildTradeItem::Chicken => (true, ImageInfo::new("white_chicken")),
+            ChildTradeItem::ZeldasLetter | ChildTradeItem::GoronMask | ChildTradeItem::ZoraMask | ChildTradeItem::GerudoMask | ChildTradeItem::SoldOut => (true, ImageInfo::new("zelda_letter")), //TODO for SOLD OUT, check trade quest progress
             //TODO Zelda's letter turned in => SOLD OUT
-            ChildTradeItem::KeatonMask => (true, "keaton_mask"),
+            ChildTradeItem::KeatonMask => (true, ImageInfo::new("keaton_mask")),
             //TODO Keaton mask sold => SOLD OUT
-            ChildTradeItem::SkullMask => (true, "skull_mask"),
+            ChildTradeItem::SkullMask => (true, ImageInfo::new("skull_mask")),
             //TODO skull mask sold => SOLD OUT
-            ChildTradeItem::SpookyMask => (true, "spooky_mask"),
+            ChildTradeItem::SpookyMask => (true, ImageInfo::new("spooky_mask")),
             //TODO spooky mask sold => SOLD OUT
-            ChildTradeItem::BunnyHood => (true, "bunny_hood"),
+            ChildTradeItem::BunnyHood => (true, ImageInfo::new("bunny_hood")),
             //TODO bunny hood sold => SOLD OUT
-            ChildTradeItem::MaskOfTruth => (true, "mask_of_truth"),
+            ChildTradeItem::MaskOfTruth => (true, ImageInfo::new("mask_of_truth")),
         }),
         increment: Box::new(|state| state.ram_mut().save.inv.child_trade_item = match state.ram().save.inv.child_trade_item {
             //TODO consider sold-out states
@@ -912,51 +908,51 @@ cells! {
         }),
     },
     Ocarina: Overlay {
-        main_img: "ocarina",
-        overlay_img: "scarecrow",
+        main_img: ImageInfo::new("ocarina"),
+        overlay_img: ImageInfo::new("scarecrow"),
         active: Box::new(|state| (state.ram().save.inv.ocarina, state.ram().save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
         toggle_main: Box::new(|state| state.ram_mut().save.inv.ocarina = !state.ram().save.inv.ocarina),
         toggle_overlay: Box::new(|state| state.ram_mut().save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)), //TODO make sure free scarecrow knowledge is toggled off properly
     },
     Beans: Simple { //TODO overlay with number bought if autotracker is on & shuffle beans is off
-        img: "beans",
+        img: ImageInfo::new("beans"),
         active: Box::new(|state| state.ram().save.inv.beans),
         toggle: Box::new(|state| state.ram_mut().save.inv.beans = !state.ram().save.inv.beans),
     },
     SwordCard: Composite {
-        left_img: "kokiri_sword",
-        right_img: "gerudo_card",
-        both_img: "composite_ksword_gcard",
+        left_img: ImageInfo::new("kokiri_sword"),
+        right_img: ImageInfo::new("gerudo_card"),
+        both_img: ImageInfo::new("composite_ksword_gcard"),
         active: Box::new(|state| (state.ram().save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram().save.quest_items.contains(QuestItems::GERUDO_CARD))),
         toggle_left: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::KOKIRI_SWORD)),
         toggle_right: Box::new(|state| state.ram_mut().save.quest_items.toggle(QuestItems::GERUDO_CARD)),
     },
     KokiriSword: Simple {
-        img: "kokiri_sword",
+        img: ImageInfo::new("kokiri_sword"),
         active: Box::new(|state| state.ram().save.equipment.contains(Equipment::KOKIRI_SWORD)),
         toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::KOKIRI_SWORD)),
     },
     Tunics: Composite {
-        left_img: "goron_tunic",
-        right_img: "zora_tunic",
-        both_img: "composite_tunics",
+        left_img: ImageInfo::new("goron_tunic"),
+        right_img: ImageInfo::new("zora_tunic"),
+        both_img: ImageInfo::new("composite_tunics"),
         active: Box::new(|state| (state.ram().save.equipment.contains(Equipment::GORON_TUNIC), state.ram().save.equipment.contains(Equipment::ZORA_TUNIC))),
         toggle_left: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::GORON_TUNIC)),
         toggle_right: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::ZORA_TUNIC)),
     },
     GoronTunic: Simple {
-        img: "goron_tunic",
+        img: ImageInfo::new("goron_tunic"),
         active: Box::new(|state| state.ram().save.equipment.contains(Equipment::GORON_TUNIC)),
         toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::GORON_TUNIC)),
     },
     ZoraTunic: Simple {
-        img: "zora_tunic",
+        img: ImageInfo::new("zora_tunic"),
         active: Box::new(|state| state.ram().save.equipment.contains(Equipment::ZORA_TUNIC)),
         toggle: Box::new(|state| state.ram_mut().save.equipment.toggle(Equipment::ZORA_TUNIC)),
     },
     Triforce: Count {
-        dimmed_img: "triforce",
-        img: "force",
+        dimmed_img: ImageInfo::new("triforce"),
+        img: ImageInfo::new("force"),
         get: Box::new(|state| state.ram().save.triforce_pieces()),
         set: Box::new(|state, value| state.ram_mut().save.set_triforce_pieces(value)),
         max: 100,
@@ -980,7 +976,7 @@ cells! {
             55..=59 => 12,
             _ => 13,
         }),
-        img: Box::new(|state| (state.ram().save.triforce_pieces() > 0, "triforce")), //TODO images from count?
+        img: Box::new(|state| (state.ram().save.triforce_pieces() > 0, ImageInfo::new("triforce"))), //TODO images from count?
         increment: Box::new(|state| {
             let new_val = match state.ram().save.triforce_pieces() {
                 0 => 1,
@@ -1219,7 +1215,7 @@ cells! {
         max_mq: 3,
     },
     BiggoronSword: Simple {
-        img: "UNIMPLEMENTED",
+        img: ImageInfo::new("UNIMPLEMENTED"),
         active: Box::new(|state| state.ram().save.biggoron_sword && state.ram().save.equipment.contains(Equipment::GIANTS_KNIFE)),
         toggle: Box::new(|state| if state.ram().save.biggoron_sword && state.ram().save.equipment.contains(Equipment::GIANTS_KNIFE) {
             state.ram_mut().save.biggoron_sword = false;
@@ -1235,7 +1231,7 @@ cells! {
             Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => 2,
             _ => 0,
         }),
-        img: Box::new(|state| (state.ram().save.upgrades.wallet() != Upgrades::NONE, "UNIMPLEMENTED")),
+        img: Box::new(|state| (state.ram().save.upgrades.wallet() != Upgrades::NONE, ImageInfo::new("UNIMPLEMENTED"))),
         increment: Box::new(|state| {
             let new_val = match state.ram().save.upgrades.wallet() {
                 Upgrades::ADULTS_WALLET => Upgrades::GIANTS_WALLET,
@@ -1254,7 +1250,7 @@ cells! {
         }),
     },
     StoneOfAgony: Simple {
-        img: "UNIMPLEMENTED",
+        img: ImageInfo::new("UNIMPLEMENTED"),
         active: Box::new(|state| state.ram().save.quest_items.contains(QuestItems::STONE_OF_AGONY)),
         toggle: Box::new(|state| state.ram_mut().save.quest_items.toggle(QuestItems::STONE_OF_AGONY)),
     },
@@ -1346,29 +1342,104 @@ pub fn dirs() -> Result<ProjectDirs, Error> {
     ProjectDirs::from("net", "Fenhl", "OoT Tracker").ok_or(Error::MissingHomeDir)
 }
 
-pub struct EmbeddedImage {
-    pub path: PathBuf,
-    pub contents: &'static [u8],
+pub enum ImageDirContext {
+    Normal,
+    Count(u8),
+    Dimmed,
 }
 
-pub trait FromEmbeddedImage {
-    fn from_embedded_image(name: &Path, contents: &'static [u8]) -> Self;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageDir {
+    Extra,
+    Xopar,
 }
 
-impl FromEmbeddedImage for EmbeddedImage {
-    fn from_embedded_image(name: &Path, contents: &'static [u8]) -> EmbeddedImage {
-        EmbeddedImage { path: name.to_owned(), contents }
+impl ImageDir {
+    fn to_string(&self, ctx: ImageDirContext) -> &'static str {
+        match (self, ctx) {
+            (ImageDir::Xopar, ImageDirContext::Normal) => "xopar-images",
+            (ImageDir::Extra, ImageDirContext::Normal) => "extra-images",
+            (ImageDir::Xopar, ImageDirContext::Count(_)) => "xopar-images-count",
+            (ImageDir::Extra, ImageDirContext::Count(_)) => "extra-images-count",
+            (ImageDir::Xopar, ImageDirContext::Dimmed) => "xopar-images-dimmed",
+            (ImageDir::Extra, ImageDirContext::Dimmed) => "extra-images-dimmed",
+        }
     }
 }
 
+pub struct ImageInfo {
+    pub dir: ImageDir,
+    pub name: &'static str,
+}
+
+impl ImageInfo {
+    fn new(name: &'static str) -> ImageInfo {
+        ImageInfo { dir: ImageDir::Xopar, name }
+    }
+
+    pub fn embedded<T: FromEmbeddedImage>(&self, ctx: ImageDirContext) -> T {
+        match (self.dir, ctx) {
+            (ImageDir::Xopar, ImageDirContext::Normal) => images::xopar_images(self.name),
+            (ImageDir::Extra, ImageDirContext::Normal) => images::extra_images(self.name),
+            (ImageDir::Xopar, ImageDirContext::Count(count)) => images::xopar_images_count(&format!("{}_{}", self.name, count)),
+            (ImageDir::Extra, ImageDirContext::Count(count)) => images::extra_images_count(&format!("{}_{}", self.name, count)),
+            (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(self.name),
+            (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(self.name),
+        }
+    }
+
+    pub fn to_string(&self, sep: char, ctx: ImageDirContext) -> String {
+        format!("{}{}{}", self.dir.to_string(ctx), sep, self.name)
+    }
+
+    pub fn with_overlay(&self, overlay: &ImageInfo) -> OverlayImageInfo {
+        assert_eq!(self.dir, overlay.dir);
+        OverlayImageInfo {
+            dir: self.dir,
+            main: self.name,
+            overlay: overlay.name,
+        }
+    }
+}
+
+pub struct OverlayImageInfo {
+    dir: ImageDir,
+    main: &'static str,
+    overlay: &'static str,
+}
+
+impl OverlayImageInfo {
+    pub fn embedded<T: FromEmbeddedImage>(&self, main_active: bool) -> T {
+        match self.dir {
+            ImageDir::Xopar => if main_active {
+                images::xopar_images_overlay(&format!("{}_{}", self.main, self.overlay))
+            } else {
+                images::xopar_images_overlay_dimmed(&format!("{}_{}", self.main, self.overlay))
+            },
+            ImageDir::Extra => images::extra_images(self.overlay),
+        }
+    }
+
+    pub fn to_string(&self, sep: char, main_active: bool) -> String {
+        match self.dir {
+            ImageDir::Xopar => format!("xopar-images-overlay{}{}{}_{}", if main_active { "" } else { "-dimmed" }, sep, self.main, self.overlay),
+            ImageDir::Extra => format!("extra-images{}{}", sep, self.overlay),
+        }
+    }
+}
+
+pub trait FromEmbeddedImage {
+    fn from_embedded_image(contents: &'static [u8]) -> Self;
+}
+
 impl FromEmbeddedImage for iced::widget::Image {
-    fn from_embedded_image(_: &Path, contents: &'static [u8]) -> iced::widget::Image {
+    fn from_embedded_image(contents: &'static [u8]) -> iced::widget::Image {
         iced::widget::Image::new(iced::image::Handle::from_memory(contents.to_vec()))
     }
 }
 
 impl FromEmbeddedImage for DynamicImage {
-    fn from_embedded_image(_: &Path, contents: &'static [u8]) -> DynamicImage {
+    fn from_embedded_image(contents: &'static [u8]) -> DynamicImage {
         image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
     }
 }

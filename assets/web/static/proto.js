@@ -64,7 +64,7 @@ const utf8encoder = new TextEncoder();
 sock.binaryType = "arraybuffer";
 
 sock.addEventListener('open', function(event) {
-    const match = window.location.pathname.match(/^\/restream\/([0-9A-Z_a-z]+)\/([0-9A-Z_a-z]+)\/([0-9A-Z_a-z]+)\/?$/);
+    const match = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
     const subscription = new ArrayBuffer(1);
     new DataView(subscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
     const restream = utf8encoder.encode(match[1]);

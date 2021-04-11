@@ -43,6 +43,8 @@ use {
 #[cfg(windows)] mod github;
 #[cfg(windows)] mod version;
 
+const MACOS_ADDR: &str = "192.168.178.63";
+
 #[derive(Debug, From)]
 enum Error {
     CommandExit(&'static str, ExitStatus),
@@ -174,12 +176,12 @@ async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release, ver
 
 #[cfg(windows)]
 async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
-    eprintln!("updating repo on bureflux");
-    Command::new("ssh").arg("bureflux").arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh", verbose).await?;
-    eprintln!("connecting to bureflux");
-    Command::new("ssh").arg("bureflux").arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").arg(if verbose { "--verbose" } else { "" }).check("ssh", true).await?;
-    eprintln!("downloading oottracker-mac.dmg from bureflux");
-    Command::new("scp").arg("bureflux:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac.dmg").arg("assets/oottracker-mac.dmg").check("scp", verbose).await?;
+    eprintln!("updating repo on Mac");
+    Command::new("ssh").arg(MACOS_ADDR).arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh", verbose).await?;
+    eprintln!("connecting to Mac");
+    Command::new("ssh").arg(MACOS_ADDR).arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").arg(if verbose { "--verbose" } else { "" }).check("ssh", true).await?; //TODO convert newlines ro \r\n
+    eprintln!("downloading oottracker-mac.dmg from Mac");
+    Command::new("scp").arg(format!("{}:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac.dmg", MACOS_ADDR)).arg("assets/oottracker-mac.dmg").check("scp", verbose).await?;
     eprintln!("uploading oottracker-mac.dmg");
     repo.release_attach(client, release, "oottracker-mac.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac.dmg").await?).await?;
     Ok(())
@@ -252,11 +254,10 @@ async fn main(args: Args) -> Result<(), Error> {
             write_release_notes(&args).await?,
         )
     } else {
-        let (setup_res, release_notes) = tokio::join!(
+        tokio::try_join!(
             setup(args.verbose),
             write_release_notes(&args),
-        );
-        (setup_res?, release_notes?)
+        )?
     };
     eprintln!("creating release");
     let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
@@ -266,16 +267,12 @@ async fn main(args: Args) -> Result<(), Error> {
         build_macos(&client, &repo, &release, args.verbose).await?;
         build_web(args.verbose).await?;
     } else {
-        let (build_bizhawk_res, build_gui_res, build_macos_res, build_web_res) = tokio::join!(
+        let ((), (), (), ()) = tokio::try_join!(
             build_bizhawk(&client, &repo, &release, args.verbose),
             build_gui(&client, &repo, &release, args.verbose),
             build_macos(&client, &repo, &release, args.verbose),
             build_web(args.verbose),
-        );
-        let () = build_bizhawk_res?;
-        let () = build_gui_res?;
-        let () = build_macos_res?;
-        let () = build_web_res?;
+        )?;
     }
     if !args.no_publish {
         eprintln!("publishing release");

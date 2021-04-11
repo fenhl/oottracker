@@ -42,10 +42,10 @@ enum ServerMessage {
         debug: String,
         display: String,
     },
-    Init(Vec<CellRender<'static>>),
+    Init(Vec<CellRender>),
     Update {
         cell_id: u8,
-        new_cell: CellRender<'static>,
+        new_cell: CellRender,
     },
 }
 
@@ -100,7 +100,7 @@ async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: im
                             }
                         };
                         let cells = layout.cells()
-                            .map(|(cell, _, _)| cell.kind().render(&runner).into_owned())
+                            .map(|(cell, _, _)| cell.kind().render(&runner))
                             .collect::<Vec<_>>();
                         if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
                         (cells, rx.clone())
@@ -121,7 +121,7 @@ async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: im
                                 return
                             }
                         };
-                        let new_cells = layout.cells().map(|(cell, _, _)| cell.kind().render(&runner).into_owned()).collect::<Vec<_>>();
+                        let new_cells = layout.cells().map(|(cell, _, _)| cell.kind().render(&runner)).collect::<Vec<_>>();
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
                             if old_cell != new_cell {
                                 if (ServerMessage::Update { cell_id: i.try_into().expect("too many cells"), new_cell: new_cell.clone() }).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling

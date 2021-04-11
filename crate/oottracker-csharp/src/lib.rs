@@ -45,6 +45,7 @@ use {
             Save,
         },
         ui::{
+            ImageDirContext,
             TrackerCellId,
             TrackerCellKind,
             TrackerLayout,
@@ -188,14 +189,14 @@ pub fn version() -> Version {
             format!("extra_images_dimmed.big_poe")
         },
         TrackerCellKind::Composite { left_img, right_img, both_img, active, .. } => match active(state) {
-            (false, false) => format!("xopar_images_dimmed.{}", both_img),
-            (false, true) => format!("xopar_images.{}", right_img),
-            (true, false) => format!("xopar_images.{}", left_img),
-            (true, true) => format!("xopar_images.{}", both_img),
+            (false, false) => both_img.to_string('.', ImageDirContext::Dimmed),
+            (false, true) => right_img.to_string('.', ImageDirContext::Normal),
+            (true, false) => left_img.to_string('.', ImageDirContext::Normal),
+            (true, true) => both_img.to_string('.', ImageDirContext::Normal),
         },
         TrackerCellKind::Count { dimmed_img, img, get, .. } => match get(state) {
-            0 => format!("xopar_images_dimmed.{}", dimmed_img),
-            n => format!("xopar_images_count.{}_{}", img, n),
+            0 => dimmed_img.to_string('.', ImageDirContext::Dimmed),
+            n => format!("{}_{}", img.to_string('.', ImageDirContext::Count(n)), n),
         },
         TrackerCellKind::Medallion(med) => format!(
             "xopar_images{}.{}_medallion",
@@ -215,16 +216,15 @@ pub fn version() -> Version {
             Some(DungeonRewardLocation::LinksPocket) => format!("xopar_images.free_text"),
         },
         TrackerCellKind::OptionalOverlay { main_img, overlay_img, active, .. } | TrackerCellKind::Overlay { main_img, overlay_img, active, .. } => match active(state) {
-            (false, false) => format!("xopar_images_dimmed.{}", main_img),
-            (false, true) => format!("xopar_images_overlay_dimmed.{}_{}", main_img, overlay_img),
-            (true, false) => format!("xopar_images.{}", main_img),
-            (true, true) => format!("xopar_images_overlay.{}_{}", main_img, overlay_img),
+            (false, false) => main_img.to_string('.', ImageDirContext::Dimmed),
+            (true, false) => main_img.to_string('.', ImageDirContext::Normal),
+            (main_active, true) => main_img.with_overlay(&overlay_img).to_string('.', main_active),
         },
         TrackerCellKind::Sequence { img, .. } => {
             let (active, img) = img(state);
-            format!("xopar_images{}.{}", if active { "" } else { "_dimmed" }, img)
+            img.to_string('.', if active { ImageDirContext::Normal } else { ImageDirContext::Dimmed })
         }
-        TrackerCellKind::Simple { img, active, .. } => format!("xopar_images{}.{}", if active(state) { "" } else { "_dimmed" }, img),
+        TrackerCellKind::Simple { img, active, .. } => img.to_string('.', if active(state) { ImageDirContext::Normal } else { ImageDirContext::Dimmed }),
         TrackerCellKind::Song { song, check, .. } => {
             let song_filename = match song {
                 QuestItems::ZELDAS_LULLABY => "lullaby",

@@ -7,28 +7,19 @@ use {
         borrow::Cow,
         collections::HashMap,
         fmt,
-        pin::Pin,
         sync::Arc,
     },
     async_proto::{
         Protocol,
         ReadError,
-        WriteError,
     },
     derive_more::From,
     futures::future::{
-        Future,
         FutureExt as _,
         TryFutureExt as _,
     },
     structopt::StructOpt,
-    tokio::{
-        io::{
-            AsyncRead,
-            AsyncWrite,
-        },
-        sync::Mutex,
-    },
+    tokio::sync::Mutex,
     warp::Filter as _,
     ootr::{
         check::Check,
@@ -72,69 +63,21 @@ enum CellStyle {
     RightDimmed,
 }
 
-#[derive(Clone, PartialEq, Eq)]
-enum CellOverlay<'a> {
+#[derive(Clone, PartialEq, Eq, Protocol)]
+enum CellOverlay {
     None,
     Count(u8),
-    Image(Cow<'a, str>),
+    Image(Cow<'static, str>),
 }
 
-impl<'a> CellOverlay<'a> {
-    fn into_owned(self) -> CellOverlay<'static> {
-        match self {
-            CellOverlay::None => CellOverlay::None,
-            CellOverlay::Count(count) => CellOverlay::Count(count),
-            CellOverlay::Image(overlay_img) => CellOverlay::Image(Cow::Owned(overlay_img.into_owned())),
-        }
-    }
-}
-
-impl Protocol for CellOverlay<'static> {
-    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Self, ReadError>> + Send + 'a>> {
-        Box::pin(async move {
-            Ok(match u8::read(stream).await? {
-                0 => CellOverlay::None,
-                1 => CellOverlay::Count(u8::read(stream).await?),
-                2 => CellOverlay::Image(Cow::read(stream).await?),
-                n => return Err(ReadError::UnknownVariant(n)),
-            })
-        })
-    }
-
-    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
-        Box::pin(async move {
-            match self {
-                CellOverlay::None => 0u8.write(sink).await?,
-                CellOverlay::Count(count) => {
-                    1u8.write(sink).await?;
-                    count.write(sink).await?;
-                }
-                CellOverlay::Image(overlay_img) => {
-                    2u8.write(sink).await?;
-                    overlay_img.write(sink).await?;
-                }
-            }
-            Ok(())
-        })
-    }
-}
-
-#[derive(Clone, PartialEq, Eq)]
-struct CellRender<'a> {
-    img_filename: Cow<'a, str>,
+#[derive(Clone, PartialEq, Eq, Protocol)]
+struct CellRender {
+    img_filename: Cow<'static, str>,
     style: CellStyle,
-    overlay: CellOverlay<'a>,
+    overlay: CellOverlay,
 }
 
-impl<'a> CellRender<'a> {
-    fn into_owned(self) -> CellRender<'static> {
-        CellRender {
-            img_filename: Cow::Owned(self.img_filename.into_owned()),
-            style: self.style,
-            overlay: self.overlay.into_owned(),
-        }
-    }
-
+impl CellRender {
     fn to_html(&self) -> String {
         let css_classes = match self.style {
             CellStyle::Normal => "",
@@ -151,43 +94,22 @@ impl<'a> CellRender<'a> {
     }
 }
 
-impl Protocol for CellRender<'static> {
-    fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Self, ReadError>> + Send + 'a>> {
-        Box::pin(async move {
-            Ok(CellRender {
-                img_filename: Cow::read(stream).await?,
-                style: CellStyle::read(stream).await?,
-                overlay: CellOverlay::read(stream).await?,
-            })
-        })
-    }
-
-    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.img_filename.write(sink).await?;
-            self.style.write(sink).await?;
-            self.overlay.write(sink).await?;
-            Ok(())
-        })
-    }
-}
-
 trait TrackerCellKindExt {
-    fn render(&self, state: &dyn ModelStateView) -> CellRender<'_>;
+    fn render(&self, state: &dyn ModelStateView) -> CellRender;
     fn click(&self, state: &mut dyn ModelStateView);
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
-    fn render(&self, state: &dyn ModelStateView) -> CellRender<'_> {
+    fn render(&self, state: &dyn ModelStateView) -> CellRender {
         match self {
             Composite { left_img, right_img, both_img, active, .. } => {
                 let is_active = active(state);
                 CellRender {
-                    img_filename: Cow::Borrowed(*match is_active {
+                    img_filename: Cow::Borrowed(match is_active {
                         (false, false) | (true, true) => both_img,
                         (false, true) => right_img,
                         (true, false) => left_img,
-                    }),
+                    }.name),
                     style: if let (false, false) = is_active { CellStyle::Dimmed } else { CellStyle::Normal },
                     overlay: CellOverlay::None,
                 }
@@ -195,9 +117,9 @@ impl TrackerCellKindExt for TrackerCellKind {
             Count { dimmed_img, get, .. } => {
                 let count = get(state);
                 if count == 0 {
-                    CellRender { img_filename: Cow::Borrowed(dimmed_img), style: CellStyle::Dimmed, overlay: CellOverlay::None }
+                    CellRender { img_filename: Cow::Borrowed(dimmed_img.name), style: CellStyle::Dimmed, overlay: CellOverlay::None }
                 } else {
-                    CellRender { img_filename: Cow::Borrowed(dimmed_img), style: CellStyle::Normal, overlay: CellOverlay::Count(count) }
+                    CellRender { img_filename: Cow::Borrowed(dimmed_img.name), style: CellStyle::Normal, overlay: CellOverlay::Count(count) }
                 }
             }
             Medallion(med) => CellRender {
@@ -227,21 +149,21 @@ impl TrackerCellKindExt for TrackerCellKind {
             OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => {
                 let (main_active, overlay_active) = active(state);
                 CellRender {
-                    img_filename: Cow::Borrowed(main_img),
+                    img_filename: Cow::Borrowed(main_img.name),
                     style: if main_active { CellStyle::Normal } else { CellStyle::Dimmed },
-                    overlay: if overlay_active { CellOverlay::Image(Cow::Borrowed(overlay_img)) } else { CellOverlay::None },
+                    overlay: if overlay_active { CellOverlay::Image(Cow::Borrowed(overlay_img.name)) } else { CellOverlay::None },
                 }
             }
             Sequence { img, .. } => {
                 let (is_active, img_filename) = img(state);
                 CellRender {
-                    img_filename: Cow::Borrowed(img_filename),
+                    img_filename: Cow::Borrowed(img_filename.name),
                     style: if is_active { CellStyle::Normal } else { CellStyle::Dimmed },
                     overlay: CellOverlay::None,
                 }
             }
             Simple { img, active, .. } => CellRender {
-                img_filename: Cow::Borrowed(img),
+                img_filename: Cow::Borrowed(img.name),
                 style: if active(state) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
             },
