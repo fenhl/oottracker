@@ -117,7 +117,7 @@ sock.addEventListener('open', function(event) {
         sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, layoutBuf]));
     } else if (restreamDoubleMatch) {
         const doubleSubscription = new ArrayBuffer(1);
-        new DataView(subscription).setUint8(0, 2); // ClientMessage variant: SubscribeDoubleRestream
+        new DataView(doubleSubscription).setUint8(0, 2); // ClientMessage variant: SubscribeDoubleRestream
         const doubleRestream = utf8encoder.encode(restreamDoubleMatch[1]);
         const doubleRestreamLen = new ArrayBuffer(8);
         new DataView(doubleRestreamLen).setBigUint64(0, BigInt(doubleRestream.length));
