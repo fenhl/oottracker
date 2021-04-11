@@ -4,7 +4,7 @@ function updateCell(cellID, data, offset) {
     //elt.replaceChildren(); //TODO use this instead of the elt.append calls below once OBS browser source updates to Chrome 86+
     elt.innerHTML = '';
     let mainImg = document.createElement('img');
-    const imgFilenameLen = view.getBigUint64(offset);
+    const imgFilenameLen = Number(view.getBigUint64(offset));
     offset += 8;
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
     offset += imgFilenameLen;
@@ -43,7 +43,7 @@ function updateCell(cellID, data, offset) {
             break;
         case 2:
             // Image
-            const overlayImgLen = view.getBigUint64(offset);
+            const overlayImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
             offset += overlayImgLen;
@@ -105,18 +105,18 @@ sock.addEventListener('message', function(event) {
             break;
         case 1:
             // Error
-            const debugLen = view.getBigUint64(offset);
+            const debugLen = Number(view.getBigUint64(offset));
             offset += 4;
             const debug = utf8decoder.decode(data.slice(offset, offset + debugLen));
             offset += debugLen;
-            const displayLen = view.getBigUint64(offset);
+            const displayLen = Number(view.getBigUint64(offset));
             offset += 4;
             const display = utf8decoder.decode(data.slice(offset, offset + displayLen));
             offset += displayLen;
             throw display;
         case 2:
             // Init
-            const numCells = view.getBigUint64(offset);
+            const numCells = Number(view.getBigUint64(offset));
             offset += 4;
             for (let cellID = 0; cellID < numCells; cellID++) {
                 offset = updateCell(cellID, data, offset);
