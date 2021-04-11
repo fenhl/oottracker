@@ -39,6 +39,7 @@ use {
         save::QuestItems,
         ui::{
             DungeonRewardLocationExt as _,
+            ImageDirContext,
             TrackerCellKind::{
                 self,
                 *,
@@ -67,11 +68,15 @@ enum CellStyle {
 enum CellOverlay {
     None,
     Count(u8),
-    Image(Cow<'static, str>),
+    Image {
+        overlay_dir: Cow<'static, str>,
+        overlay_img: Cow<'static, str>,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Protocol)]
 struct CellRender {
+    img_dir: Cow<'static, str>,
     img_filename: Cow<'static, str>,
     style: CellStyle,
     overlay: CellOverlay,
@@ -88,9 +93,9 @@ impl CellRender {
         let overlay = match self.overlay {
             CellOverlay::None => String::default(),
             CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
-            CellOverlay::Image(ref overlay_img) => format!(r#"<img src="/static/img/xopar-overlays/{}.png" />"#, overlay_img),
+            CellOverlay::Image { ref overlay_dir, ref overlay_img } => format!(r#"<img src="/static/img/{}/{}.png" />"#, overlay_dir, overlay_img),
         };
-        format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />{}"#, css_classes, self.img_filename, overlay)
+        format!(r#"<img class="{}" src="/static/img/{}/{}.png" />{}"#, css_classes, self.img_dir, self.img_filename, overlay)
     }
 }
 
@@ -104,25 +109,25 @@ impl TrackerCellKindExt for TrackerCellKind {
         match self {
             Composite { left_img, right_img, both_img, active, .. } => {
                 let is_active = active(state);
+                let img = match is_active {
+                    (false, false) | (true, true) => both_img,
+                    (false, true) => right_img,
+                    (true, false) => left_img,
+                };
                 CellRender {
-                    img_filename: Cow::Borrowed(match is_active {
-                        (false, false) | (true, true) => both_img,
-                        (false, true) => right_img,
-                        (true, false) => left_img,
-                    }.name),
+                    img_dir: Cow::Borrowed(img.dir.to_string(ImageDirContext::Normal)),
+                    img_filename: Cow::Borrowed(img.name),
                     style: if let (false, false) = is_active { CellStyle::Dimmed } else { CellStyle::Normal },
                     overlay: CellOverlay::None,
                 }
             }
             Count { dimmed_img, get, .. } => {
                 let count = get(state);
-                if count == 0 {
-                    CellRender { img_filename: Cow::Borrowed(dimmed_img.name), style: CellStyle::Dimmed, overlay: CellOverlay::None }
-                } else {
-                    CellRender { img_filename: Cow::Borrowed(dimmed_img.name), style: CellStyle::Normal, overlay: CellOverlay::Count(count) }
-                }
+                let (style, overlay) = if count == 0 { (CellStyle::Dimmed, CellOverlay::None) } else { (CellStyle::Normal, CellOverlay::Count(count)) };
+                CellRender { img_dir: Cow::Borrowed(dimmed_img.dir.to_string(ImageDirContext::Normal)), img_filename: Cow::Borrowed(dimmed_img.name), style, overlay }
             }
             Medallion(med) => CellRender {
+                img_dir: Cow::Borrowed("xopar-images"),
                 img_filename: Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
                 style: if state.ram().save.quest_items.has(*med) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
@@ -130,6 +135,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             MedallionLocation(med) => {
                 let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
                 CellRender {
+                    img_dir: Cow::Borrowed("xopar-images"),
                     img_filename: Cow::Borrowed(match location {
                         None => "unknown_text",
                         Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
@@ -149,25 +155,36 @@ impl TrackerCellKindExt for TrackerCellKind {
             OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => {
                 let (main_active, overlay_active) = active(state);
                 CellRender {
+                    img_dir: Cow::Borrowed(main_img.dir.to_string(ImageDirContext::Normal)),
                     img_filename: Cow::Borrowed(main_img.name),
                     style: if main_active { CellStyle::Normal } else { CellStyle::Dimmed },
-                    overlay: if overlay_active { CellOverlay::Image(Cow::Borrowed(overlay_img.name)) } else { CellOverlay::None },
+                    overlay: if overlay_active {
+                        CellOverlay::Image {
+                            overlay_dir: Cow::Borrowed(overlay_img.dir.to_string(ImageDirContext::OverlayOnly)),
+                            overlay_img: Cow::Borrowed(overlay_img.name),
+                        }
+                    } else {
+                        CellOverlay::None
+                    },
                 }
             }
             Sequence { img, .. } => {
                 let (is_active, img_filename) = img(state);
                 CellRender {
+                    img_dir: Cow::Borrowed(img_filename.dir.to_string(ImageDirContext::Normal)),
                     img_filename: Cow::Borrowed(img_filename.name),
                     style: if is_active { CellStyle::Normal } else { CellStyle::Dimmed },
                     overlay: CellOverlay::None,
                 }
             }
             Simple { img, active, .. } => CellRender {
+                img_dir: Cow::Borrowed(img.dir.to_string(ImageDirContext::Normal)),
                 img_filename: Cow::Borrowed(img.name),
                 style: if active(state) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
             },
             Song { song, check, .. } => CellRender {
+                img_dir: Cow::Borrowed("xopar-images"),
                 img_filename: Cow::Borrowed(match *song {
                     QuestItems::ZELDAS_LULLABY => "lullaby",
                     QuestItems::EPONAS_SONG => "epona",
@@ -185,12 +202,16 @@ impl TrackerCellKindExt for TrackerCellKind {
                 }),
                 style: if state.ram().save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
-                    CellOverlay::Image(Cow::Borrowed("check"))
+                    CellOverlay::Image {
+                        overlay_dir: Cow::Borrowed("xopar-overlays"),
+                        overlay_img: Cow::Borrowed("check"),
+                    }
                 } else {
                     CellOverlay::None
                 },
             },
             Stone(stone) => CellRender {
+                img_dir: Cow::Borrowed("xopar-images"),
                 img_filename: Cow::Borrowed(match *stone {
                     Stone::KokiriEmerald => "kokiri_emerald",
                     Stone::GoronRuby => "goron_ruby",
@@ -202,6 +223,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             StoneLocation(stone) => {
                 let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
                 CellRender {
+                    img_dir: Cow::Borrowed("xopar-images"),
                     img_filename: Cow::Borrowed(match location {
                         None => "unknown_text",
                         Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",

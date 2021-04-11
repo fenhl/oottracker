@@ -5,7 +5,7 @@ function updateCell(cellID, data, offset) {
     elt.innerHTML = '';
     let mainImg = document.createElement('img');
     const imgFilenameLen = view.getBigUint64(offset);
-    offset += 4;
+    offset += 8;
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
     offset += imgFilenameLen;
     mainImg.setAttribute('src', '/static/img/xopar-images/' + imgFilename + '.png');
@@ -44,7 +44,7 @@ function updateCell(cellID, data, offset) {
         case 2:
             // Image
             const overlayImgLen = view.getBigUint64(offset);
-            offset += 4;
+            offset += 8;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
             offset += overlayImgLen;
             let imgOverlay = document.createElement('img');
@@ -68,10 +68,10 @@ sock.addEventListener('open', function(event) {
     const subscription = new ArrayBuffer(1);
     new DataView(subscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
     const restream = utf8encoder.encode(match[1]);
-    const restreamLen = new ArrayBuffer(4);
+    const restreamLen = new ArrayBuffer(8);
     new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
     const runner = utf8encoder.encode(match[2]);
-    const runnerLen = new ArrayBuffer(4);
+    const runnerLen = new ArrayBuffer(8);
     new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
     let layout;
     switch (match[3]) {

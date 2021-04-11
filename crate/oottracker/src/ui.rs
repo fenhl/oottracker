@@ -1378,6 +1378,7 @@ pub enum ImageDirContext {
     Normal,
     Count(u8),
     Dimmed,
+    OverlayOnly,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1387,7 +1388,7 @@ pub enum ImageDir {
 }
 
 impl ImageDir {
-    fn to_string(&self, ctx: ImageDirContext) -> &'static str {
+    pub fn to_string(&self, ctx: ImageDirContext) -> &'static str {
         match (self, ctx) {
             (ImageDir::Xopar, ImageDirContext::Normal) => "xopar-images",
             (ImageDir::Extra, ImageDirContext::Normal) => "extra-images",
@@ -1395,6 +1396,8 @@ impl ImageDir {
             (ImageDir::Extra, ImageDirContext::Count(_)) => "extra-images-count",
             (ImageDir::Xopar, ImageDirContext::Dimmed) => "xopar-images-dimmed",
             (ImageDir::Extra, ImageDirContext::Dimmed) => "extra-images-dimmed",
+            (ImageDir::Xopar, ImageDirContext::OverlayOnly) => "xopar-overlays",
+            (ImageDir::Extra, ImageDirContext::OverlayOnly) => unimplemented!(),
         }
     }
 }
@@ -1417,6 +1420,7 @@ impl ImageInfo {
             (ImageDir::Extra, ImageDirContext::Count(count)) => images::extra_images_count(&format!("{}_{}", self.name, count)),
             (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(self.name),
             (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(self.name),
+            (_, ImageDirContext::OverlayOnly) => unimplemented!(),
         }
     }
 
