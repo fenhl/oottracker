@@ -88,7 +88,7 @@ sock.addEventListener('open', function(event) {
     const restreamDoubleMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/with\/([0-9A-Za-z-]+)\/?$/);
     if (restreamMatch) {
         const restreamSubscription = new ArrayBuffer(1);
-        new DataView(subscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
+        new DataView(restreamSubscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
         const restream = utf8encoder.encode(restreamMatch[1]);
         const restreamLen = new ArrayBuffer(8);
         new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
