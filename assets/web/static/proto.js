@@ -106,18 +106,18 @@ sock.addEventListener('message', function(event) {
         case 1:
             // Error
             const debugLen = Number(view.getBigUint64(offset));
-            offset += 4;
+            offset += 8;
             const debug = utf8decoder.decode(data.slice(offset, offset + debugLen));
             offset += debugLen;
             const displayLen = Number(view.getBigUint64(offset));
-            offset += 4;
+            offset += 8;
             const display = utf8decoder.decode(data.slice(offset, offset + displayLen));
             offset += displayLen;
             throw display;
         case 2:
             // Init
             const numCells = Number(view.getBigUint64(offset));
-            offset += 4;
+            offset += 8;
             for (let cellID = 0; cellID < numCells; cellID++) {
                 offset = updateCell(cellID, data, offset);
             }
