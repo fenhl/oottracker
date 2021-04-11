@@ -4,11 +4,15 @@ function updateCell(cellID, data, offset) {
     //elt.replaceChildren(); //TODO use this instead of the elt.append calls below once OBS browser source updates to Chrome 86+
     elt.innerHTML = '';
     let mainImg = document.createElement('img');
+    const imgDirLen = Number(view.getBigUint64(offset));
+    offset += 8;
+    const imgDir = utf8decoder.decode(data.slice(offset, offset + imgDirLen));
+    offset += imgDirLen;
     const imgFilenameLen = Number(view.getBigUint64(offset));
     offset += 8;
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
     offset += imgFilenameLen;
-    mainImg.setAttribute('src', '/static/img/xopar-images/' + imgFilename + '.png');
+    mainImg.setAttribute('src', '/static/img/' + imgDir + '/' + imgFilename + '.png');
     switch (view.getUint8(offset++)) {
         case 0:
             // Normal
