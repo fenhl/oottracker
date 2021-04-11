@@ -120,7 +120,7 @@ impl TrackerLayout {
                 Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
                 Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
-                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude, MirrorShield,
+                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude,
             ].into_iter().map(|cell| (cell, 3, false))))
         }
     }
