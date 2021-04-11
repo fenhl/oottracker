@@ -72,6 +72,10 @@ enum CellOverlay {
         overlay_dir: Cow<'static, str>,
         overlay_img: Cow<'static, str>,
     },
+    Location {
+        dimmed: bool,
+        loc_img: Cow<'static, str>,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Protocol)]
@@ -94,6 +98,7 @@ impl CellRender {
             CellOverlay::None => String::default(),
             CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
             CellOverlay::Image { ref overlay_dir, ref overlay_img } => format!(r#"<img src="/static/img/{}/{}.png" />"#, overlay_dir, overlay_img),
+            CellOverlay::Location { dimmed, ref loc_img } => format!(r#"<img class="loc{}" src="/static/img/xopar-images/{}.png" />"#, if dimmed { " dimmed" } else { "" }, loc_img),
         };
         format!(r#"<img class="{}" src="/static/img/{}/{}.png" />{}"#, css_classes, self.img_dir, self.img_filename, overlay)
     }

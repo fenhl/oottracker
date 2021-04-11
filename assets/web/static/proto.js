@@ -59,6 +59,18 @@ function updateCell(cellID, data, offset) {
             imgOverlay.setAttribute('src', '/static/img/' + overlayDir + '/' + overlayImg + '.png');
             elt.append(imgOverlay);
             break;
+        case 3:
+            // Location
+            const locDimmed = view.getUint8(offset++) != 0;
+            const locImgLen = Number(view.getBigUint64(offset));
+            offset += 8;
+            const locImg = utf8decoder.decode(data.slice(offset, offset + locImgLen));
+            offset += locImgLen;
+            let locOverlay = document.createElement('img');
+            locOverlay.setAttribute('class', locDimmed ? 'loc dimmed' : 'loc');
+            locOverlay.setAttribute('src', '/static/img/xopar-images/' + locImg + '.png');
+            elt.append(locOverlay);
+            break;
         default:
             throw 'unexpected CellOverlay variant';
     }
@@ -72,35 +84,61 @@ const utf8encoder = new TextEncoder();
 sock.binaryType = "arraybuffer";
 
 sock.addEventListener('open', function(event) {
-    const match = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
-    const subscription = new ArrayBuffer(1);
-    new DataView(subscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
-    const restream = utf8encoder.encode(match[1]);
-    const restreamLen = new ArrayBuffer(8);
-    new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
-    const runner = utf8encoder.encode(match[2]);
-    const runnerLen = new ArrayBuffer(8);
-    new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-    let layout;
-    switch (match[3]) {
-        case 'default':
-            layout = 0;
-            break;
-        case 'mw-expanded':
-            layout = 1;
-            break;
-        case 'mw-collapsed':
-            layout = 2;
-            break;
-        case 'mw-edit':
-            layout = 3;
-            break;
-        default:
-            throw 'unknown layout';
+    const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
+    const restreamDoubleMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/with\/([0-9A-Za-z-]+)\/?$/);
+    if (restreamMatch) {
+        const restreamSubscription = new ArrayBuffer(1);
+        new DataView(subscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
+        const restream = utf8encoder.encode(restreamMatch[1]);
+        const restreamLen = new ArrayBuffer(8);
+        new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
+        const runner = utf8encoder.encode(restreamMatch[2]);
+        const runnerLen = new ArrayBuffer(8);
+        new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
+        let layout;
+        switch (restreamMatch[3]) {
+            case 'default':
+                layout = 0;
+                break;
+            case 'mw-expanded':
+                layout = 1;
+                break;
+            case 'mw-collapsed':
+                layout = 2;
+                break;
+            case 'mw-edit':
+                layout = 3;
+                break;
+            default:
+                throw 'unknown layout';
+        }
+        const layoutBuf = new ArrayBuffer(1);
+        new DataView(layoutBuf).setUint8(0, layout);
+        sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, layoutBuf]));
+    } else if (restreamDoubleMatch) {
+        const doubleSubscription = new ArrayBuffer(1);
+        new DataView(subscription).setUint8(0, 2); // ClientMessage variant: SubscribeDoubleRestream
+        const doubleRestream = utf8encoder.encode(restreamDoubleMatch[1]);
+        const doubleRestreamLen = new ArrayBuffer(8);
+        new DataView(doubleRestreamLen).setBigUint64(0, BigInt(doubleRestream.length));
+        const runner1 = utf8encoder.encode(restreamDoubleMatch[2]);
+        const runner1len = new ArrayBuffer(8);
+        new DataView(runner1len).setBigUint64(0, BigInt(runner1.length));
+        const runner2 = utf8encoder.encode(restreamDoubleMatch[4]);
+        const runner2len = new ArrayBuffer(8);
+        new DataView(runner2len).setBigUint64(0, BigInt(runner2.length));
+        let doubleLayout;
+        switch (restreamDoubleMatch[3]) {
+            case 'dungeon-rewards':
+                doubleLayout = 0;
+                break;
+            default:
+                throw 'unknown layout';
+        }
+        const doubleLayoutBuf = new ArrayBuffer(1);
+        new DataView(doubleLayoutBuf).setUint8(0, doubleLayout);
+        sock.send(new Blob([doubleSubscription, doubleRestreamLen, doubleRestream, runner1len, runner1, runner2len, runner2, doubleLayoutBuf]));
     }
-    const layoutBuf = new ArrayBuffer(1);
-    new DataView(layoutBuf).setUint8(0, layout);
-    sock.send(new Blob([subscription, restreamLen, restream, runnerLen, runner, layoutBuf]));
 });
 
 sock.addEventListener('message', function(event) {

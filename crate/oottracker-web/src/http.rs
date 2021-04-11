@@ -14,12 +14,6 @@ use {
         StaticFiles,
         crate_relative,
     },
-    ootr::model::{
-        DungeonReward,
-        DungeonRewardLocation,
-        MainDungeon,
-        Stone,
-    },
     oottracker::{
         ModelStateView,
         ui::TrackerCellId,
@@ -30,8 +24,8 @@ use {
         TrackerCellKindExt as _,
         restream::{
             DoubleTrackerLayout,
-            RestreamState,
             TrackerLayout,
+            render_double_cell,
         },
     },
 };
@@ -47,41 +41,6 @@ impl TrackerCellIdExt for TrackerCellId {
         let css_classes = if loc { format!("cols{} loc", colspan) } else { format!("cols{}", colspan) };
         format!(r#"<a id="cell{}" href="/{}/click/{}" class="{}">{}</a>"#, cell_id, room_name, cell_id, css_classes, content.to_html()) //TODO click action for JS, put link in a noscript tag
     }
-}
-
-fn double_view(restream: &mut RestreamState, runner1: &str, runner2: &str, reward: DungeonReward) -> Option<String> {
-    let img_filename = match reward {
-        DungeonReward::Medallion(med) => format!("{}_medallion", med.element().to_ascii_lowercase()),
-        DungeonReward::Stone(Stone::KokiriEmerald) => format!("kokiri_emerald"),
-        DungeonReward::Stone(Stone::GoronRuby) => format!("goron_ruby"),
-        DungeonReward::Stone(Stone::ZoraSapphire) => format!("zora_sapphire"),
-    };
-    let runner1_has = restream.runner(runner1)?.2.ram().save.quest_items.has(reward);
-    let (_, _, runner2) = restream.runner(runner2)?;
-    let css_classes = match (runner1_has, runner2.ram().save.quest_items.has(reward)) {
-        (false, false) => "dimmed",
-        (false, true) => "left-dimmed",
-        (true, false) => "right-dimmed",
-        (true, true) => "",
-    };
-    let location = runner2.knowledge().dungeon_reward_locations.get(&reward);
-    let loc_img_filename = match location {
-        None => "unknown_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
-        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
-        Some(DungeonRewardLocation::LinksPocket) => "free_text",
-    };
-    let loc_css_classes = if location.is_some() { "" } else { "dimmed" };
-    Some(format!(r#"<div class="cols3">
-        <img class="{}" src="/static/img/xopar-images/{}.png" />
-        <img class="loc {}" src="/static/img/xopar-images/{}.png" />
-    </div>"#, css_classes, img_filename, loc_css_classes, loc_img_filename)) //TODO overlay with location knowledge
 }
 
 fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
@@ -164,9 +123,10 @@ async fn restream_double_room_layout(restreams: State<'_, Restreams>, restreamer
         let restream = restreams.get_mut(&restreamer)?;
         layout.cells()
             .into_iter()
-            .map(|reward| double_view(restream, &runner1, &runner2, reward))
+            .map(|reward| render_double_cell(restream, &runner1, &runner2, reward))
             .collect::<Option<Vec<_>>>()?
             .into_iter()
+            .map(|render| render.to_html())
             .join("\n")
     };
     Some(tracker_page(&layout.to_string(), html_layout))

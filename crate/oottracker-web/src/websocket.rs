@@ -29,7 +29,11 @@ use {
         Restreams,
         Rooms,
         TrackerCellKindExt as _,
-        restream::TrackerLayout,
+        restream::{
+            DoubleTrackerLayout,
+            TrackerLayout,
+            render_double_cell,
+        },
     },
 };
 
@@ -65,6 +69,12 @@ enum ClientMessage {
         restream: String,
         runner: String,
         layout: TrackerLayout,
+    },
+    SubscribeDoubleRestream {
+        restream: String,
+        runner1: String,
+        runner2: String,
+        layout: DoubleTrackerLayout,
     },
 }
 
@@ -131,7 +141,58 @@ async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: im
                     }
                 });
             }
-            //TODO allow subscriptions for regular rooms and combined restream rooms
+            ClientMessage::SubscribeDoubleRestream { restream, runner1, runner2, layout } => {
+                let restreams = Restreams::clone(&restreams);
+                let sink = WsSink::clone(&sink);
+                tokio::spawn(async move {
+                    let (mut old_cells, mut rx) = {
+                        let mut restreams = restreams.lock().await;
+                        let restream = match restreams.get_mut(&restream) {
+                            Some(restream) => restream,
+                            None => {
+                                let _ = ServerMessage::from_error("no such restream").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                return
+                            }
+                        };
+                        let cells = if let Some(cells) = layout.cells().into_iter()
+                            .map(|reward| render_double_cell(restream, &runner1, &runner2, reward))
+                            .collect::<Option<Vec<_>>>()
+                        {
+                            cells
+                        } else {
+                            let _ = ServerMessage::from_error("no such runner").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                            return
+                        };
+                        if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                        let rx = match restream.runner(&runner1) {
+                            Some((_, rx, _)) => rx,
+                            None => {
+                                let _ = ServerMessage::from_error("no such runner").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                return
+                            }
+                        };
+                        (cells, rx.clone())
+                    };
+                    while let Ok(()) = rx.changed().await { //TODO better error handling
+                        let mut restreams = restreams.lock().await;
+                        let restream = match restreams.get_mut(&restream) {
+                            Some(restream) => restream,
+                            None => {
+                                let _ = ServerMessage::from_error("no such restream").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                return
+                            }
+                        };
+                        let new_cells = layout.cells().into_iter().map(|reward| render_double_cell(restream, &runner1, &runner2, reward)).collect::<Option<Vec<_>>>().expect("no such runner");
+                        for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
+                            if old_cell != new_cell {
+                                if (ServerMessage::Update { cell_id: i.try_into().expect("too many cells"), new_cell: new_cell.clone() }).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                            }
+                        }
+                        old_cells = new_cells;
+                    }
+                });
+            }
+            //TODO allow subscriptions for regular rooms
             //TODO accept client messages to update the room
         }
     }

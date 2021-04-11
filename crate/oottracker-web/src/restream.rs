@@ -1,5 +1,6 @@
 use {
     std::{
+        borrow::Cow,
         collections::HashMap,
         fmt,
     },
@@ -17,13 +18,21 @@ use {
     tokio::sync::watch::*,
     ootr::model::{
         DungeonReward,
+        DungeonRewardLocation,
+        MainDungeon,
         Medallion,
         Stone,
     },
     oottracker::{
+        ModelStateView as _,
         Knowledge,
         Ram,
         ui::TrackerCellId,
+    },
+    crate::{
+        CellOverlay,
+        CellRender,
+        CellStyle,
     },
 };
 
@@ -159,6 +168,7 @@ impl UriDisplay<Path> for TrackerLayout {
     }
 }
 
+#[derive(Protocol)]
 pub(crate) enum DoubleTrackerLayout {
     DungeonRewards,
 }
@@ -198,4 +208,43 @@ impl fmt::Display for DoubleTrackerLayout {
             DoubleTrackerLayout::DungeonRewards => write!(f, "dungeon-rewards"),
         }
     }
+}
+
+pub(crate) fn render_double_cell(restream: &mut RestreamState, runner1: &str, runner2: &str, reward: DungeonReward) -> Option<CellRender> {
+    let img_filename = match reward {
+        DungeonReward::Medallion(med) => Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
+        DungeonReward::Stone(Stone::KokiriEmerald) => Cow::Borrowed("kokiri_emerald"),
+        DungeonReward::Stone(Stone::GoronRuby) => Cow::Borrowed("goron_ruby"),
+        DungeonReward::Stone(Stone::ZoraSapphire) => Cow::Borrowed("zora_sapphire"),
+    };
+    let runner1_has = restream.runner(runner1)?.2.ram().save.quest_items.has(reward);
+    let (_, _, runner2) = restream.runner(runner2)?;
+    let style = match (runner1_has, runner2.ram().save.quest_items.has(reward)) {
+        (false, false) => CellStyle::Dimmed,
+        (false, true) => CellStyle::LeftDimmed,
+        (true, false) => CellStyle::RightDimmed,
+        (true, true) => CellStyle::Normal,
+    };
+    let location = runner2.knowledge().dungeon_reward_locations.get(&reward);
+    let loc_img_filename = match location {
+        None => "unknown_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+        Some(DungeonRewardLocation::LinksPocket) => "free_text",
+    };
+    Some(CellRender {
+        img_dir: Cow::Borrowed("xopar-images"),
+        img_filename,
+        style,
+        overlay: CellOverlay::Location {
+            dimmed: location.is_none(),
+            loc_img: Cow::Borrowed(loc_img_filename),
+        },
+    })
 }
