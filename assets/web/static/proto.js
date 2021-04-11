@@ -69,10 +69,10 @@ sock.addEventListener('open', function(event) {
     new DataView(subscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
     const restream = utf8encoder.encode(match[1]);
     const restreamLen = new ArrayBuffer(4);
-    new DataView(restreamLen).setBigUint64(0, restream.length);
+    new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
     const runner = utf8encoder.encode(match[2]);
     const runnerLen = new ArrayBuffer(4);
-    new DataView(runnerLen).setBigUint64(0, runner.length);
+    new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
     let layout;
     switch (match[3]) {
         case 'default':

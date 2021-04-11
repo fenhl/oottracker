@@ -37,6 +37,7 @@ use {
     crate::{
         ModelStateView,
         info_tables::*,
+        knowledge::ProgressionMode,
         save::*,
     },
 };
@@ -267,15 +268,46 @@ macro_rules! cells {
 cells! {
     GoMode: Simple {
         img: ImageInfo { dir: ImageDir::Extra, name: "go_mode" },
-        active: Box::new(|_| false), //TODO
-        toggle: Box::new(|_| ()), //TODO
+        active: Box::new(|state| match state.knowledge().progression_mode {
+            ProgressionMode::Go | ProgressionMode::Done => true,
+            ProgressionMode::Bk | ProgressionMode::Normal => false,
+        }),
+        toggle: Box::new(|state| {
+            let new_mode = match state.knowledge().progression_mode {
+                ProgressionMode::Done => ProgressionMode::Done, // only the racetime integration may toggle .done for now
+                ProgressionMode::Go => ProgressionMode::Normal,
+                ProgressionMode::Bk | ProgressionMode::Normal => ProgressionMode::Go,
+            };
+            state.knowledge_mut().progression_mode = new_mode;
+        }),
     },
     GoBk: Overlay {
         main_img: ImageInfo { dir: ImageDir::Extra, name: "go_mode" },
         overlay_img: ImageInfo { dir: ImageDir::Extra, name: "bk_mode" },
-        active: Box::new(|_| (false, false)), //TODO
-        toggle_main: Box::new(|_| ()), //TODO
-        toggle_overlay: Box::new(|_| ()), //TODO
+        active: Box::new(|state| match state.knowledge().progression_mode {
+            ProgressionMode::Done => (true, true), // rendered as both, with no image
+            ProgressionMode::Go => (true, false),
+            ProgressionMode::Bk => (false, true),
+            ProgressionMode::Normal => (false, false),
+        }),
+        toggle_main: Box::new(|state| {
+            let new_mode = match state.knowledge().progression_mode {
+                ProgressionMode::Normal => ProgressionMode::Go,
+                ProgressionMode::Bk => ProgressionMode::Done,
+                ProgressionMode::Go => ProgressionMode::Normal,
+                ProgressionMode::Done => ProgressionMode::Bk,
+            };
+            state.knowledge_mut().progression_mode = new_mode;
+        }),
+        toggle_overlay: Box::new(|state| {
+            let new_mode = match state.knowledge().progression_mode {
+                ProgressionMode::Normal => ProgressionMode::Bk,
+                ProgressionMode::Bk => ProgressionMode::Normal,
+                ProgressionMode::Go => ProgressionMode::Done,
+                ProgressionMode::Done => ProgressionMode::Go,
+            };
+            state.knowledge_mut().progression_mode = new_mode;
+        }),
     },
     LightMedallionLocation: MedallionLocation(Medallion::Light),
     ForestMedallionLocation: MedallionLocation(Medallion::Forest),
@@ -1416,14 +1448,14 @@ impl OverlayImageInfo {
             } else {
                 images::xopar_images_overlay_dimmed(&format!("{}_{}", self.main, self.overlay))
             },
-            ImageDir::Extra => images::extra_images(self.overlay),
+            ImageDir::Extra => images::extra_images(if main_active { "blank" } else { self.overlay }),
         }
     }
 
     pub fn to_string(&self, sep: char, main_active: bool) -> String {
         match self.dir {
             ImageDir::Xopar => format!("xopar-images-overlay{}{}{}_{}", if main_active { "" } else { "-dimmed" }, sep, self.main, self.overlay),
-            ImageDir::Extra => format!("extra-images{}{}", sep, self.overlay),
+            ImageDir::Extra => format!("extra-images{}{}", sep, if main_active { "blank" } else { self.overlay }),
         }
     }
 }

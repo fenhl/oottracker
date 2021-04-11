@@ -25,6 +25,21 @@ use {
     },
 };
 
+#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq, Protocol)]
+pub enum ProgressionMode {
+    /// No progression available. Should only occur in multiworld and no-logic seeds.
+    Bk,
+    /// The player is neither done nor in go mode nor in BK mode.
+    #[default]
+    Normal,
+    /// The player either has or knows the location of every item required to beat the game.
+    ///
+    /// See <https://github.com/fenhl/oottracker/issues/9#issuecomment-783503311> for a more detailed definition.
+    Go,
+    /// Game beaten.
+    Done,
+}
+
 #[derive(Debug, SmartDefault, Clone, PartialEq, Eq)]
 pub struct Knowledge {
     pub bool_settings: HashMap<String, bool>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
@@ -36,6 +51,7 @@ pub struct Knowledge {
     pub dungeon_reward_locations: HashMap<DungeonReward, DungeonRewardLocation>,
     #[default(Some(Default::default()))] //TODO include exits that are never shuffled
     pub exits: Option<HashMap<String, HashMap<String, String>>>, //TODO remove option wrapping
+    pub progression_mode: ProgressionMode, //TODO automatically determine from remaining model state
 }
 
 impl Knowledge {
@@ -148,6 +164,7 @@ impl Knowledge {
                 Medallion::Shadow => true,
                 Medallion::Spirit => true,
             ],
+            progression_mode: ProgressionMode::Go,
         }
     }
 
@@ -168,6 +185,7 @@ impl Protocol for Knowledge {
                     exits: Some(HashMap::read(stream).await?),
                     active_trials: HashMap::read(stream).await?,
                     string_settings: HashMap::read(stream).await?,
+                    progression_mode: ProgressionMode::read(stream).await?,
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
@@ -191,6 +209,7 @@ impl Protocol for Knowledge {
                 self.exits.as_ref().expect("non-vanilla Knowledge should have Some in exits field").write(sink).await?;
                 self.active_trials.write(sink).await?;
                 self.string_settings.write(sink).await?;
+                self.progression_mode.write(sink).await?;
             }
             Ok(())
         })
