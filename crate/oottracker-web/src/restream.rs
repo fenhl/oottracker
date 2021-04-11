@@ -109,7 +109,7 @@ impl TrackerLayout {
             TrackerLayout::MultiworldCollapsed => Box::new(vec![
                 KokiriSword, Bottle, Skulltula, Strength, Scale, Spells, Slingshot, Bombs, Boomerang, GoBk,
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms, Hookshot, Bow, Hammer, Magic,
-                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude, MirrorShield, Boots, Arrows, Tunics, //TODO replace tunics with wallets once images exist
+                Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude, MirrorShield, Boots, Arrows, Tunics, //TODO replace tunics with wallets once images exist
             ].into_iter().map(|cell| (cell, 3, false))),
             TrackerLayout::MultiworldEdit => Box::new(vec![
                 KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, LightMedallionLocation, ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation,
@@ -120,7 +120,7 @@ impl TrackerLayout {
                 Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
                 Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
-                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude,
+                Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude,
             ].into_iter().map(|cell| (cell, 3, false))))
         }
     }
