@@ -71,7 +71,7 @@ pub(crate) enum TrackerLayout {
 }
 
 impl TrackerLayout {
-    pub(crate) fn cells(&self) -> Box<dyn Iterator<Item = (TrackerCellId, u8, bool)>> {
+    pub(crate) fn cells(&self) -> Box<dyn Iterator<Item = (TrackerCellId, u8, bool)> + Send> {
         use TrackerCellId::*;
 
         match self {

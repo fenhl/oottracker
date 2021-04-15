@@ -107,6 +107,8 @@ impl CellRender {
 trait TrackerCellKindExt {
     fn render(&self, state: &ModelState) -> CellRender;
     fn click(&self, state: &mut ModelState);
+    fn left_click(&self, state: &mut ModelState);
+    fn right_click(&self, state: &mut ModelState);
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
@@ -259,7 +261,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             OptionalOverlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
             Count { get, set, max, .. } => {
                 let current = get(state);
-                if current == *max { set(state, 0) } else { set(state, current + 1) }
+                set(state, if current == *max { 0 } else { current + 1 });
             }
             Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
             MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
@@ -267,6 +269,29 @@ impl TrackerCellKindExt for TrackerCellKind {
             Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
             Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
+        }
+    }
+
+    fn left_click(&self, state: &mut ModelState) {
+        match self {
+            Composite { toggle_left, .. } | Overlay { toggle_main: toggle_left, .. } => toggle_left(state),
+            _ => self.click(state),
+        }
+    }
+
+    fn right_click(&self, state: &mut ModelState) {
+        match self {
+            Composite { toggle_right, .. } | OptionalOverlay { toggle_overlay: toggle_right, .. } | Overlay { toggle_overlay: toggle_right, .. } => toggle_right(state),
+            Count { get, set, max, .. } => {
+                let current = get(state);
+                set(state, if current == 0 { *max } else { current - 1 });
+            }
+            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
+            Sequence { decrement, .. } => decrement(state),
+            Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
+            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
+            Medallion(_) | Simple { .. } | Stone(_) => {}
             BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }

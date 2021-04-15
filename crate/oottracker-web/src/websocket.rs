@@ -76,6 +76,13 @@ enum ClientMessage {
         runner2: String,
         layout: DoubleTrackerLayout,
     },
+    ClickRestream {
+        restream: String,
+        runner: String,
+        layout: TrackerLayout,
+        cell_id: u8,
+        right: bool,
+    },
 }
 
 async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
@@ -211,8 +218,37 @@ async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: im
                     }
                 });
             }
-            //TODO allow subscriptions for regular rooms
-            //TODO accept client messages to update the room
+            ClientMessage::ClickRestream { restream, runner, layout, cell_id, right } => {
+                let mut restreams = restreams.write().await;
+                let restream = match restreams.get_mut(&restream) {
+                    Some(restream) => restream,
+                    None => {
+                        let _ = ServerMessage::from_error("no such restream").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                let (tx, runner) = match restream.runner_mut(&runner) {
+                    Some((tx, _, runner)) => (tx, runner),
+                    None => {
+                        let _ = ServerMessage::from_error("no such runner").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                let cell = match layout.cells().nth(cell_id.into()) {
+                    Some((cell, _, _)) => cell,
+                    None => {
+                        let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                if right {
+                    cell.kind().right_click(runner);
+                } else {
+                    cell.kind().left_click(runner);
+                }
+                tx.send(()).expect("failed to notify websockets about state change");
+            }
+            //TODO allow subscriptions & clicks for regular rooms
         }
     }
 }

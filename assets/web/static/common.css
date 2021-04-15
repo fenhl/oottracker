@@ -35,6 +35,11 @@ body {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 
+.items > a {
+    /* style JS fake links as links */
+    cursor: pointer;
+}
+
 .items > div,
 .items > a {
     position: relative;

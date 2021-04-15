@@ -1,3 +1,42 @@
+const sock = new WebSocket("wss://oottracker.fenhl.net/websocket");
+const utf8decoder = new TextDecoder();
+const utf8encoder = new TextEncoder();
+
+sock.binaryType = "arraybuffer";
+
+function restreamLayoutID(layoutString) {
+    switch (layoutString) {
+        case 'default':
+            return 0;
+        case 'mw-expanded':
+            return 1;
+        case 'mw-collapsed':
+            return 2;
+        case 'mw-edit':
+            return 3;
+        default:
+            throw 'unknown layout';
+    }
+}
+
+function sendClick(cellID, right) {
+    const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
+    const clickRestream = new ArrayBuffer(1);
+    new DataView(clickRestream).setUint8(0, 3); // ClientMessage variant: ClickRestream
+    const restream = utf8encoder.encode(restreamMatch[1]);
+    const restreamLen = new ArrayBuffer(8);
+    new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
+    const runner = utf8encoder.encode(restreamMatch[2]);
+    const runnerLen = new ArrayBuffer(8);
+    new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
+    const buf = new ArrayBuffer(3);
+    const bufView = new DataView(buf);
+    bufView.setUint8(0, restreamLayoutID(restreamMatch[3]));
+    bufView.setUint8(1, cellID);
+    bufView.setUint8(2, right ? 1 : 0);
+    sock.send(new Blob([clickRestream, restreamLen, restream, runnerLen, runner, buf]));
+}
+
 function updateCell(cellID, data, offset) {
     const view = new DataView(data);
     const elt = document.getElementById('cell' + cellID); //TODO modify element
@@ -74,14 +113,13 @@ function updateCell(cellID, data, offset) {
         default:
             throw 'unexpected CellOverlay variant';
     }
+    if (elt.hasAttribute('href')) {
+        elt.addEventListener('click', function(event) { event.preventDefault(); sendClick(cellID, false); return false; }, false);
+        elt.addEventListener('contextmenu', function(event) { event.preventDefault(); sendClick(cellID, true); return false; }, false);
+        elt.removeAttribute('href');
+    }
     return offset;
 }
-
-const sock = new WebSocket("wss://oottracker.fenhl.net/websocket");
-const utf8decoder = new TextDecoder();
-const utf8encoder = new TextEncoder();
-
-sock.binaryType = "arraybuffer";
 
 sock.addEventListener('open', function(event) {
     const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
@@ -95,25 +133,8 @@ sock.addEventListener('open', function(event) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        let layout;
-        switch (restreamMatch[3]) {
-            case 'default':
-                layout = 0;
-                break;
-            case 'mw-expanded':
-                layout = 1;
-                break;
-            case 'mw-collapsed':
-                layout = 2;
-                break;
-            case 'mw-edit':
-                layout = 3;
-                break;
-            default:
-                throw 'unknown layout';
-        }
         const layoutBuf = new ArrayBuffer(1);
-        new DataView(layoutBuf).setUint8(0, layout);
+        new DataView(layoutBuf).setUint8(0, restreamLayoutID(restreamMatch[3]));
         sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, layoutBuf]));
     } else if (restreamDoubleMatch) {
         const doubleSubscription = new ArrayBuffer(1);
