@@ -48,12 +48,6 @@ pub struct ModelState {
 }
 
 impl ModelState {
-    //TODO the 4 methods below are left over from no longer necessary ModelStateView trait, should probably be deleted in favor of just using the fields directly again
-    #[inline] pub fn knowledge(&self) -> &Knowledge { &self.knowledge }
-    #[inline] pub fn knowledge_mut(&mut self) -> &mut Knowledge { &mut self.knowledge }
-    #[inline] pub fn ram(&self) -> &Ram { &self.ram }
-    #[inline] pub fn ram_mut(&mut self) -> &mut Ram { &mut self.ram }
-
     pub fn update_knowledge(&mut self) {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
         if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {

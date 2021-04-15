@@ -134,11 +134,11 @@ impl TrackerCellKindExt for TrackerCellKind {
             Medallion(med) => CellRender {
                 img_dir: Cow::Borrowed("xopar-images"),
                 img_filename: Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
-                style: if state.ram().save.quest_items.has(*med) { CellStyle::Normal } else { CellStyle::Dimmed },
+                style: if state.ram.save.quest_items.has(*med) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
             },
             MedallionLocation(med) => {
-                let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
+                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
                 CellRender {
                     img_dir: Cow::Borrowed("xopar-images"),
                     img_filename: Cow::Borrowed(match location {
@@ -205,7 +205,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                     QuestItems::PRELUDE_OF_LIGHT => "prelude",
                     _ => unreachable!(),
                 }),
-                style: if state.ram().save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
+                style: if state.ram.save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
                     CellOverlay::Image {
                         overlay_dir: Cow::Borrowed("xopar-overlays"),
@@ -222,11 +222,11 @@ impl TrackerCellKindExt for TrackerCellKind {
                     Stone::GoronRuby => "goron_ruby",
                     Stone::ZoraSapphire => "zora_sapphire",
                 }),
-                style: if state.ram().save.quest_items.has(*stone) { CellStyle::Normal } else { CellStyle::Dimmed },
+                style: if state.ram.save.quest_items.has(*stone) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
             },
             StoneLocation(stone) => {
-                let location = state.knowledge().dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
+                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
                 CellRender {
                     img_dir: Cow::Borrowed("xopar-images"),
                     img_filename: Cow::Borrowed(match location {
@@ -261,12 +261,12 @@ impl TrackerCellKindExt for TrackerCellKind {
                 let current = get(state);
                 if current == *max { set(state, 0) } else { set(state, current + 1) }
             }
-            Medallion(med) => state.ram_mut().save.quest_items.toggle(QuestItems::from(med)),
-            MedallionLocation(med) => state.knowledge_mut().dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
+            Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
+            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
             Sequence { increment, .. } => increment(state),
-            Song { song: quest_item, .. } => state.ram_mut().save.quest_items.toggle(*quest_item),
-            Stone(stone) => state.ram_mut().save.quest_items.toggle(QuestItems::from(stone)),
-            StoneLocation(stone) => state.knowledge_mut().dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
+            Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
+            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
             BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }

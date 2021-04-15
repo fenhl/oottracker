@@ -207,13 +207,13 @@ pub(crate) fn render_double_cell(runner1: &ModelState, runner2: &ModelState, rew
         DungeonReward::Stone(Stone::GoronRuby) => Cow::Borrowed("goron_ruby"),
         DungeonReward::Stone(Stone::ZoraSapphire) => Cow::Borrowed("zora_sapphire"),
     };
-    let style = match (runner1.ram().save.quest_items.has(reward), runner2.ram().save.quest_items.has(reward)) {
+    let style = match (runner1.ram.save.quest_items.has(reward), runner2.ram.save.quest_items.has(reward)) {
         (false, false) => CellStyle::Dimmed,
         (false, true) => CellStyle::LeftDimmed,
         (true, false) => CellStyle::RightDimmed,
         (true, true) => CellStyle::Normal,
     };
-    let location = (runner1.knowledge().clone() & runner2.knowledge().clone()).map(|knowledge| knowledge.dungeon_reward_locations.get(&reward).copied()).unwrap_or_default(); //TODO display contradiction errors differently?
+    let location = (runner1.knowledge.clone() & runner2.knowledge.clone()).map(|knowledge| knowledge.dungeon_reward_locations.get(&reward).copied()).unwrap_or_default(); //TODO display contradiction errors differently?
     let loc_img_filename = match location {
         None => "unknown_text",
         Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",

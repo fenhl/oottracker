@@ -41,65 +41,65 @@ pub trait CheckExt {
 impl<R: Rando> CheckExt for Check<R> {
     fn checked(&self, model: &ModelState) -> Option<bool> {
         // event and location lists from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
-        if let Some(checked) = model.ram().save.gold_skulltulas.checked(self) { return Some(checked) }
-        if let Some(checked) = model.ram().scene_flags().checked(self) { return Some(checked) }
-        if let Some(checked) = model.ram().save.event_chk_inf.checked(self) { return Some(checked) }
-        if let Some(checked) = model.ram().save.item_get_inf.checked(self) { return Some(checked) }
-        if let Some(checked) = model.ram().save.inf_table.checked(self) { return Some(checked) }
+        if let Some(checked) = model.ram.save.gold_skulltulas.checked(self) { return Some(checked) }
+        if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) }
+        if let Some(checked) = model.ram.save.event_chk_inf.checked(self) { return Some(checked) }
+        if let Some(checked) = model.ram.save.item_get_inf.checked(self) { return Some(checked) }
+        if let Some(checked) = model.ram.save.inf_table.checked(self) { return Some(checked) }
         match self {
             Check::AnonymousEvent(at_check, id) => match (&**at_check, id) {
                 (Check::Event(event), 0) if *event == "Deku Tree Clear" /*vanilla*/ => Some(
-                    model.ram().scene_flags().deku_tree.room_clear.contains(
+                    model.ram.scene_flags().deku_tree.room_clear.contains(
                         crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
                     )
                 ),
                 (Check::Exit { from_mq: None, from, to }, 0) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
-                    model.ram().scene_flags().death_mountain.switches.contains(
+                    model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_FIRST_BOULDER
                         | crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_SECOND_BOULDER
                     )
                 ),
                 (Check::Exit { from_mq: None, from, to }, 1) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
-                    model.ram().scene_flags().death_mountain.switches.contains(
+                    model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::BLOW_UP_DC_ENTRANCE
                         | crate::scene::DeathMountainSwitches::PLANT_BEAN
                     )
                 ),
                 (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 0) if *from == "Deku Tree Lobby" && *to == "Deku Tree Basement Backroom" => Some(
-                    model.ram().scene_flags().deku_tree.switches.contains(
+                    model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_BURN_FIRST_WEB_TO_BACK_ROOM
                         | crate::scene::DekuTreeSwitches::LIGHT_TORCHES_AFTER_WATER_ROOM
                     )
                 ),
                 (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 2) if *from == "Deku Tree Lobby" && *to == "Deku Tree Basement Backroom" => Some(
-                    model.ram().scene_flags().deku_tree.switches.contains(
+                    model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
                 ),
                 (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 1) if *from == "Deku Tree Lobby" && *to == "Deku Tree Boss Room" => Some(
-                    model.ram().scene_flags().deku_tree.switches.contains(
+                    model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
                 ),
                 (Check::Location(loc), 0) if *loc == "Deku Tree Queen Gohma Heart" => Some(
-                    model.ram().scene_flags().deku_tree.room_clear.contains(
+                    model.ram.scene_flags().deku_tree.room_clear.contains(
                         crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
                     )
                 ),
                 (Check::Location(loc), 0) if *loc == "Queen Gohma" => Some(
-                    model.ram().scene_flags().deku_tree.room_clear.contains(
+                    model.ram.scene_flags().deku_tree.room_clear.contains(
                         crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
                     )
                 ),
                 // the anonymous event for this skulltula is really just collecting it from a different region with different item requirements
                 (Check::Location(loc), 0) if *loc == "Forest Temple GS Level Island Courtyard" => Some(
-                    model.ram().save.gold_skulltulas.forest_temple.contains(
+                    model.ram.save.gold_skulltulas.forest_temple.contains(
                         crate::scene::ForestTempleGoldSkulltulas::FOREST_TEMPLE_GS_LEVEL_ISLAND_COURTYARD
                     )
                 ),
                 // the anonymous events for this chest are really just opening it from different regions with different item requirements
                 (Check::Location(loc), 0) | (Check::Location(loc), 1) if *loc == "Forest Temple Raised Island Courtyard Chest" => Some(
-                    model.ram().scene_flags().forest_temple.chests.contains(
+                    model.ram.scene_flags().forest_temple.chests.contains(
                         crate::scene::ForestTempleChests::FOREST_TEMPLE_RAISED_ISLAND_COURTYARD_CHEST
                     )
                 ),
@@ -116,7 +116,7 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Mask of Truth" => None, //TODO
                 "Drain Well" => None, //TODO
                 "GC Woods Warp Open" => Some(
-                    model.ram().scene_flags().goron_city.switches.intersects(
+                    model.ram.scene_flags().goron_city.switches.intersects(
                         crate::scene::GoronCitySwitches::LW_LEFT_BOULDER
                         | crate::scene::GoronCitySwitches::LW_MIDDLE_BOULDER
                         | crate::scene::GoronCitySwitches::LW_RIGHT_BOULDER
@@ -139,7 +139,7 @@ impl<R: Rando> CheckExt for Check<R> {
 
                 // Forest Temple
                 "Forest Temple Jo and Beth" => Some(
-                    model.ram().scene_flags().forest_temple.switches.contains(
+                    model.ram.scene_flags().forest_temple.switches.contains(
                         crate::scene::ForestTempleSwitches::JOELLE_DEFEATED
                         | crate::scene::ForestTempleSwitches::BETH_DEFEATED
                     )
@@ -152,13 +152,13 @@ impl<R: Rando> CheckExt for Check<R> {
 
                 _ => panic!("unknown event name: {}", event),
             },
-            Check::Exit { from, to, .. } => Some(model.knowledge().get_exit(from.as_ref(), to.as_ref()).is_some()),
+            Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from.as_ref(), to.as_ref()).is_some()),
             Check::Location(loc) => match &loc[..] {
-                "LH Child Fishing" => Some(model.ram().save.fishing_context.contains(crate::save::FishingContext::CHILD_PRIZE_OBTAINED)),
-                "LH Adult Fishing" => Some(model.ram().save.fishing_context.contains(crate::save::FishingContext::ADULT_PRIZE_OBTAINED)),
+                "LH Child Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::CHILD_PRIZE_OBTAINED)),
+                "LH Adult Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::ADULT_PRIZE_OBTAINED)),
                 "Market Bombchu Bowling Bombchus" => None, // repeatable check
                 "ZR Magic Bean Salesman" => None, //TODO make sure this is handled correctly both with and without bean shuffle
-                "DMT Biggoron" => Some(model.ram().save.dmt_biggoron_checked),
+                "DMT Biggoron" => Some(model.ram.save.dmt_biggoron_checked),
                 "Market 10 Big Poes" => None, //TODO figure out how to read point target count from ROM, or read it from the text box
                 "Wasteland Bombchu Salesman" => None, //TODO make sure this is handled correctly both with and without medi/carp shuffle (and according to knowledge)
                 "GC Medigoron" => None, //TODO make sure this is handled correctly both with and without medi/carp shuffle (and according to knowledge)
