@@ -170,10 +170,12 @@ sock.addEventListener('message', function(event) {
             for (let cellID = 0; cellID < numCells; cellID++) {
                 offset = updateCell(cellID, data, offset);
             }
+            break;
         case 3:
             // Update
             const cellID = view.getUint8(offset++);
             updateCell(cellID, data, offset);
+            break;
         default:
             throw 'unexpected ServerMessage variant';
     }
