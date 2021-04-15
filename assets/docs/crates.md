@@ -10,3 +10,4 @@ A brief description of each crate in this repo and its purpose:
 * `oottracker-derive` contains proc macros for the `oottracker` crate.
 * `oottracker-gui` is a cross-platform graphical frontend for the tracker written using `iced`.
 * `oottracker-utils` contains debugging and release scripts for the project.
+* `oottracker-web` is a web frontend for the tracker with support for networked tracking, live at <https://oottracker.fenhl.net/>.

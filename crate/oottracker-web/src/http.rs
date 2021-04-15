@@ -15,7 +15,7 @@ use {
         crate_relative,
     },
     oottracker::{
-        ModelStateView,
+        ModelState,
         ui::TrackerCellId,
     },
     crate::{
@@ -31,11 +31,11 @@ use {
 };
 
 trait TrackerCellIdExt {
-    fn view(&self, room_name: &str, cell_id: u8, state: &dyn ModelStateView, colspan: u8, loc: bool) -> String;
+    fn view(&self, room_name: &str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> String;
 }
 
 impl TrackerCellIdExt for TrackerCellId {
-    fn view(&self, room_name: &str, cell_id: u8, state: &dyn ModelStateView, colspan: u8, loc: bool) -> String {
+    fn view(&self, room_name: &str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> String {
         let kind = self.kind();
         let content = kind.render(state);
         let css_classes = if loc { format!("cols{} loc", colspan) } else { format!("cols{}", colspan) };
@@ -76,8 +76,8 @@ fn index() -> Html<String> {
 #[rocket::get("/restream/<restreamer>/<runner>")]
 async fn restream_room_input(restreams: State<'_, Restreams>, restreamer: String, runner: String) -> Option<Html<String>> {
     let html_layout = {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer)?;
+        let restreams = restreams.read().await;
+        let restream = restreams.get(&restreamer)?;
         let layout = restream.layout();
         let (_, _, model_state_view) = restream.runner(&runner)?;
         let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
@@ -92,8 +92,8 @@ async fn restream_room_input(restreams: State<'_, Restreams>, restreamer: String
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>")]
 async fn restream_room_view(restreams: State<'_, Restreams>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Html<String>> {
     let html_layout = {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer)?;
+        let restreams = restreams.read().await;
+        let restream = restreams.get(&restreamer)?;
         let (_, _, model_state_view) = restream.runner(&runner)?;
         let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
         layout.cells()
@@ -107,10 +107,10 @@ async fn restream_room_view(restreams: State<'_, Restreams>, restreamer: String,
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>/click/<cell_id>")]
 async fn restream_click(restreams: State<'_, Restreams>, restreamer: String, runner: String, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
     {
-        let mut restreams = restreams.lock().await;
+        let mut restreams = restreams.write().await;
         let restream = restreams.get_mut(&restreamer).ok_or(NotFound("No such restream"))?;
-        let (tx, _, mut model_state_view) = restream.runner(&runner).ok_or(NotFound("No such runner"))?;
-        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(&mut model_state_view);
+        let (tx, _, model_state_view) = restream.runner_mut(&runner).ok_or(NotFound("No such runner"))?;
+        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(model_state_view);
         tx.send(()).expect("failed to notify websockets about state change");
     }
     Ok(Redirect::to(rocket::uri!(restream_room_view: restreamer, runner, layout)))
@@ -119,11 +119,11 @@ async fn restream_click(restreams: State<'_, Restreams>, restreamer: String, run
 #[rocket::get("/restream/<restreamer>/<runner1>/<layout>/with/<runner2>")]
 async fn restream_double_room_layout(restreams: State<'_, Restreams>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Html<String>> {
     let html_layout = {
-        let mut restreams = restreams.lock().await;
-        let restream = restreams.get_mut(&restreamer)?;
+        let restreams = restreams.read().await;
+        let restream = restreams.get(&restreamer)?;
         layout.cells()
             .into_iter()
-            .map(|reward| render_double_cell(restream, &runner1, &runner2, reward))
+            .map(|reward| Some(render_double_cell(restream.runner(&runner1)?.2, restream.runner(&runner2)?.2, reward)))
             .collect::<Option<Vec<_>>>()?
             .into_iter()
             .enumerate()

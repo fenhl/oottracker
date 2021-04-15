@@ -19,7 +19,10 @@ use {
         TryFutureExt as _,
     },
     structopt::StructOpt,
-    tokio::sync::Mutex,
+    tokio::sync::{
+        Mutex,
+        RwLock,
+    },
     warp::Filter as _,
     ootr::{
         check::Check,
@@ -31,10 +34,7 @@ use {
         },
     },
     oottracker::{
-        Knowledge,
         ModelState,
-        ModelStateView,
-        Ram,
         checks::CheckExt as _,
         save::QuestItems,
         ui::{
@@ -53,7 +53,7 @@ mod http;
 mod restream;
 mod websocket;
 
-type Restreams = Arc<Mutex<HashMap<String, RestreamState>>>;
+type Restreams = Arc<RwLock<HashMap<String, RestreamState>>>;
 type Rooms = Arc<Mutex<HashMap<String, ModelState>>>;
 
 #[derive(Clone, Copy, PartialEq, Eq, Protocol)]
@@ -105,12 +105,12 @@ impl CellRender {
 }
 
 trait TrackerCellKindExt {
-    fn render(&self, state: &dyn ModelStateView) -> CellRender;
-    fn click(&self, state: &mut dyn ModelStateView);
+    fn render(&self, state: &ModelState) -> CellRender;
+    fn click(&self, state: &mut ModelState);
 }
 
 impl TrackerCellKindExt for TrackerCellKind {
-    fn render(&self, state: &dyn ModelStateView) -> CellRender {
+    fn render(&self, state: &ModelState) -> CellRender {
         match self {
             Composite { left_img, right_img, both_img, active, .. } => {
                 let is_active = active(state);
@@ -249,7 +249,7 @@ impl TrackerCellKindExt for TrackerCellKind {
         }
     }
 
-    fn click(&self, state: &mut dyn ModelStateView) {
+    fn click(&self, state: &mut ModelState) {
         match self {
             Composite { active, toggle_left, toggle_right, .. } | Overlay { active, toggle_main: toggle_left, toggle_overlay: toggle_right, .. } => {
                 let (left, _) = active(state);
@@ -299,12 +299,12 @@ async fn main(Args {}: Args) -> Result<(), Error> {
         //TODO remove hardcoded restream, allow configuring active restreams somehow
         let mut map = HashMap::default();
         let multiworld_3v3 = vec![
-            (Knowledge::default(), vec![(format!("a1"), Ram::default()), (format!("b1"), Ram::default())].into_iter().collect()),
-            (Knowledge::default(), vec![(format!("a2"), Ram::default()), (format!("b2"), Ram::default())].into_iter().collect()),
-            (Knowledge::default(), vec![(format!("a3"), Ram::default()), (format!("b3"), Ram::default())].into_iter().collect()),
+            vec!["a1", "b1"],
+            vec!["a2", "b2"],
+            vec!["a3", "b3"],
         ];
         map.insert(format!("fenhl"), RestreamState::new(multiworld_3v3));
-        Restreams::new(Mutex::new(map))
+        Restreams::new(RwLock::new(map))
     };
     let websocket_task = {
         let rooms = Rooms::clone(&rooms);

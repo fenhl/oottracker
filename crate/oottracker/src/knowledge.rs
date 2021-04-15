@@ -6,6 +6,7 @@ use {
         },
         future::Future,
         io::prelude::*,
+        ops::BitAnd,
         pin::Pin,
     },
     async_proto::{
@@ -170,6 +171,156 @@ impl Knowledge {
 
     pub fn get_exit<'a>(&'a self, from: &str, to: &'a str) -> Option<&'a str> {
         self.exits.as_ref().map_or(Some(to), |exits| exits.get(from).and_then(|region_exits| region_exits.get(to)).map(String::as_ref))
+    }
+}
+
+pub enum Contradiction {
+    BoolSetting {
+        name: String,
+        lhs_enabled: bool,
+    },
+    StringSetting {
+        name: String,
+        lhs_values: HashSet<String>,
+        rhs_values: HashSet<String>,
+    },
+    Trick {
+        name: String,
+        lhs_enabled: bool,
+    },
+    Mq {
+        dungeon: Dungeon,
+        lhs_mq: Mq,
+    },
+    Trial {
+        trial: Medallion,
+        lhs_active: bool,
+    },
+    DungeonRewardLocation {
+        reward: DungeonReward,
+        lhs_location: DungeonRewardLocation,
+        rhs_location: DungeonRewardLocation,
+    },
+}
+
+impl BitAnd for Knowledge {
+    type Output = Result<Knowledge, Contradiction>;
+
+    fn bitand(self, rhs: Knowledge) -> Result<Knowledge, Contradiction> {
+        let Knowledge { bool_settings, string_settings, tricks, mq, active_trials, dungeon_reward_locations, exits: _ /*TODO*/, progression_mode: _ /*TODO*/ } = self;
+        Ok(Knowledge {
+            bool_settings: {
+                let mut bool_settings = bool_settings;
+                for (name, rhs_enabled) in rhs.bool_settings {
+                    if let Some(&lhs_enabled) = bool_settings.get(&name) {
+                        if lhs_enabled != rhs_enabled {
+                            return Err(Contradiction::BoolSetting { name, lhs_enabled })
+                        }
+                    } else {
+                        bool_settings.insert(name, rhs_enabled);
+                    }
+                }
+                bool_settings
+            },
+            string_settings: {
+                let mut string_settings = string_settings;
+                for (name, rhs_values) in rhs.string_settings {
+                    if let Some(lhs_values) = string_settings.get(&name) {
+                        let values = lhs_values & &rhs_values;
+                        if values.is_empty() {
+                            return Err(Contradiction::StringSetting {
+                                name, rhs_values,
+                                lhs_values: lhs_values.clone(),
+                            })
+                        }
+                        string_settings.insert(name, values);
+                    } else {
+                        string_settings.insert(name, rhs_values);
+                    }
+                }
+                string_settings
+            },
+            tricks: if let Some(mut tricks) = tricks {
+                if let Some(rhs_tricks) = rhs.tricks {
+                    for (name, rhs_enabled) in rhs_tricks {
+                        if let Some(&lhs_enabled) = tricks.get(&name) {
+                            if lhs_enabled != rhs_enabled {
+                                return Err(Contradiction::Trick { name, lhs_enabled })
+                            }
+                        } else {
+                            tricks.insert(name, rhs_enabled);
+                        }
+                    }
+                    Some(tricks)
+                } else {
+                    // rhs vanilla
+                    if let Some((lhs_trick, _)) = tricks.iter().find(|&(_, &enabled)| enabled) {
+                        return Err(Contradiction::Trick {
+                            name: lhs_trick.clone(),
+                            lhs_enabled: true,
+                        })
+                    } else {
+                        None
+                    }
+                }
+            } else {
+                // lhs vanilla
+                if let Some(rhs_tricks) = rhs.tricks {
+                    if let Some((rhs_trick, _)) = rhs_tricks.iter().find(|&(_, &enabled)| enabled) {
+                        return Err(Contradiction::Trick {
+                            name: rhs_trick.clone(),
+                            lhs_enabled: false,
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    // rhs vanilla
+                    None
+                }
+            },
+            mq: {
+                let mut mq = mq;
+                for (dungeon, rhs_mq) in rhs.mq {
+                    if let Some(&lhs_mq) = mq.get(&dungeon) {
+                        if lhs_mq != rhs_mq {
+                            return Err(Contradiction::Mq { dungeon, lhs_mq })
+                        }
+                    } else {
+                        mq.insert(dungeon, rhs_mq);
+                    }
+                }
+                mq
+            },
+            active_trials: {
+                let mut active_trials = active_trials;
+                for (trial, rhs_active) in rhs.active_trials {
+                    if let Some(&lhs_active) = active_trials.get(&trial) {
+                        if lhs_active != rhs_active {
+                            return Err(Contradiction::Trial { trial, lhs_active })
+                        }
+                    } else {
+                        active_trials.insert(trial, rhs_active);
+                    }
+                }
+                active_trials
+            },
+            dungeon_reward_locations: {
+                let mut dungeon_reward_locations = dungeon_reward_locations;
+                for (reward, rhs_location) in rhs.dungeon_reward_locations {
+                    if let Some(&lhs_location) = dungeon_reward_locations.get(&reward) {
+                        if lhs_location != rhs_location {
+                            return Err(Contradiction::DungeonRewardLocation { reward, lhs_location, rhs_location })
+                        }
+                    } else {
+                        dungeon_reward_locations.insert(reward, rhs_location);
+                    }
+                }
+                dungeon_reward_locations
+            },
+            exits: None, //TODO
+            progression_mode: ProgressionMode::Normal, //TODO this should actually be recalculated from the rest of the knowledge, use a dummy value for now
+        })
     }
 }
 

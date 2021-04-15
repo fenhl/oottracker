@@ -26,7 +26,6 @@ use {
     crate::{
         Check,
         ModelState,
-        ModelStateView,
         region::{
             RegionExt as _,
             RegionLookup,
@@ -36,11 +35,11 @@ use {
 };
 
 pub trait CheckExt {
-    fn checked(&self, model: &(impl ModelStateView + ?Sized)) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
+    fn checked(&self, model: &ModelState) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
 }
 
 impl<R: Rando> CheckExt for Check<R> {
-    fn checked(&self, model: &(impl ModelStateView + ?Sized)) -> Option<bool> {
+    fn checked(&self, model: &ModelState) -> Option<bool> {
         // event and location lists from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
         if let Some(checked) = model.ram().save.gold_skulltulas.checked(self) { return Some(checked) }
         if let Some(checked) = model.ram().scene_flags().checked(self) { return Some(checked) }
