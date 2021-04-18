@@ -8,6 +8,10 @@ body {
     font-family: 'DejaVu Sans', sans-serif;
 }
 
+a {
+    color: #6600ff;
+}
+
 .items {
     display: grid;
     gap: 10px;
@@ -128,5 +132,9 @@ footer {
     body {
         background-color: black;
         color: #bbb;
+    }
+
+    a {
+        color: #00bb44;
     }
 }
