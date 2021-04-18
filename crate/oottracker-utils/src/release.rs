@@ -43,7 +43,7 @@ use {
 #[cfg(windows)] mod github;
 #[cfg(windows)] mod version;
 
-const MACOS_ADDR: &str = "192.168.178.63";
+#[cfg(windows)] const MACOS_ADDR: &str = "192.168.178.63";
 
 #[derive(Debug, From)]
 enum Error {
@@ -234,7 +234,7 @@ struct Args {
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
     eprintln!("building oottracker-mac.app for x86_64");
-    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").env("MACOSX_DEPLOYMENT_TARGET", "10.9").check("cargo", args.verbose).await?;
     eprintln!("building oottracker-mac.app for aarch64");
     Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
     eprintln!("creating Universal macOS binary");
