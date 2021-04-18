@@ -59,6 +59,9 @@ fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
                 <div class="items {}">
                     {}
                 </div>
+                <noscript>
+                    <p>live update disabled (requires JavaScript)</p>
+                </noscript>
                 <footer>
                     <a href="https://fenhl.net/disc">disclaimer / Impressum</a>
                 </footer>

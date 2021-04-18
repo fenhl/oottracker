@@ -1,5 +1,7 @@
 #!/bin/zsh
 
+# macOS portion of the release flow, called by the Windows version of oottracker-release
+
 verbose=
 quiet=--quiet
 quiet_verbose=--quiet
