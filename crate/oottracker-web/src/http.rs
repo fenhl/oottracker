@@ -141,7 +141,7 @@ async fn room(rooms: State<'_, Rooms>, name: String) -> Html<String> {
         let layout = TrackerLayout::default();
         layout.cells()
             .enumerate()
-            .map(|(cell_id, (cell, colspan, loc))| cell.view(&name, cell_id.try_into().expect("too many cells"), room, colspan, loc))
+            .map(|(cell_id, (cell, colspan, loc))| cell.view(&name, cell_id.try_into().expect("too many cells"), &room.model, colspan, loc))
             .join("\n")
     };
     tracker_page("default", html_layout)
@@ -153,7 +153,7 @@ async fn click(rooms: State<'_, Rooms>, name: String, cell_id: u8) -> Result<Red
         let mut rooms = rooms.lock().await;
         let room = rooms.entry(name.clone()).or_default();
         let layout = TrackerLayout::default();
-        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(room);
+        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(&mut room.model);
     }
     Ok(Redirect::to(rocket::uri!(room: name)))
 }

@@ -22,6 +22,7 @@ use {
     tokio::sync::{
         Mutex,
         RwLock,
+        watch::*,
     },
     warp::Filter as _,
     ootr::{
@@ -54,7 +55,23 @@ mod restream;
 mod websocket;
 
 type Restreams = Arc<RwLock<HashMap<String, RestreamState>>>;
-type Rooms = Arc<Mutex<HashMap<String, ModelState>>>;
+type Rooms = Arc<Mutex<HashMap<String, RoomState>>>;
+
+struct RoomState {
+    tx: Sender<()>,
+    rx: Receiver<()>,
+    model: ModelState,
+}
+
+impl Default for RoomState {
+    fn default() -> RoomState {
+        let (tx, rx) = channel(());
+        RoomState {
+            tx, rx,
+            model: ModelState::default(),
+        }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Protocol)]
 enum CellStyle {

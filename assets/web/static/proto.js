@@ -20,21 +20,36 @@ function restreamLayoutID(layoutString) {
 }
 
 function sendClick(cellID, right) {
+    const roomMatch = window.location.pathname.match(/^\/room\/([0-9A-Za-z-]+)\/?$/);
     const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
-    const clickRestream = new ArrayBuffer(1);
-    new DataView(clickRestream).setUint8(0, 3); // ClientMessage variant: ClickRestream
-    const restream = utf8encoder.encode(restreamMatch[1]);
-    const restreamLen = new ArrayBuffer(8);
-    new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
-    const runner = utf8encoder.encode(restreamMatch[2]);
-    const runnerLen = new ArrayBuffer(8);
-    new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
     const buf = new ArrayBuffer(3);
     const bufView = new DataView(buf);
-    bufView.setUint8(0, restreamLayoutID(restreamMatch[3]));
-    bufView.setUint8(1, cellID);
-    bufView.setUint8(2, right ? 1 : 0);
-    sock.send(new Blob([clickRestream, restreamLen, restream, runnerLen, runner, buf]));
+    if (roomMatch) {
+        const clickRoom = new ArrayBuffer(1);
+        new DataView(clickRoom).setUint8(0, 5); // ClientMessage variant: ClickRoom
+        const room = utf8encoder.encode(roomMatch[1]);
+        const roomLen = new ArrayBuffer(8);
+        new DataView(roomLen).setBigUint64(0, BigInt(room.length));
+        bufView.setUint8(0, 0); // TrackerLayout variant: Default
+        bufView.setUint8(1, cellID);
+        bufView.setUint8(2, right ? 1 : 0);
+        sock.send(new Blob([clickRoom, roomLen, room, buf]));
+    } else if (restreamMatch) {
+        const clickRestream = new ArrayBuffer(1);
+        new DataView(clickRestream).setUint8(0, 3); // ClientMessage variant: ClickRestream
+        const restream = utf8encoder.encode(restreamMatch[1]);
+        const restreamLen = new ArrayBuffer(8);
+        new DataView(restreamLen).setBigUint64(0, BigInt(restream.length));
+        const runner = utf8encoder.encode(restreamMatch[2]);
+        const runnerLen = new ArrayBuffer(8);
+        new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
+        bufView.setUint8(0, restreamLayoutID(restreamMatch[3]));
+        bufView.setUint8(1, cellID);
+        bufView.setUint8(2, right ? 1 : 0);
+        sock.send(new Blob([clickRestream, restreamLen, restream, runnerLen, runner, buf]));
+    } else {
+        throw 'unknown tracker type';
+    }
 }
 
 function updateCell(cellID, data, offset) {
@@ -122,9 +137,19 @@ function updateCell(cellID, data, offset) {
 }
 
 sock.addEventListener('open', function(event) {
+    const roomMatch = window.location.pathname.match(/^\/room\/([0-9A-Za-z-]+)\/?$/);
     const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
     const restreamDoubleMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/with\/([0-9A-Za-z-]+)\/?$/);
-    if (restreamMatch) {
+    if (roomMatch) {
+        const roomSubscription = new ArrayBuffer(1);
+        new DataView(roomSubscription).setUint8(0, 4); // ClientMessage variant: SubscribeRoom
+        const room = utf8encoder.encode(roomMatch[1]);
+        const roomLen = new ArrayBuffer(8);
+        new DataView(roomLen).setBigUint64(0, BigInt(room.length));
+        const roomLayoutBuf = new ArrayBuffer(1);
+        new DataView(roomLayoutBuf).setUint8(0, 0); // TrackerLayout variant: Default
+        sock.send(new Blob([roomSubscription, roomLen, room, roomLayoutBuf]));
+    } else if (restreamMatch) {
         const restreamSubscription = new ArrayBuffer(1);
         new DataView(restreamSubscription).setUint8(0, 1); // ClientMessage variant: SubscribeRestream
         const restream = utf8encoder.encode(restreamMatch[1]);
@@ -133,9 +158,9 @@ sock.addEventListener('open', function(event) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        const layoutBuf = new ArrayBuffer(1);
-        new DataView(layoutBuf).setUint8(0, restreamLayoutID(restreamMatch[3]));
-        sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, layoutBuf]));
+        const restreamLayoutBuf = new ArrayBuffer(1);
+        new DataView(restreamLayoutBuf).setUint8(0, restreamLayoutID(restreamMatch[3]));
+        sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, restreamLayoutBuf]));
     } else if (restreamDoubleMatch) {
         const doubleSubscription = new ArrayBuffer(1);
         new DataView(doubleSubscription).setUint8(0, 2); // ClientMessage variant: SubscribeDoubleRestream

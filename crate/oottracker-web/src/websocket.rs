@@ -83,9 +83,19 @@ enum ClientMessage {
         cell_id: u8,
         right: bool,
     },
+    SubscribeRoom {
+        room: String,
+        layout: TrackerLayout,
+    },
+    ClickRoom {
+        room: String,
+        layout: TrackerLayout,
+        cell_id: u8,
+        right: bool,
+    },
 }
 
-async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
+async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
     let ping_sink = WsSink::clone(&sink);
     tokio::spawn(async move {
         loop {
@@ -248,7 +258,51 @@ async fn client_session(_ /*rooms*/: Rooms, restreams: Restreams, mut stream: im
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
-            //TODO allow subscriptions & clicks for regular rooms
+            ClientMessage::SubscribeRoom { room, layout } => {
+                let rooms = Rooms::clone(&rooms);
+                let sink = WsSink::clone(&sink);
+                tokio::spawn(async move {
+                    let (mut old_cells, mut rx) = {
+                        let mut rooms = rooms.lock().await;
+                        let room = rooms.entry(room.clone()).or_default();
+                        let cells = layout.cells()
+                            .map(|(cell, _, _)| cell.kind().render(&room.model))
+                            .collect::<Vec<_>>();
+                        if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                        (cells, room.rx.clone())
+                    };
+                    while let Ok(()) = rx.changed().await { //TODO better error handling
+                        let new_cells = {
+                            let mut rooms = rooms.lock().await;
+                            let room = rooms.entry(room.clone()).or_default();
+                            layout.cells().map(|(cell, _, _)| cell.kind().render(&room.model)).collect::<Vec<_>>()
+                        };
+                        for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
+                            if old_cell != new_cell {
+                                if (ServerMessage::Update { cell_id: i.try_into().expect("too many cells"), new_cell: new_cell.clone() }).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                            }
+                        }
+                        old_cells = new_cells;
+                    }
+                });
+            }
+            ClientMessage::ClickRoom { room, layout, cell_id, right } => {
+                let mut rooms = rooms.lock().await;
+                let room = rooms.entry(room.clone()).or_default();
+                let cell = match layout.cells().nth(cell_id.into()) {
+                    Some((cell, _, _)) => cell,
+                    None => {
+                        let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                if right {
+                    cell.kind().right_click(&mut room.model);
+                } else {
+                    cell.kind().left_click(&mut room.model);
+                }
+                room.tx.send(()).expect("failed to notify websockets about state change");
+            }
         }
     }
 }
