@@ -158,7 +158,7 @@ async fn click(rooms: State<'_, Rooms>, name: String, cell_id: u8) -> Result<Red
     Ok(Redirect::to(rocket::uri!(room: name)))
 }
 
-pub(crate) fn rocket(rooms: Rooms, restreams: Restreams) -> Rocket {
+pub(crate) fn rocket(rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build> {
     rocket::custom(rocket::Config {
         port: 24807,
         //TODO configure secret_key for release mode
