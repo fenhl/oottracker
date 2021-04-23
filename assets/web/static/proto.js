@@ -121,6 +121,14 @@ function updateCell(cellID, data, offset) {
             break;
         case 3:
             // Location
+            const locDirLen = Number(view.getBigUint64(offset));
+            offset += 8;
+            const locDir = utf8decoder.decode(data.slice(offset, offset + locDirLen));
+            offset += locDirLen;
+            const locImgLen = Number(view.getBigUint64(offset));
+            offset += 8;
+            const locImg = utf8decoder.decode(data.slice(offset, offset + locImgLen));
+            offset += locImgLen;
             let locStyle;
             switch (view.getUint8(offset++)) { // style
                 case 0:
@@ -138,13 +146,9 @@ function updateCell(cellID, data, offset) {
                 default:
                     throw 'unexpected LocationStyle variant';
             }
-            const locImgLen = Number(view.getBigUint64(offset));
-            offset += 8;
-            const locImg = utf8decoder.decode(data.slice(offset, offset + locImgLen));
-            offset += locImgLen;
             let locOverlay = document.createElement('img');
             locOverlay.setAttribute('class', locStyle);
-            locOverlay.setAttribute('src', '/static/img/xopar-images/' + locImg + '.png');
+            locOverlay.setAttribute('src', '/static/img/' + locDir + '/' + locImg + '.png');
             elt.append(locOverlay);
             break;
         default:

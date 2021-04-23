@@ -95,8 +95,9 @@ enum CellOverlay {
         overlay_img: Cow<'static, str>,
     },
     Location {
-        style: LocationStyle,
+        loc_dir: Cow<'static, str>,
         loc_img: Cow<'static, str>,
+        style: LocationStyle,
     },
 }
 
@@ -131,11 +132,11 @@ impl CellRender {
                 CellOverlay::None => String::default(),
                 CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
                 CellOverlay::Image { ref overlay_dir, ref overlay_img } => format!(r#"<img src="/static/img/{}/{}.png" />"#, overlay_dir, overlay_img),
-                CellOverlay::Location { style, ref loc_img } => format!(r#"<img class="{}" src="/static/img/xopar-images/{}.png" />"#, match style {
+                CellOverlay::Location { ref loc_dir, ref loc_img, style } => format!(r#"<img class="{}" src="/static/img/{}/{}.png" />"#, match style {
                     LocationStyle::Normal => "loc",
                     LocationStyle::Dimmed => "loc dimmed",
                     LocationStyle::Mq => "loc mq",
-                }, loc_img),
+                }, loc_dir, loc_img),
             },
         )
     }
@@ -194,8 +195,9 @@ impl TrackerCellKindExt for TrackerCellKind {
                     img_filename: Cow::Borrowed("blank"),
                     style: CellStyle::Normal,
                     overlay: CellOverlay::Location {
+                        loc_dir: Cow::Borrowed("extra-images"),
+                        loc_img: Cow::Borrowed("fort_text"),
                         style: if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |values| values.iter().eq(iter::once("normal"))) { LocationStyle::Mq } else { LocationStyle::Normal }, //TODO dim if unknown?
-                        loc_img: Cow::Borrowed("fort_text"), //TODO specify as extra-image
                     },
                 }
             }
@@ -213,8 +215,12 @@ impl TrackerCellKindExt for TrackerCellKind {
                         Some(DungeonReward::Stone(Stone::ZoraSapphire)) => Cow::Borrowed("zora_sapphire"),
                         None => Cow::Borrowed("blank"), //TODO “unknown dungeon reward” image?
                     },
-                    style: if reward.is_some() { CellStyle::Normal } else { CellStyle::Dimmed },
-                    overlay: CellOverlay::Location { style: LocationStyle::Normal, loc_img: Cow::Borrowed("free_text") },
+                    style: CellStyle::Normal,
+                    overlay: CellOverlay::Location {
+                        loc_dir: Cow::Borrowed("xopar-images"),
+                        loc_img: Cow::Borrowed("free_text"),
+                        style: LocationStyle::Normal,
+                    },
                 }
             }
             Medallion(med) => CellRender {
@@ -261,10 +267,9 @@ impl TrackerCellKindExt for TrackerCellKind {
                         Some(DungeonReward::Stone(Stone::ZoraSapphire)) => Cow::Borrowed("zora_sapphire"),
                         None => Cow::Borrowed("blank"), //TODO “unknown dungeon reward” image? (only for dungeons that have rewards)
                     },
-                    style: if reward.is_some() { CellStyle::Normal } else { CellStyle::Dimmed },
+                    style: if reward.map_or(false, |&reward| state.ram.save.quest_items.has(reward)) { CellStyle::Normal } else { CellStyle::Dimmed },
                     overlay: CellOverlay::Location {
-                        style: if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) { LocationStyle::Mq } else { LocationStyle::Normal },
-                        //img_dir: Cow::Borrowed(match dungeon { Dungeon::Main(_) => "xopar-images", _ => "extra-images" }),
+                        loc_dir: Cow::Borrowed(if let Dungeon::Main(_) = dungeon { "xopar-images" } else { "extra-images" }),
                         loc_img: Cow::Borrowed(match dungeon {
                             Dungeon::Main(MainDungeon::DekuTree) => "deku_text",
                             Dungeon::Main(MainDungeon::DodongosCavern) => "dc_text",
@@ -279,6 +284,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                             Dungeon::GerudoTrainingGrounds => "gtg_text",
                             Dungeon::GanonsCastle => "ganon_text",
                         }),
+                        style: if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) { LocationStyle::Mq } else { LocationStyle::Normal },
                     },
                 }
             }

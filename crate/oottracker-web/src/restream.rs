@@ -143,7 +143,7 @@ impl TrackerLayout {
                 .collect(),
             TrackerLayout::RslEdit => {
                 let mut cells = TrackerLayout::MultiworldEdit.cells();
-                cells[5].0 = GoMode; // unlike multiworld, RSL doesn't track BK mode
+                cells[23].0 = GoMode; // unlike multiworld, RSL doesn't track BK mode
                 cells.extend(vec![
                     ForestMq, FireMq, WaterMq, SpiritMq, ShadowMq, GanonMq,
                     ForestKeys, FireKeys, WaterKeys, SpiritKeys, ShadowKeys, GanonKeys,
@@ -269,8 +269,9 @@ pub(crate) fn render_double_cell(runner1: &ModelState, runner2: &ModelState, rew
         img_filename,
         style,
         overlay: CellOverlay::Location {
-            style: if location.is_some() { LocationStyle::Normal } else { LocationStyle::Dimmed },
+            loc_dir: Cow::Borrowed("xopar-images"),
             loc_img: Cow::Borrowed(loc_img_filename),
+            style: if location.is_some() { LocationStyle::Normal } else { LocationStyle::Dimmed },
         },
     }
 }
