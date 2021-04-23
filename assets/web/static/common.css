@@ -31,8 +31,15 @@ a {
 
 /* 6-column layouts */
 .items.default,
-.items.mw-edit {
+.items.mw-edit,
+.items.rsl-edit {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
+}
+
+/* 9-column layouts */
+.items.rsl-left,
+.items.rsl-right {
+    grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 
 /* 10-column layouts */
@@ -66,6 +73,11 @@ a {
 
 .right-dimmed {
     mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0.15) 50%);
+}
+
+.mq {
+    /* hack to recolor the white text images red */
+    filter: brightness(50%) sepia(100) saturate(100);
 }
 
 .cols2 {

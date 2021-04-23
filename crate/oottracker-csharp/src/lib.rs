@@ -269,7 +269,7 @@ pub fn version() -> Version {
             Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => format!("xopar_images.spirit_text"),
             Some(DungeonRewardLocation::LinksPocket) => format!("xopar_images.free_text"),
         },
-        TrackerCellKind::BossKey { .. } | TrackerCellKind::FortressMq | TrackerCellKind::Mq(_) | TrackerCellKind::SmallKeys { .. } | TrackerCellKind::SongCheck { .. } => unimplemented!(),
+        TrackerCellKind::BossKey { .. } | TrackerCellKind::CompositeKeys { .. } | TrackerCellKind::FortressMq | TrackerCellKind::FreeReward | TrackerCellKind::Mq(_) | TrackerCellKind::SmallKeys { .. } | TrackerCellKind::SongCheck { .. } => unimplemented!(),
     })
 }
 

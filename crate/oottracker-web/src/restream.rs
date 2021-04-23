@@ -31,6 +31,7 @@ use {
         CellOverlay,
         CellRender,
         CellStyle,
+        LocationStyle,
     },
 };
 
@@ -68,16 +69,19 @@ pub(crate) enum TrackerLayout {
     MultiworldExpanded,
     MultiworldCollapsed,
     MultiworldEdit,
+    RslLeft,
+    RslRight,
+    RslEdit,
 }
 
 impl TrackerLayout {
-    pub(crate) fn cells(&self) -> Box<dyn Iterator<Item = (TrackerCellId, u8, bool)> + Send> {
+    pub(crate) fn cells(&self) -> Vec<(TrackerCellId, u8, bool)> {
         use TrackerCellId::*;
 
         match self {
             TrackerLayout::Default => {
                 let layout = oottracker::ui::TrackerLayout::default();
-                Box::new(layout.meds.into_iter().map(|med| (TrackerCellId::med_location(med), 3, true))
+                layout.meds.into_iter().map(|med| (TrackerCellId::med_location(med), 3, true))
                     .chain(layout.meds.into_iter().map(|med| (TrackerCellId::from(med), 3, false)))
                     .chain(vec![
                         (layout.row2[0], 3, false),
@@ -94,33 +98,61 @@ impl TrackerLayout {
                     .chain(layout.rest.iter().flat_map(|row|
                         row.iter().map(|&cell| (cell, 3, false))
                     ).collect_vec())
-                    .chain(layout.warp_songs.into_iter().map(|med| (TrackerCellId::warp_song(med), 3, false))))
+                    .chain(layout.warp_songs.into_iter().map(|med| (TrackerCellId::warp_song(med), 3, false)))
+                    .collect()
             }
-            TrackerLayout::MultiworldExpanded => Box::new(vec![
-                KokiriSword, Slingshot, Skulltula, GoBk,
+            TrackerLayout::MultiworldExpanded => vec![
+                SwordCard, Slingshot, Skulltula, GoBk,
                 Bombs, Bow, ZeldasLullaby, Minuet,
                 Boomerang, Hammer, EponasSong, Bolero,
                 Hookshot, Spells, SariasSong, Serenade,
                 Bottle, Arrows, SunsSong, Requiem,
                 MirrorShield, Strength, SongOfTime, Nocturne,
                 Boots, Scale, SongOfStorms, Prelude,
-            ].into_iter().map(|cell| (cell, 3, false))),
-            TrackerLayout::MultiworldCollapsed => Box::new(vec![
-                KokiriSword, Bottle, Skulltula, Strength, Scale, Spells, Slingshot, Bombs, Boomerang, GoBk,
+            ].into_iter().map(|cell| (cell, 3, false)).collect(),
+            TrackerLayout::MultiworldCollapsed => vec![
+                SwordCard, Bottle, Skulltula, Strength, Scale, Spells, Slingshot, Bombs, Boomerang, GoBk,
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms, Hookshot, Bow, Hammer, Magic,
                 Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude, MirrorShield, Boots, Arrows, Tunics, //TODO replace tunics with wallets once images exist
-            ].into_iter().map(|cell| (cell, 3, false))),
-            TrackerLayout::MultiworldEdit => Box::new(vec![
+            ].into_iter().map(|cell| (cell, 3, false)).collect(),
+            TrackerLayout::MultiworldEdit => vec![
                 KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, LightMedallionLocation, ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation,
             ].into_iter().map(|cell| (cell, 2, true)).chain(vec![
                 KokiriEmerald, GoronRuby, ZoraSapphire, LightMedallion, ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion,
             ].into_iter().map(|cell| (cell, 2, false))).chain(vec![
-                KokiriSword, Bottle, Skulltula, Scale, Tunics, GoBk, //TODO replace tunics with wallets once images exist
+                SwordCard, Bottle, Skulltula, Scale, Tunics, GoBk, //TODO replace tunics with wallets once images exist
                 Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
                 Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
                 Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude,
-            ].into_iter().map(|cell| (cell, 3, false))))
+            ].into_iter().map(|cell| (cell, 3, false))).collect(),
+            TrackerLayout::RslLeft => vec![
+                Slingshot, Bombs, Boomerang, Skulltula, GoMode, GanonMq, GanonKeys, DekuMq, Blank,
+                Hookshot, Bow, Hammer, ZeldasLullaby, Minuet, ForestMq, ForestKeys, DcMq, Blank,
+                Bottle, Strength, Scale, EponasSong, Bolero, FireMq, FireKeys, JabuMq, Blank,
+                ChildTrade, Beans, SwordCard, SariasSong, Serenade, WaterMq, WaterKeys, IceMq, Blank,
+                AdultTrade, Tunics, Triforce, SunsSong, Requiem, SpiritMq, SpiritKeys, WellMq, WellSmallKeys,
+                Magic, Spells, Arrows, SongOfTime, Nocturne, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
+                MirrorShield, Boots, Ocarina, SongOfStorms, Prelude, FreeReward, Blank, GtgMq, GtgSmallKeys,
+            ].into_iter().map(|cell| (cell, 3, false)).collect(),
+            TrackerLayout::RslRight => TrackerLayout::RslLeft.cells()
+                .into_iter()
+                .chunks(9)
+                .into_iter()
+                .flat_map(|row| row.collect_vec().into_iter().rev())
+                .collect(),
+            TrackerLayout::RslEdit => {
+                let mut cells = TrackerLayout::MultiworldEdit.cells();
+                cells[5].0 = GoMode; // unlike multiworld, RSL doesn't track BK mode
+                cells.extend(vec![
+                    ForestMq, FireMq, WaterMq, SpiritMq, ShadowMq, GanonMq,
+                    ForestKeys, FireKeys, WaterKeys, SpiritKeys, ShadowKeys, GanonKeys,
+                    DekuMq, DcMq, JabuMq, WellMq, FortressMq, GtgMq,
+                    ChildTrade, Beans, IceMq, WellSmallKeys, FortressSmallKeys, GtgSmallKeys,
+                    AdultTrade, Triforce, Ocarina, Blank, Blank, Blank,
+                ].into_iter().map(|cell| (cell, 3, false)));
+                cells
+            }
         }
     }
 }
@@ -134,6 +166,9 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "mw-expanded" => TrackerLayout::MultiworldExpanded,
             "mw-collapsed" => TrackerLayout::MultiworldCollapsed,
             "mw-edit" => TrackerLayout::MultiworldEdit,
+            "rsl-left" => TrackerLayout::RslLeft,
+            "rsl-right" => TrackerLayout::RslRight,
+            "rsl-edit" => TrackerLayout::RslEdit,
             _ => return Err(()),
         })
     }
@@ -148,6 +183,9 @@ impl fmt::Display for TrackerLayout {
             TrackerLayout::MultiworldExpanded => write!(f, "mw-expanded"),
             TrackerLayout::MultiworldCollapsed => write!(f, "mw-collapsed"),
             TrackerLayout::MultiworldEdit => write!(f, "mw-edit"),
+            TrackerLayout::RslLeft => write!(f, "rsl-left"),
+            TrackerLayout::RslRight => write!(f, "rsl-right"),
+            TrackerLayout::RslEdit => write!(f, "rsl-edit"),
         }
     }
 }
@@ -231,7 +269,7 @@ pub(crate) fn render_double_cell(runner1: &ModelState, runner2: &ModelState, rew
         img_filename,
         style,
         overlay: CellOverlay::Location {
-            dimmed: location.is_none(),
+            style: if location.is_some() { LocationStyle::Normal } else { LocationStyle::Dimmed },
             loc_img: Cow::Borrowed(loc_img_filename),
         },
     }

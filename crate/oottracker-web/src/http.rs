@@ -84,7 +84,7 @@ async fn restream_room_input(restreams: State<'_, Restreams>, restreamer: String
         let layout = restream.layout();
         let (_, _, model_state_view) = restream.runner(&runner)?;
         let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-        layout.cells()
+        layout.cells().into_iter()
             .enumerate()
             .map(|(cell_id, (cell, colspan, loc))| cell.view(&pseudo_name, cell_id.try_into().expect("too many cells"), &model_state_view, colspan, loc))
             .join("\n")
@@ -99,7 +99,7 @@ async fn restream_room_view(restreams: State<'_, Restreams>, restreamer: String,
         let restream = restreams.get(&restreamer)?;
         let (_, _, model_state_view) = restream.runner(&runner)?;
         let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-        layout.cells()
+        layout.cells().into_iter()
             .enumerate()
             .map(|(cell_id, (cell, colspan, loc))| cell.view(&pseudo_name, cell_id.try_into().expect("too many cells"), &model_state_view, colspan, loc))
             .join("\n")
@@ -113,7 +113,7 @@ async fn restream_click(restreams: State<'_, Restreams>, restreamer: String, run
         let mut restreams = restreams.write().await;
         let restream = restreams.get_mut(&restreamer).ok_or(NotFound("No such restream"))?;
         let (tx, _, model_state_view) = restream.runner_mut(&runner).ok_or(NotFound("No such runner"))?;
-        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(model_state_view);
+        layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.0.kind().click(model_state_view);
         tx.send(()).expect("failed to notify websockets about state change");
     }
     Ok(Redirect::to(rocket::uri!(restream_room_view: restreamer, runner, layout)))
@@ -142,7 +142,7 @@ async fn room(rooms: State<'_, Rooms>, name: String) -> Html<String> {
         let mut rooms = rooms.lock().await;
         let room = rooms.entry(name.clone()).or_default();
         let layout = TrackerLayout::default();
-        layout.cells()
+        layout.cells().into_iter()
             .enumerate()
             .map(|(cell_id, (cell, colspan, loc))| cell.view(&name, cell_id.try_into().expect("too many cells"), &room.model, colspan, loc))
             .join("\n")
@@ -156,7 +156,7 @@ async fn click(rooms: State<'_, Rooms>, name: String, cell_id: u8) -> Result<Red
         let mut rooms = rooms.lock().await;
         let room = rooms.entry(name.clone()).or_default();
         let layout = TrackerLayout::default();
-        layout.cells().nth(cell_id.into()).ok_or(NotFound("No such cell"))?.0.kind().click(&mut room.model);
+        layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.0.kind().click(&mut room.model);
     }
     Ok(Redirect::to(rocket::uri!(room: name)))
 }

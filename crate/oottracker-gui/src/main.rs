@@ -221,7 +221,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text"),
                 Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text"),
             }.width(Length::Units(STONE_SIZE)),
-            BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
+            BossKey { .. } | CompositeKeys { .. } | FortressMq | FreeReward | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
 
@@ -244,7 +244,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
                 Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
-                BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
+                BigPoeTriforce | BossKey { .. } | CompositeKeys { .. } | FortressMq | FreeReward | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
             }
         }
         false
@@ -267,7 +267,7 @@ impl TrackerCellKindExt for TrackerCellKind {
                 Simple { .. } | Stone(_) => {}
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
-                BigPoeTriforce | BossKey { .. } | FortressMq | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
+                BigPoeTriforce | BossKey { .. } | CompositeKeys { .. } | FortressMq | FreeReward | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
             }
         }
         false

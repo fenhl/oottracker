@@ -14,6 +14,12 @@ function restreamLayoutID(layoutString) {
             return 2;
         case 'mw-edit':
             return 3;
+        case 'rsl-left':
+            return 4;
+        case 'rsl-right':
+            return 5;
+        case 'rsl-edit':
+            return 6;
         default:
             throw 'unknown layout';
     }
@@ -67,7 +73,7 @@ function updateCell(cellID, data, offset) {
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
     offset += imgFilenameLen;
     mainImg.setAttribute('src', '/static/img/' + imgDir + '/' + imgFilename + '.png');
-    switch (view.getUint8(offset++)) {
+    switch (view.getUint8(offset++)) { // style
         case 0:
             // Normal
             break;
@@ -87,7 +93,7 @@ function updateCell(cellID, data, offset) {
             throw 'unexpected CellStyle variant';
     }
     elt.append(mainImg);
-    switch (view.getUint8(offset++)) {
+    switch (view.getUint8(offset++)) { // overlay
         case 0:
             // None
             break;
@@ -115,13 +121,29 @@ function updateCell(cellID, data, offset) {
             break;
         case 3:
             // Location
-            const locDimmed = view.getUint8(offset++) != 0;
+            let locStyle;
+            switch (view.getUint8(offset++)) { // style
+                case 0:
+                    // Normal
+                    locStyle = 'loc';
+                    break;
+                case 1:
+                    // Dimmed
+                    locStyle = 'loc dimmed';
+                    break;
+                case 2:
+                    // Mq
+                    locStyle = 'loc mq';
+                    break;
+                default:
+                    throw 'unexpected LocationStyle variant';
+            }
             const locImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const locImg = utf8decoder.decode(data.slice(offset, offset + locImgLen));
             offset += locImgLen;
             let locOverlay = document.createElement('img');
-            locOverlay.setAttribute('class', locDimmed ? 'loc dimmed' : 'loc');
+            locOverlay.setAttribute('class', locStyle);
             locOverlay.setAttribute('src', '/static/img/xopar-images/' + locImg + '.png');
             elt.append(locOverlay);
             break;

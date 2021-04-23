@@ -187,6 +187,10 @@ pub enum TrackerCellKind {
         toggle_left: Box<dyn Fn(&mut ModelState)>,
         toggle_right: Box<dyn Fn(&mut ModelState)>,
     },
+    CompositeKeys {
+        small: TrackerCellId,
+        boss: TrackerCellId,
+    },
     Count {
         dimmed_img: ImageInfo,
         img: ImageInfo,
@@ -196,6 +200,7 @@ pub enum TrackerCellKind {
         step: u8,
     },
     FortressMq, // a cell kind used on Xopar's tracker to show whether Gerudo Fortress has 4 carpenters
+    FreeReward,
     Medallion(Medallion),
     MedallionLocation(Medallion),
     Mq(Dungeon),
@@ -1156,6 +1161,7 @@ cells! {
         check: "Sheik at Temple",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SHEIK_AT_TEMPLE)),
     },
+    FreeReward: FreeReward,
     DekuMq: Mq(Dungeon::Main(MainDungeon::DekuTree)),
     DcMq: Mq(Dungeon::Main(MainDungeon::DodongosCavern)),
     JabuMq: Mq(Dungeon::Main(MainDungeon::JabuJabu)),
@@ -1170,23 +1176,9 @@ cells! {
         active: Box::new(|keys| keys.forest_temple),
         toggle: Box::new(|keys| keys.forest_temple = !keys.forest_temple),
     },
-    ShadowMq: Mq(Dungeon::Main(MainDungeon::ShadowTemple)),
-    ShadowSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.shadow_temple),
-        set: Box::new(|keys, value| keys.shadow_temple = value),
-        max_vanilla: 5,
-        max_mq: 6,
-    },
-    ShadowBossKey: BossKey {
-        active: Box::new(|keys| keys.shadow_temple),
-        toggle: Box::new(|keys| keys.shadow_temple = !keys.shadow_temple),
-    },
-    WellMq: Mq(Dungeon::BottomOfTheWell),
-    WellSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.bottom_of_the_well),
-        set: Box::new(|keys, value| keys.bottom_of_the_well = value),
-        max_vanilla: 3,
-        max_mq: 2,
+    ForestKeys: CompositeKeys {
+        small: TrackerCellId::ForestSmallKeys,
+        boss: TrackerCellId::ForestBossKey,
     },
     FireMq: Mq(Dungeon::Main(MainDungeon::FireTemple)),
     FireSmallKeys: TrackerCellKind::SmallKeys {
@@ -1199,23 +1191,9 @@ cells! {
         active: Box::new(|keys| keys.fire_temple),
         toggle: Box::new(|keys| keys.fire_temple = !keys.fire_temple),
     },
-    SpiritMq: Mq(Dungeon::Main(MainDungeon::SpiritTemple)),
-    SpiritSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.spirit_temple),
-        set: Box::new(|keys, value| keys.spirit_temple = value),
-        max_vanilla: 5,
-        max_mq: 7,
-    },
-    SpiritBossKey: BossKey {
-        active: Box::new(|keys| keys.spirit_temple),
-        toggle: Box::new(|keys| keys.spirit_temple = !keys.spirit_temple),
-    },
-    FortressMq: FortressMq,
-    FortressSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.thieves_hideout),
-        set: Box::new(|keys, value| keys.thieves_hideout = value),
-        max_vanilla: 4,
-        max_mq: 4,
+    FireKeys: CompositeKeys {
+        small: TrackerCellId::FireSmallKeys,
+        boss: TrackerCellId::FireBossKey,
     },
     WaterMq: Mq(Dungeon::Main(MainDungeon::WaterTemple)),
     WaterSmallKeys: TrackerCellKind::SmallKeys {
@@ -1228,6 +1206,62 @@ cells! {
         active: Box::new(|keys| keys.water_temple),
         toggle: Box::new(|keys| keys.water_temple = !keys.water_temple),
     },
+    WaterKeys: CompositeKeys {
+        small: TrackerCellId::WaterSmallKeys,
+        boss: TrackerCellId::WaterBossKey,
+    },
+    ShadowMq: Mq(Dungeon::Main(MainDungeon::ShadowTemple)),
+    ShadowSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.shadow_temple),
+        set: Box::new(|keys, value| keys.shadow_temple = value),
+        max_vanilla: 5,
+        max_mq: 6,
+    },
+    ShadowBossKey: BossKey {
+        active: Box::new(|keys| keys.shadow_temple),
+        toggle: Box::new(|keys| keys.shadow_temple = !keys.shadow_temple),
+    },
+    ShadowKeys: CompositeKeys {
+        small: TrackerCellId::ShadowSmallKeys,
+        boss: TrackerCellId::ShadowBossKey,
+    },
+    SpiritMq: Mq(Dungeon::Main(MainDungeon::SpiritTemple)),
+    SpiritSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.spirit_temple),
+        set: Box::new(|keys, value| keys.spirit_temple = value),
+        max_vanilla: 5,
+        max_mq: 7,
+    },
+    SpiritBossKey: BossKey {
+        active: Box::new(|keys| keys.spirit_temple),
+        toggle: Box::new(|keys| keys.spirit_temple = !keys.spirit_temple),
+    },
+    SpiritKeys: CompositeKeys {
+        small: TrackerCellId::SpiritSmallKeys,
+        boss: TrackerCellId::SpiritBossKey,
+    },
+    IceMq: Mq(Dungeon::IceCavern),
+    WellMq: Mq(Dungeon::BottomOfTheWell),
+    WellSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.bottom_of_the_well),
+        set: Box::new(|keys, value| keys.bottom_of_the_well = value),
+        max_vanilla: 3,
+        max_mq: 2,
+    },
+    FortressMq: FortressMq,
+    FortressSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.thieves_hideout),
+        set: Box::new(|keys, value| keys.thieves_hideout = value),
+        max_vanilla: 4,
+        max_mq: 4,
+    },
+    GtgMq: Mq(Dungeon::GerudoTrainingGrounds),
+    GtgSmallKeys: TrackerCellKind::SmallKeys {
+        get: Box::new(|keys| keys.gerudo_training_grounds),
+        set: Box::new(|keys, value| keys.gerudo_training_grounds = value),
+        max_vanilla: 9,
+        max_mq: 3,
+    },
     GanonMq: Mq(Dungeon::GanonsCastle),
     GanonSmallKeys: TrackerCellKind::SmallKeys {
         get: Box::new(|keys| keys.ganons_castle),
@@ -1239,12 +1273,9 @@ cells! {
         active: Box::new(|keys| keys.ganons_castle),
         toggle: Box::new(|keys| keys.ganons_castle = !keys.ganons_castle),
     },
-    GtgMq: Mq(Dungeon::GerudoTrainingGrounds),
-    GtgSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.gerudo_training_grounds),
-        set: Box::new(|keys, value| keys.gerudo_training_grounds = value),
-        max_vanilla: 9,
-        max_mq: 3,
+    GanonKeys: CompositeKeys {
+        small: TrackerCellId::GanonSmallKeys,
+        boss: TrackerCellId::GanonBossKey,
     },
     BiggoronSword: Simple {
         img: ImageInfo::new("UNIMPLEMENTED"),
@@ -1285,6 +1316,11 @@ cells! {
         img: ImageInfo::new("UNIMPLEMENTED"),
         active: Box::new(|state| state.ram.save.quest_items.contains(QuestItems::STONE_OF_AGONY)),
         toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::STONE_OF_AGONY)),
+    },
+    Blank: Simple {
+        img: ImageInfo { dir: ImageDir::Extra, name: "blank" },
+        active: Box::new(|_| false),
+        toggle: Box::new(|_| ()),
     },
 }
 

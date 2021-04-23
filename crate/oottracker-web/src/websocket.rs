@@ -126,7 +126,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                                 return
                             }
                         };
-                        let cells = layout.cells()
+                        let cells = layout.cells().into_iter()
                             .map(|(cell, _, _)| cell.kind().render(&runner))
                             .collect::<Vec<_>>();
                         if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
@@ -149,7 +149,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                                     return
                                 }
                             };
-                            layout.cells().map(|(cell, _, _)| cell.kind().render(&runner)).collect::<Vec<_>>()
+                            layout.cells().into_iter().map(|(cell, _, _)| cell.kind().render(&runner)).collect::<Vec<_>>()
                         };
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
                             if old_cell != new_cell {
@@ -244,8 +244,8 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                         return Ok(())
                     }
                 };
-                let cell = match layout.cells().nth(cell_id.into()) {
-                    Some((cell, _, _)) => cell,
+                let cell = match layout.cells().get(usize::from(cell_id)) {
+                    Some(&(cell, _, _)) => cell,
                     None => {
                         let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())
@@ -265,7 +265,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                     let (mut old_cells, mut rx) = {
                         let mut rooms = rooms.lock().await;
                         let room = rooms.entry(room.clone()).or_default();
-                        let cells = layout.cells()
+                        let cells = layout.cells().into_iter()
                             .map(|(cell, _, _)| cell.kind().render(&room.model))
                             .collect::<Vec<_>>();
                         if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
@@ -275,7 +275,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                         let new_cells = {
                             let mut rooms = rooms.lock().await;
                             let room = rooms.entry(room.clone()).or_default();
-                            layout.cells().map(|(cell, _, _)| cell.kind().render(&room.model)).collect::<Vec<_>>()
+                            layout.cells().into_iter().map(|(cell, _, _)| cell.kind().render(&room.model)).collect::<Vec<_>>()
                         };
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
                             if old_cell != new_cell {
@@ -289,8 +289,8 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
             ClientMessage::ClickRoom { room, layout, cell_id, right } => {
                 let mut rooms = rooms.lock().await;
                 let room = rooms.entry(room.clone()).or_default();
-                let cell = match layout.cells().nth(cell_id.into()) {
-                    Some((cell, _, _)) => cell,
+                let cell = match layout.cells().get(usize::from(cell_id)) {
+                    Some(&(cell, _, _)) => cell,
                     None => {
                         let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())
