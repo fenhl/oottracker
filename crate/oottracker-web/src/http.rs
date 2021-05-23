@@ -4,15 +4,15 @@ use {
     rocket::{
         Rocket,
         State,
+        fs::{
+            FileServer,
+            relative,
+        },
         response::{
             Redirect,
             content::Html,
             status::NotFound,
         },
-    },
-    rocket_contrib::serve::{
-        StaticFiles,
-        crate_relative,
     },
     oottracker::{
         ModelState,
@@ -77,7 +77,7 @@ fn index() -> Html<String> {
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>")]
-async fn restream_room_input(restreams: State<'_, Restreams>, restreamer: String, runner: String) -> Option<Html<String>> {
+async fn restream_room_input(restreams: &State<Restreams>, restreamer: String, runner: String) -> Option<Html<String>> {
     let html_layout = {
         let restreams = restreams.read().await;
         let restream = restreams.get(&restreamer)?;
@@ -92,7 +92,7 @@ async fn restream_room_input(restreams: State<'_, Restreams>, restreamer: String
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>")]
-async fn restream_room_view(restreams: State<'_, Restreams>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Html<String>> {
+async fn restream_room_view(restreams: &State<Restreams>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Html<String>> {
     let html_layout = {
         let restreams = restreams.read().await;
         let restream = restreams.get(&restreamer)?;
@@ -106,7 +106,7 @@ async fn restream_room_view(restreams: State<'_, Restreams>, restreamer: String,
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>/click/<cell_id>")]
-async fn restream_click(restreams: State<'_, Restreams>, restreamer: String, runner: String, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
+async fn restream_click(restreams: &State<Restreams>, restreamer: String, runner: String, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
     {
         let mut restreams = restreams.write().await;
         let restream = restreams.get_mut(&restreamer).ok_or(NotFound("No such restream"))?;
@@ -114,11 +114,15 @@ async fn restream_click(restreams: State<'_, Restreams>, restreamer: String, run
         layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(model_state_view);
         tx.send(()).expect("failed to notify websockets about state change");
     }
-    Ok(Redirect::to(rocket::uri!(restream_room_view: restreamer, runner, layout)))
+    Ok(Redirect::to(if layout == TrackerLayout::default() {
+        rocket::uri!(restream_room_input(restreamer, runner))
+    } else {
+        rocket::uri!(restream_room_view(restreamer, runner, layout))
+    }))
 }
 
 #[rocket::get("/restream/<restreamer>/<runner1>/<layout>/with/<runner2>")]
-async fn restream_double_room_layout(restreams: State<'_, Restreams>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Html<String>> {
+async fn restream_double_room_layout(restreams: &State<Restreams>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Html<String>> {
     let html_layout = {
         let restreams = restreams.read().await;
         let restream = restreams.get(&restreamer)?;
@@ -135,7 +139,7 @@ async fn restream_double_room_layout(restreams: State<'_, Restreams>, restreamer
 }
 
 #[rocket::get("/room/<name>")]
-async fn room(rooms: State<'_, Rooms>, name: String) -> Html<String> {
+async fn room(rooms: &State<Rooms>, name: String) -> Html<String> {
     let html_layout = {
         let mut rooms = rooms.lock().await;
         let room = rooms.entry(name.clone()).or_default();
@@ -148,14 +152,14 @@ async fn room(rooms: State<'_, Rooms>, name: String) -> Html<String> {
 }
 
 #[rocket::get("/room/<name>/click/<cell_id>")]
-async fn click(rooms: State<'_, Rooms>, name: String, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
+async fn click(rooms: &State<Rooms>, name: String, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
     {
         let mut rooms = rooms.lock().await;
         let room = rooms.entry(name.clone()).or_default();
         let layout = TrackerLayout::default();
         layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(&mut room.model);
     }
-    Ok(Redirect::to(rocket::uri!(room: name)))
+    Ok(Redirect::to(rocket::uri!(room(name))))
 }
 
 pub(crate) fn rocket(rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build> {
@@ -166,7 +170,7 @@ pub(crate) fn rocket(rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build
     })
     .manage(rooms)
     .manage(restreams)
-    .mount("/static", StaticFiles::new(crate_relative!("../../assets/web/static"), rocket_contrib::serve::Options::None))
+    .mount("/static", FileServer::new(relative!("../../assets/web/static"), rocket::fs::Options::None))
     .mount("/", rocket::routes![
         index,
         restream_room_input,

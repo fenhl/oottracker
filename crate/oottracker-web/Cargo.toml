@@ -1,6 +1,6 @@
 [package]
 name = "oottracker-web"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
@@ -29,10 +29,6 @@ path = "../ootr-static"
 path = "../oottracker"
 
 [dependencies.rocket]
-git = "https://github.com/SergioBenitez/Rocket"
-branch = "master"
-
-[dependencies.rocket_contrib]
 git = "https://github.com/SergioBenitez/Rocket"
 branch = "master"
 

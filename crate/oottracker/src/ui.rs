@@ -13,7 +13,7 @@ use {
     image::DynamicImage,
     itertools::Itertools as _,
     rocket::{
-        http::uri::{
+        http::uri::fmt::{
             Formatter,
             Path,
             UriDisplay,
