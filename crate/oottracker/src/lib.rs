@@ -2,7 +2,14 @@
 #![forbid(unsafe_code)]
 
 use {
-    std::collections::HashSet,
+    std::{
+        collections::HashSet,
+        ops::{
+            AddAssign,
+            Sub,
+        },
+    },
+    async_proto::Protocol,
     collect_mac::collect,
     enum_iterator::IntoEnumIterator as _,
     itertools::Itertools as _,
@@ -40,8 +47,9 @@ pub mod region;
 pub mod save;
 mod scene;
 pub mod ui;
+pub mod websocket;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Protocol)]
 pub struct ModelState {
     pub knowledge: Knowledge,
     pub ram: Ram,
@@ -99,7 +107,7 @@ impl ModelState {
             access::Expr::TrialActive(trial) => if let Some(&trial_active) = self.knowledge.active_trials.get(trial) {
                 trial_active
             } else {
-                return Err(collect![Check::TrialActive(trial.clone())]) //TODO remove clone call once `trial` is a `Medallion`
+                return Err(collect![Check::TrialActive(*trial)])
             },
             access::Expr::Trick(trick) => if let Some(trick_value) = self.knowledge.tricks.as_ref().map_or(Some(false), |tricks| tricks.get(trick).copied()) {
                 trick_value
@@ -172,6 +180,31 @@ impl ModelState {
             _ => unimplemented!("access expr {:?} <= value", expr),
         })
     }
+}
+
+impl AddAssign<ModelDelta> for ModelState {
+    fn add_assign(&mut self, rhs: ModelDelta) {
+        self.knowledge = rhs.knowledge;
+        self.ram += rhs.ram;
+    }
+}
+
+impl<'a, 'b> Sub<&'b ModelState> for &'a ModelState {
+    type Output = ModelDelta;
+
+    fn sub(self, rhs: &ModelState) -> ModelDelta {
+        ModelDelta {
+            knowledge: self.knowledge.clone(), //TODO only include new knowledge?
+            ram: &self.ram - &rhs.ram,
+        }
+    }
+}
+
+/// The difference between two model states.
+#[derive(Debug, Clone, Protocol)]
+pub struct ModelDelta {
+    knowledge: Knowledge, //TODO use a separate knowledge delta format?
+    ram: ram::Delta,
 }
 
 pub fn version() -> Version {

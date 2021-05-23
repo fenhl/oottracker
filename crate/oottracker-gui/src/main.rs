@@ -93,11 +93,11 @@ mod logic;
 mod subscriptions;
 
 const CELL_SIZE: u16 = 50;
-const STONE_SIZE: u16 = 33;
+const STONE_SIZE: u16 = 30;
 const MEDALLION_LOCATION_HEIGHT: u16 = 18;
-const STONE_LOCATION_HEIGHT: u16 = 12;
-const WIDTH: u32 = CELL_SIZE as u32 * 6 + 7; // 6 images, each 50px wide, plus 1px spacing
-const HEIGHT: u32 = MEDALLION_LOCATION_HEIGHT as u32 + CELL_SIZE as u32 * 7 + 9; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 1px spacing
+//const STONE_LOCATION_HEIGHT: u16 = 10;
+const WIDTH: u32 = (CELL_SIZE as u32 + 10) * 6; // 6 images, each 50px wide, plus 10px spacing
+const HEIGHT: u32 = (MEDALLION_LOCATION_HEIGHT as u32 + 10) + (CELL_SIZE as u32 + 10) * 7; // dungeon reward location text, 18px high, and 7 images, each 50px high, plus 10px spacing
 
 struct ContainerStyle;
 
@@ -300,66 +300,10 @@ trait TrackerLayoutExt {
 
 impl TrackerLayoutExt for TrackerLayout {
     fn cell_at(&self, [x, y]: [f32; 2], include_songs: bool) -> Option<TrackerCellId> {
-        if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + 1.0 {
-            for (i, med) in self.meds.into_iter().enumerate() {
-                if x <= (f32::from(CELL_SIZE) + 1.0) * (i as f32 + 1.0) {
-                    return Some(TrackerCellId::med_location(med))
-                }
-            }
-            return None
-        }
-        if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) + 2.0 {
-            for (i, med) in self.meds.into_iter().enumerate() {
-                if x <= (f32::from(CELL_SIZE) + 1.0) * (i as f32 + 1.0) {
-                    return Some(TrackerCellId::from(med))
-                }
-            }
-            return None
-        }
-        if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) * 2.0 + 3.0 {
-            return if x <= f32::from(CELL_SIZE) + 1.0 { Some(self.row2[0]) }
-            else if x <= f32::from(CELL_SIZE) * 2.0 + 2.0 { Some(self.row2[1]) }
-            else if x <= f32::from(CELL_SIZE) * 2.0 + f32::from(STONE_SIZE) + 3.0 {
-                Some(if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) + f32::from(STONE_LOCATION_HEIGHT) + 3.0 {
-                    TrackerCellId::KokiriEmeraldLocation
-                } else {
-                    TrackerCellId::KokiriEmerald
-                })
-            } else if x <= f32::from(CELL_SIZE) * 2.0 + f32::from(STONE_SIZE) * 2.0 + 4.0 {
-                Some(if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) + f32::from(STONE_LOCATION_HEIGHT) + 3.0 {
-                    TrackerCellId::GoronRubyLocation
-                } else {
-                    TrackerCellId::GoronRuby
-                })
-            } else if x <= f32::from(CELL_SIZE) * 2.0 + f32::from(STONE_SIZE) * 3.0 + 5.0 {
-                Some(if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) + f32::from(STONE_LOCATION_HEIGHT) + 3.0 {
-                    TrackerCellId::ZoraSapphireLocation
-                } else {
-                    TrackerCellId::ZoraSapphire
-                })
-            }
-            else if x <= f32::from(CELL_SIZE) * 3.0 + f32::from(STONE_SIZE) * 3.0 + 6.0 { Some(self.row2[2]) }
-            else if x <= f32::from(CELL_SIZE) * 4.0 + f32::from(STONE_SIZE) * 3.0 + 7.0 { Some(self.row2[3]) }
-            else { None }
-        }
-        for (row_idx, row) in self.rest.iter().enumerate() {
-            if !include_songs && row_idx == 3 { return None }
-            if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) * (row_idx as f32 + 3.0) + row_idx as f32 + 4.0 {
-                for (cell_idx, &cell) in row.iter().enumerate() {
-                    if x <= (f32::from(CELL_SIZE) + 1.0) * (cell_idx as f32 + 1.0) { return Some(cell) }
-                }
-                return None
-            }
-        }
-        if y <= f32::from(MEDALLION_LOCATION_HEIGHT) + f32::from(CELL_SIZE) * 7.0 + 8.0 {
-            for (i, med) in self.warp_songs.into_iter().enumerate() {
-                if x <= (f32::from(CELL_SIZE) + 1.0) * (i as f32 + 1.0) {
-                    return Some(TrackerCellId::warp_song(med))
-                }
-            }
-            return None
-        }
-        None
+        if !include_songs && y >= (MEDALLION_LOCATION_HEIGHT as f32 + 10.0) + (CELL_SIZE as f32 + 10.0) * 5.0 { return None }
+        self.cells().into_iter()
+            .find(|CellLayout { pos: [pos_x, pos_y], size: [size_x, size_y], .. }| (*pos_x..pos_x + size_x).contains(&(x as u16)) && (*pos_y..pos_y + size_y).contains(&(y as u16)))
+            .map(|CellLayout { id, .. }| id)
     }
 }
 
@@ -645,10 +589,6 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             Message::Packet(packet) => {
                 match packet {
                     Packet::Goodbye => unreachable!(), // Goodbye is not yielded from proto::read
-                    Packet::RamInit(ram) => {
-                        self.model.ram = ram;
-                        self.model.update_knowledge();
-                    }
                     Packet::SaveDelta(delta) => {
                         self.model.ram.save = &self.model.ram.save + &delta;
                         self.model.update_knowledge();
@@ -658,11 +598,23 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                         self.model.update_knowledge();
                     }
                     Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
+                    Packet::RamInit(ram) => {
+                        self.model.ram = ram;
+                        self.model.update_knowledge();
+                    }
                     Packet::UpdateCell(cell_id, value) => if let Some(ref connection) = self.connection {
                         if let Some(app) = connection.firebase_app() {
                             app.set_cell(&mut self.model, cell_id, value).expect("failed to apply state change from Firebase"); //TODO show error message instead of panicking?
                         }
                     },
+                    Packet::ModelInit(model) => {
+                        self.model = model;
+                        self.model.update_knowledge();
+                    }
+                    Packet::ModelDelta(delta) => {
+                        self.model += delta;
+                        self.model.update_knowledge();
+                    }
                 }
                 if self.flags.show_available_checks {
                     let rando = self.rando.clone();
@@ -728,7 +680,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
 
         macro_rules! cell {
             ($cell:expr) => {{
-                $cell.view(&self.model, cell_buttons.next().expect("not enough cell button states"))
+                $cell.id.view(&self.model, cell_buttons.next().expect("not enough cell button states"))
             }}
         }
 
@@ -744,20 +696,33 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 .push(Text::new("Warp song order:"))
                 .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.warp_song_order), Message::SetWarpSongOrder))
                 .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                //TODO replace connection options with “current connection” info when connected
                 .push(PickList::new(&mut menu_state.connection_kind, ConnectionKind::into_enum_iter().collect_vec(), Some(menu_state.connection_params.kind()), Message::SetConnectionKind))
                 .push(menu_state.connection_params.view())
                 .push(Button::new(&mut menu_state.connect_btn, Text::new(if self.connection.is_some() { "Disconnect" } else { "Connect" })).on_press(Message::Connect))
+                .padding(5)
                 .into()
         }
-        let mut med_locations = Row::new();
-        let mut meds = Row::new();
-        for med in layout.meds {
-            med_locations = med_locations.push(cell!(TrackerCellId::med_location(med)));
-            meds = meds.push(cell!(TrackerCellId::from(med)));
-        }
+        let mut cells = layout.cells().into_iter();
         let view = Column::new()
-            .push(med_locations.spacing(1))
-            .push(meds.spacing(1));
+            .push(Row::new()
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .spacing(10)
+            )
+            .push(Row::new()
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .push(cell!(cells.next().unwrap()))
+                .spacing(10)
+            );
         let view = if let Some(ref mut dismiss_button) = self.dismiss_welcome_screen_button {
             view.push(Text::new("Welcome to the OoT tracker!\nTo change settings, right-click a Medallion.")
                     .color([1.0, 1.0, 1.0])
@@ -766,35 +731,48 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 )
                 .push(Button::new(dismiss_button, Text::new("OK")).on_press(Message::DismissWelcomeScreen))
         } else {
+            let mut row2 = Vec::with_capacity(4);
+            let mut stone_locs = Vec::with_capacity(3);
+            row2.push(cells.next().unwrap());
+            row2.push(cells.next().unwrap());
+            stone_locs.push(cells.next().unwrap());
+            stone_locs.push(cells.next().unwrap());
+            stone_locs.push(cells.next().unwrap());
+            row2.push(cells.next().unwrap());
+            row2.push(cells.next().unwrap());
             let mut view = view.push(Row::new()
-                    .push(cell!(layout.row2[0]))
-                    .push(cell!(layout.row2[1]))
+                    .push(cell!(row2[0]))
+                    .push(cell!(row2[1]))
                     .push(Column::new()
-                        .push(cell!(TrackerCellId::KokiriEmeraldLocation))
-                        .push(cell!(TrackerCellId::KokiriEmerald))
-                        .spacing(1)
+                        .push(cell!(stone_locs[0]))
+                        .push(cell!(cells.next().unwrap()))
+                        .spacing(10)
                     )
                     .push(Column::new()
-                        .push(cell!(TrackerCellId::GoronRubyLocation))
-                        .push(cell!(TrackerCellId::GoronRuby))
-                        .spacing(1)
+                        .push(cell!(stone_locs[1]))
+                        .push(cell!(cells.next().unwrap()))
+                        .spacing(10)
                     )
                     .push(Column::new()
-                        .push(cell!(TrackerCellId::ZoraSapphireLocation))
-                        .push(cell!(TrackerCellId::ZoraSapphire))
-                        .spacing(1)
+                        .push(cell!(stone_locs[2]))
+                        .push(cell!(cells.next().unwrap()))
+                        .spacing(10)
                     )
-                    .push(cell!(layout.row2[2]))
-                    .push(cell!(layout.row2[3]))
-                    .spacing(1)
+                    .push(cell!(row2[2]))
+                    .push(cell!(row2[3]))
+                    .spacing(10)
                 );
-            for (i, layout_row) in layout.rest.iter().enumerate() {
+            for i in 0..5 {
                 if i == 3 && self.notification.is_some() { break }
-                let mut row = Row::new();
-                for cell in layout_row {
-                    row = row.push(cell!(cell));
-                }
-                view = view.push(row.spacing(1));
+                view = view.push(Row::new()
+                    .push(cell!(cells.next().unwrap()))
+                    .push(cell!(cells.next().unwrap()))
+                    .push(cell!(cells.next().unwrap()))
+                    .push(cell!(cells.next().unwrap()))
+                    .push(cell!(cells.next().unwrap()))
+                    .push(cell!(cells.next().unwrap()))
+                    .spacing(10)
+                );
             }
             if let Some((is_temp, ref notification)) = self.notification {
                 let mut row = Row::new()
@@ -804,14 +782,10 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 }
                 view.push(row.height(Length::Units(101)))
             } else {
-                let mut row = Row::new();
-                for med in layout.warp_songs {
-                    row = row.push(cell!(TrackerCellId::warp_song(med)));
-                }
-                view.push(row.spacing(1))
+                view
             }
         };
-        let items_container = Container::new(Container::new(view.spacing(1).padding(1))
+        let items_container = Container::new(Container::new(view.spacing(10).padding(5))
                 .width(Length::Units(WIDTH as u16))
                 .height(Length::Units(HEIGHT as u16))
             )
@@ -869,8 +843,11 @@ enum ConnectionError {
     #[from_arc]
     Reqwest(Arc<reqwest::Error>),
     UnsupportedHost(Option<url::Host<String>>),
+    UnsupportedRoomKind(String),
     #[from]
     UrlParse(url::ParseError),
+    #[from]
+    Write(async_proto::WriteError),
 }
 
 impl fmt::Display for ConnectionError {
@@ -886,7 +863,9 @@ impl fmt::Display for ConnectionError {
             },
             ConnectionError::UnsupportedHost(Some(host)) => write!(f, "the tracker at {} is not (yet) supported", host),
             ConnectionError::UnsupportedHost(None) => write!(f, "this kind of connection is not supported"),
+            ConnectionError::UnsupportedRoomKind(kind) => write!(f, "“{}” rooms are not (yet) supported", kind),
             ConnectionError::UrlParse(e) => e.fmt(f),
+            ConnectionError::Write(e) => e.fmt(f),
         }
     }
 }
@@ -916,7 +895,15 @@ async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn 
                 Some(url::Host::Domain("ootr-tracker.web.app")) | Some(url::Host::Domain("ootr-tracker.firebaseapp.com")) => firebase_host!(RestreamTracker),
                 Some(url::Host::Domain("ootr-random-settings-tracker.web.app")) | Some(url::Host::Domain("ootr-random-settings-tracker.firebaseapp.com")) => firebase_host!(RslItemTracker),
                 //TODO support for rsl-settings-tracker.web.app
-                //TODO support for oottracker.fenhl.net
+                Some(url::Host::Domain("oottracker.fenhl.net")) => {
+                    let mut path_segments = url.path_segments().into_iter().flatten().fuse();
+                    match path_segments.next() {
+                        None => return Err(ConnectionError::MissingRoomName),
+                        Some("room") => Arc::new(net::WebConnection::new(path_segments.next().ok_or(ConnectionError::MissingRoomName)?).await?),
+                        Some("restream") => return Err(ConnectionError::UnsupportedRoomKind(format!("restream"))), //TODO support for single-player restream room connections
+                        Some(room_kind) => return Err(ConnectionError::UnsupportedRoomKind(room_kind.to_owned())),
+                    }
+                }
                 host => return Err(ConnectionError::UnsupportedHost(host.map(|host| host.to_owned()))),
             }
         }

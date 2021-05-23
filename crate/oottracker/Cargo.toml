@@ -21,8 +21,8 @@ serde_json = "1"
 smart-default = "0.6"
 
 [dependencies.async-proto]
-version = "0.6"
-features = ["serde_json", "write-sync"]
+version = "0.7"
+features = ["serde_json", "tokio-tungstenite", "write-sync"]
 
 [dependencies.derive_more]
 version = "0.99"
@@ -55,17 +55,25 @@ version = "0.11"
 default-features = false
 features = ["json", "rustls-tls"]
 
+[dependencies.rocket]
+git = "https://github.com/SergioBenitez/Rocket"
+branch = "master"
+
 [dependencies.serde]
 version = "1"
 features = ["derive"]
 
 [dependencies.tokio]
 version = "1"
-features = ["fs", "net", "time"]
+features = ["fs", "net", "sync", "time"]
 
 [dependencies.tokio-stream]
 version = "0.1"
 features = ["net"]
+
+[dependencies.tokio-tungstenite]
+version = "0.14"
+features = ["rustls-tls"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"

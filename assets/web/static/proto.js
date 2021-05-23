@@ -4,22 +4,34 @@ const utf8encoder = new TextEncoder();
 
 sock.binaryType = "arraybuffer";
 
-function restreamLayoutID(layoutString) {
+function layoutBuf(layoutString) {
+    let buf = new ArrayBuffer(1);
     switch (layoutString) {
         case 'default':
-            return 0;
+            buf = new ArrayBuffer(4);
+            new DataView(buf).setUint8(0, 0); // TrackerLayout variant: Default
+            new DataView(buf).setUint8(1, 0); // TrackerLayout::Default field: auto: false
+            new DataView(buf).setUint8(2, 0); // TrackerLayout::Default field: meds: LightShadowSpirit
+            new DataView(buf).setUint8(3, 3); // TrackerLayout::Default field: warp_songs: SpiritShadowLight
+            return buf;
         case 'mw-expanded':
-            return 1;
+            new DataView(buf).setUint8(0, 1);
+            return buf;
         case 'mw-collapsed':
-            return 2;
+            new DataView(buf).setUint8(0, 2);
+            return buf;
         case 'mw-edit':
-            return 3;
+            new DataView(buf).setUint8(0, 3);
+            return buf;
         case 'rsl-left':
-            return 4;
+            new DataView(buf).setUint8(0, 4);
+            return buf;
         case 'rsl-right':
-            return 5;
+            new DataView(buf).setUint8(0, 5);
+            return buf;
         case 'rsl-edit':
-            return 6;
+            new DataView(buf).setUint8(0, 6);
+            return buf;
         default:
             throw 'unknown layout';
     }
@@ -28,17 +40,22 @@ function restreamLayoutID(layoutString) {
 function sendClick(cellID, right) {
     const roomMatch = window.location.pathname.match(/^\/room\/([0-9A-Za-z-]+)\/?$/);
     const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
-    const buf = new ArrayBuffer(3);
-    const bufView = new DataView(buf);
+    let buf;
+    let bufView;
     if (roomMatch) {
         const clickRoom = new ArrayBuffer(1);
         new DataView(clickRoom).setUint8(0, 5); // ClientMessage variant: ClickRoom
         const room = utf8encoder.encode(roomMatch[1]);
         const roomLen = new ArrayBuffer(8);
         new DataView(roomLen).setBigUint64(0, BigInt(room.length));
+        buf = new ArrayBuffer(6);
+        bufView = new DataView(buf);
         bufView.setUint8(0, 0); // TrackerLayout variant: Default
-        bufView.setUint8(1, cellID);
-        bufView.setUint8(2, right ? 1 : 0);
+        bufView.setUint8(1, 0); // TrackerLayout::Default field: auto: false
+        bufView.setUint8(2, 0); // TrackerLayout::Default field: meds: LightShadowSpirit
+        bufView.setUint8(3, 3); // TrackerLayout::Default field: warp_songs: SpiritShadowLight
+        bufView.setUint8(4, cellID);
+        bufView.setUint8(5, right ? 1 : 0);
         sock.send(new Blob([clickRoom, roomLen, room, buf]));
     } else if (restreamMatch) {
         const clickRestream = new ArrayBuffer(1);
@@ -49,10 +66,12 @@ function sendClick(cellID, right) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        bufView.setUint8(0, restreamLayoutID(restreamMatch[3]));
-        bufView.setUint8(1, cellID);
-        bufView.setUint8(2, right ? 1 : 0);
-        sock.send(new Blob([clickRestream, restreamLen, restream, runnerLen, runner, buf]));
+        const layoutBuf = restreamLayoutBuf(restreamMatch[3]);
+        buf = new ArrayBuffer(2);
+        bufView = new DataView(buf);
+        bufView.setUint8(0, cellID);
+        bufView.setUint8(1, right ? 1 : 0);
+        sock.send(new Blob([clickRestream, restreamLen, restream, runnerLen, runner, layoutBuf, buf]));
     } else {
         throw 'unknown tracker type';
     }
@@ -60,7 +79,7 @@ function sendClick(cellID, right) {
 
 function updateCell(cellID, data, offset) {
     const view = new DataView(data);
-    const elt = document.getElementById('cell' + cellID); //TODO modify element
+    const elt = document.getElementById('cell' + cellID);
     //elt.replaceChildren(); //TODO use this instead of the elt.append calls below once OBS browser source updates to Chrome 86+
     elt.innerHTML = '';
     let mainImg = document.createElement('img');
@@ -172,8 +191,11 @@ sock.addEventListener('open', function(event) {
         const room = utf8encoder.encode(roomMatch[1]);
         const roomLen = new ArrayBuffer(8);
         new DataView(roomLen).setBigUint64(0, BigInt(room.length));
-        const roomLayoutBuf = new ArrayBuffer(1);
+        const roomLayoutBuf = new ArrayBuffer(4);
         new DataView(roomLayoutBuf).setUint8(0, 0); // TrackerLayout variant: Default
+        new DataView(roomLayoutBuf).setUint8(1, 0); // TrackerLayout::Default field: auto: false
+        new DataView(roomLayoutBuf).setUint8(2, 0); // TrackerLayout::Default field: meds: LightShadowSpirit
+        new DataView(roomLayoutBuf).setUint8(3, 3); // TrackerLayout::Default field: warp_songs: SpiritShadowLight
         sock.send(new Blob([roomSubscription, roomLen, room, roomLayoutBuf]));
     } else if (restreamMatch) {
         const restreamSubscription = new ArrayBuffer(1);
@@ -184,8 +206,7 @@ sock.addEventListener('open', function(event) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        const restreamLayoutBuf = new ArrayBuffer(1);
-        new DataView(restreamLayoutBuf).setUint8(0, restreamLayoutID(restreamMatch[3]));
+        const restreamLayoutBuf = layoutBuf(restreamMatch[3]);
         sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, restreamLayoutBuf]));
     } else if (restreamDoubleMatch) {
         const doubleSubscription = new ArrayBuffer(1);

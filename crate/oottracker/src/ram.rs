@@ -3,6 +3,10 @@ use {
         borrow::Borrow,
         future::Future,
         io::prelude::*,
+        ops::{
+            AddAssign,
+            Sub,
+        },
         pin::Pin,
     },
     async_proto::{
@@ -236,4 +240,38 @@ impl Protocol for Ram {
         }
         Ok(())
     }
+}
+
+impl AddAssign<Delta> for Ram {
+    fn add_assign(&mut self, rhs: Delta) {
+        self.save = &self.save + &rhs.save;
+        if let Some((current_scene_id, current_scene_switch_flags, current_scene_chest_flags, current_scene_room_clear_flags)) = rhs.current_scene_data {
+            self.current_scene_id = current_scene_id;
+            self.current_scene_switch_flags = current_scene_switch_flags;
+            self.current_scene_chest_flags = current_scene_chest_flags;
+            self.current_scene_room_clear_flags = current_scene_room_clear_flags;
+        }
+    }
+}
+
+impl<'a, 'b> Sub<&'b Ram> for &'a Ram {
+    type Output = Delta;
+
+    fn sub(self, rhs: &Ram) -> Delta {
+        Delta {
+            save: &self.save - &rhs.save,
+            current_scene_data: if self.current_scene_id == rhs.current_scene_id
+                && self.current_scene_switch_flags == rhs.current_scene_switch_flags
+                && self.current_scene_chest_flags == rhs.current_scene_chest_flags
+                && self.current_scene_room_clear_flags == rhs.current_scene_room_clear_flags
+            { None } else { Some((self.current_scene_id, self.current_scene_switch_flags, self.current_scene_chest_flags, self.current_scene_room_clear_flags)) },
+        }
+    }
+}
+
+/// The difference between two RAM states.
+#[derive(Debug, Clone, Protocol)]
+pub struct Delta {
+    save: save::Delta,
+    current_scene_data: Option<(u8, u32, u32, u32)>,
 }

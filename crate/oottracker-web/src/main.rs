@@ -10,10 +10,7 @@ use {
         iter,
         sync::Arc,
     },
-    async_proto::{
-        Protocol,
-        ReadError,
-    },
+    async_proto::ReadError,
     collect_mac::collect,
     derive_more::From,
     futures::future::{
@@ -44,8 +41,12 @@ use {
         checks::CheckExt as _,
         save::QuestItems,
         ui::{
+            CellRender,
+            CellOverlay,
+            CellStyle,
             DungeonRewardLocationExt as _,
             ImageDirContext,
+            LocationStyle,
             TrackerCellKind::{
                 self,
                 *,
@@ -75,70 +76,6 @@ impl Default for RoomState {
             tx, rx,
             model: ModelState::default(),
         }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Protocol)]
-enum CellStyle {
-    Normal,
-    Dimmed,
-    LeftDimmed,
-    RightDimmed,
-}
-
-#[derive(Clone, PartialEq, Eq, Protocol)]
-enum CellOverlay {
-    None,
-    Count(u8),
-    Image {
-        overlay_dir: Cow<'static, str>,
-        overlay_img: Cow<'static, str>,
-    },
-    Location {
-        loc_dir: Cow<'static, str>,
-        loc_img: Cow<'static, str>,
-        style: LocationStyle,
-    },
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Protocol)]
-enum LocationStyle {
-    Normal,
-    Dimmed,
-    Mq,
-}
-
-#[derive(Clone, PartialEq, Eq, Protocol)]
-struct CellRender {
-    img_dir: Cow<'static, str>,
-    img_filename: Cow<'static, str>,
-    style: CellStyle,
-    overlay: CellOverlay,
-}
-
-impl CellRender {
-    fn to_html(&self) -> String {
-        format!(
-            r#"<img class="{}" src="/static/img/{}/{}.png" />{}"#,
-            match self.style {
-                CellStyle::Normal => "",
-                CellStyle::Dimmed => "dimmed",
-                CellStyle::LeftDimmed => "left-dimmed",
-                CellStyle::RightDimmed => "right-dimmed",
-            },
-            self.img_dir,
-            self.img_filename,
-            match self.overlay {
-                CellOverlay::None => String::default(),
-                CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
-                CellOverlay::Image { ref overlay_dir, ref overlay_img } => format!(r#"<img src="/static/img/{}/{}.png" />"#, overlay_dir, overlay_img),
-                CellOverlay::Location { ref loc_dir, ref loc_img, style } => format!(r#"<img class="{}" src="/static/img/{}/{}.png" />"#, match style {
-                    LocationStyle::Normal => "loc",
-                    LocationStyle::Dimmed => "loc dimmed",
-                    LocationStyle::Mq => "loc mq",
-                }, loc_dir, loc_img),
-            },
-        )
     }
 }
 

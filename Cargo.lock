@@ -112,40 +112,18 @@ dependencies = [
 
 [[package]]
 name = "async-proto"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7caa20d1a352e0cd1981dbc7b235b12d548dfd999ab644bb2ede8620d775db19"
-dependencies = [
- "async-proto-derive 0.6.2",
- "byteorder",
- "derive_more",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "async-proto"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5d4200a940567e09c236892c0c268e7c24b2b11e27103b0abc52b22a11de976"
 dependencies = [
- "async-proto-derive 0.7.1",
+ "async-proto-derive",
+ "byteorder",
  "derive_more",
  "futures",
+ "serde_json",
  "tokio",
+ "tokio-tungstenite 0.14.0",
  "warp",
-]
-
-[[package]]
-name = "async-proto-derive"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf880a2496d7ec52a2f6b8340a1f38ed8795417f409a1cc083e2ac0f7a437283"
-dependencies = [
- "itertools 0.10.0",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -2944,7 +2922,7 @@ checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
 name = "ootr"
 version = "0.4.2"
 dependencies = [
- "async-proto 0.6.2",
+ "async-proto",
  "derivative",
  "enum-iterator",
  "quote-value",
@@ -3002,7 +2980,7 @@ dependencies = [
 name = "oottracker"
 version = "0.4.2"
 dependencies = [
- "async-proto 0.6.2",
+ "async-proto",
  "async-stream",
  "bitflags",
  "byteorder",
@@ -3022,12 +3000,14 @@ dependencies = [
  "oottracker-derive",
  "pin-utils",
  "reqwest",
+ "rocket",
  "semver 0.11.0",
  "serde",
  "serde_json",
  "smart-default",
  "tokio",
  "tokio-stream",
+ "tokio-tungstenite 0.14.0",
  "wheel",
 ]
 
@@ -3042,7 +3022,7 @@ dependencies = [
 name = "oottracker-csharp"
 version = "0.4.2"
 dependencies = [
- "async-proto 0.6.2",
+ "async-proto",
  "itertools 0.10.0",
  "libc",
  "ootr",
@@ -3066,6 +3046,7 @@ dependencies = [
 name = "oottracker-gui"
 version = "0.4.2"
 dependencies = [
+ "async-proto",
  "derivative",
  "derive_more",
  "enum-iterator",
@@ -3118,7 +3099,7 @@ dependencies = [
 name = "oottracker-web"
 version = "0.4.2"
 dependencies = [
- "async-proto 0.7.1",
+ "async-proto",
  "collect-mac",
  "derive_more",
  "futures",
@@ -3128,7 +3109,6 @@ dependencies = [
  "oottracker",
  "rocket",
  "rocket_contrib",
- "smart-default",
  "structopt",
  "tokio",
  "warp",
@@ -4614,7 +4594,24 @@ dependencies = [
  "log",
  "pin-project",
  "tokio",
- "tungstenite",
+ "tungstenite 0.12.0",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
+dependencies = [
+ "futures-util",
+ "log",
+ "pin-project",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
+ "tungstenite 0.13.0",
+ "webpki",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -4714,6 +4711,29 @@ dependencies = [
  "sha-1",
  "url",
  "utf-8",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
+dependencies = [
+ "base64",
+ "byteorder",
+ "bytes",
+ "http",
+ "httparse",
+ "input_buffer",
+ "log",
+ "rand 0.8.3",
+ "rustls",
+ "sha-1",
+ "thiserror",
+ "url",
+ "utf-8",
+ "webpki",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -4940,7 +4960,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.13.0",
  "tokio-util",
  "tower-service",
  "tracing",

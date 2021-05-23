@@ -145,26 +145,9 @@ pub fn version() -> Version {
 ///
 /// # Panics
 ///
-/// If `idx >= 52`.
+/// If `idx` is outside the range of cells for `layout`.
 #[no_mangle] pub unsafe extern "C" fn layout_cell(layout: *const TrackerLayout, idx: u8) -> HandleOwned<TrackerCellId> {
-    let layout = &*layout;
-    HandleOwned::new(match idx {
-        0..=5 => TrackerCellId::med_location(layout.meds.into_iter().nth(usize::from(idx)).expect("ElementOrder has 6 elements")),
-        6..=11 => TrackerCellId::from(layout.meds.into_iter().nth(usize::from(idx) - 6).expect("ElementOrder has 6 elements")),
-        12 => layout.row2[0],
-        13 => layout.row2[1],
-        14 => TrackerCellId::KokiriEmeraldLocation,
-        15 => TrackerCellId::KokiriEmerald,
-        16 => TrackerCellId::GoronRubyLocation,
-        17 => TrackerCellId::GoronRuby,
-        18 => TrackerCellId::ZoraSapphireLocation,
-        19 => TrackerCellId::ZoraSapphire,
-        20 => layout.row2[2],
-        21 => layout.row2[3],
-        22..=45 => layout.rest[(usize::from(idx) - 22) / 6][(usize::from(idx) - 22) % 6],
-        46..=51 => TrackerCellId::warp_song(layout.warp_songs.into_iter().nth(usize::from(idx) - 46).expect("ElementOrder has 6 elements")),
-        _ => panic!("invalid tracker cell index"),
-    })
+    HandleOwned::new((&*layout).cells()[usize::from(idx)].id)
 }
 
 /// # Safety
@@ -270,7 +253,7 @@ pub fn version() -> Version {
             Some(DungeonRewardLocation::LinksPocket) => format!("xopar_images.free_text"),
         },
         TrackerCellKind::BossKey { .. } | TrackerCellKind::CompositeKeys { .. } | TrackerCellKind::FortressMq | TrackerCellKind::FreeReward | TrackerCellKind::Mq(_) | TrackerCellKind::SmallKeys { .. } | TrackerCellKind::SongCheck { .. } => unimplemented!(),
-    })
+    }.replace('-', "_"))
 }
 
 /// # Safety

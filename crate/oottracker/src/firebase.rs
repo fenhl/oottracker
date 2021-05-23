@@ -181,7 +181,7 @@ impl TrackerCellKindExt for TrackerCellKind {
             },
             Sequence { idx, increment, decrement, .. } => {
                 let mut old_idx = idx(state);
-                let new_idx = value.as_u64().ok_or_else(|| value.clone())?.try_into().map_err(|_| value.clone())?;
+                let new_idx = u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value.clone())?;
                 while old_idx < new_idx { increment(state); old_idx += 1 }
                 while old_idx > new_idx { decrement(state); old_idx -= 1 }
             }

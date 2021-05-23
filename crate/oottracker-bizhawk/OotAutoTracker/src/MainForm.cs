@@ -797,7 +797,7 @@ namespace Net.Fenhl.OotAutoTracker
         public MainForm()
         {
             InitializeComponent();
-            ClientSize = new Size(614, 754);
+            ClientSize = new Size(720, 896);
             Icon = new Icon(typeof(MainForm).Assembly.GetManifestResourceStream("Net.Fenhl.OotAutoTracker.Resources.icon.ico"));
             SuspendLayout();
             ResumeLayout();
@@ -1009,17 +1009,18 @@ namespace Net.Fenhl.OotAutoTracker
                 this.cells[i] = cell;
                 cell.Location = i switch
                 {
-                    _ when i < 6 => new Point(102 * i + 2, 2),
-                    _ when i < 14 => new Point(102 * (i % 6) + 2, 102 * (i / 6) - 62),
-                    14 or 16 or 18 => new Point(34 * (i - 14) + 206, 142),
-                    15 or 17 or 19 => new Point(34 * (i - 15) + 206, 168),
-                    _ => new Point(102 * ((i - 4) % 6) + 2, 102 * ((i - 4) / 6) - 62),
+                    _ when i < 6 => new Point(120 * i + 10, 10),
+                    _ when i < 14 => new Point(120 * (i % 6) + 10, 120 * (i / 6) - 54),
+                    _ when i < 17 => new Point(80 * (i - 14) + 250, 186),
+                    _ when i < 19 => new Point(120 * ((i - 1) % 6) + 10, 120 * ((i - 1) / 6) - 54),
+                    _ when i < 22 => new Point(80 * (i - 19) + 250, 226),
+                    _ => new Point(120 * ((i - 4) % 6) + 10, 120 * ((i - 4) / 6) - 54),
                 };
                 cell.Size = i switch
                 {
                     _ when i < 6 => new Size(100, 36),
-                    14 or 16 or 18 => new Size(66, 24),
-                    15 or 17 or 19 => new Size(66, 66),
+                    14 or 15 or 16 => new Size(60, 20),
+                    19 or 20 or 21 => new Size(60, 60),
                     _ => new Size(100, 100),
                 };
                 cell.SizeMode = PictureBoxSizeMode.StretchImage;
@@ -1043,7 +1044,6 @@ namespace Net.Fenhl.OotAutoTracker
                         }
                     });
                 }
-                //TODO right-click event for medallions
                 this.Controls.Add(cell);
             }
             this.UpdateCells();
@@ -1114,7 +1114,7 @@ namespace Net.Fenhl.OotAutoTracker
             this.button_Close_Menu.Text = "Done";
             this.button_Close_Menu.Visible = false;
             this.button_Close_Menu.Click += new EventHandler((object sender, EventArgs e) => {
-                this.ClientSize = new Size(614, 754);
+                this.ClientSize = new Size(720, 896);
                 this.label_Version.Visible = false;
                 this.label_Game.Visible = false;
                 this.label_Connection.Visible = false;

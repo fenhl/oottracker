@@ -12,6 +12,8 @@ use {
     serde_json::Value as Json,
     tokio::net::TcpStream,
     crate::{
+        ModelDelta,
+        ModelState,
         knowledge,
         ram::Ram,
         save,
@@ -30,6 +32,8 @@ pub enum Packet {
     KnowledgeInit(knowledge::Knowledge),
     RamInit(Ram),
     UpdateCell(TrackerCellId, Json),
+    ModelInit(ModelState),
+    ModelDelta(ModelDelta),
 }
 
 #[derive(Debug, From, Clone)]

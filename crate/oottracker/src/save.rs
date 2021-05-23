@@ -1161,23 +1161,23 @@ impl Save {
                 _ => 0,
             },
             "Bombchus" | "Bombchu Drop" | "Bombchus (5)" | "Bombchus (10)" | "Bombchus (20)" | "Buy Bombchu (5)" | "Buy Bombchu (10)" | "Buy Bombchu (20)" => self.inv_amounts.bombchus,
-            "Boomerang" => if self.inv.boomerang { 1 } else { 0 },
-            "Bow" => if self.inv.bow { 1 } else { 0 },
+            "Boomerang" => self.inv.boomerang.into(),
+            "Bow" => self.inv.bow.into(),
             "Deku Nut Drop" | "Buy Deku Nut (5)" | "Buy Deku Nut (10)" => self.inv_amounts.deku_nuts,
-            "Buy Deku Shield" => if self.equipment.contains(Equipment::DEKU_SHIELD) { 1 } else { 0 },
+            "Buy Deku Shield" => self.equipment.contains(Equipment::DEKU_SHIELD).into(),
             "Deku Stick Drop" | "Buy Deku Stick (1)" => self.inv_amounts.deku_sticks,
-            "Deliver Letter" => if self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER) { 1 } else { 0 }, //TODO only consider when known by settings knowledge or visual confirmation
-            "Dins Fire" => if self.inv.dins_fire { 1 } else { 0 },
+            "Deliver Letter" => self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER).into(), //TODO only consider when known by settings knowledge or visual confirmation
+            "Dins Fire" => self.inv.dins_fire.into(),
             "Fish" | "Buy Fish" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Fish).count().try_into().expect("more than u8::MAX bottles"),
-            "Gerudo Membership Card" => if self.quest_items.contains(QuestItems::GERUDO_CARD) { 1 } else { 0 },
-            "Hover Boots" => if self.equipment.contains(Equipment::HOVER_BOOTS) { 1 } else { 0 },
-            "Buy Hylian Shield" => if self.equipment.contains(Equipment::HYLIAN_SHIELD) { 1 } else { 0 },
-            "Kokiri Sword" => if self.equipment.contains(Equipment::KOKIRI_SWORD) { 1 } else { 0 },
-            "Lens of Truth" => if self.inv.lens { 1 } else { 0 },
-            "Megaton Hammer" => if self.inv.hammer { 1 } else { 0 },
-            "Mirror Shield" => if self.equipment.contains(Equipment::MIRROR_SHIELD) { 1 } else { 0 },
-            "Nayrus Love" => if self.inv.nayrus_love { 1 } else { 0 },
-            "Ocarina" => if self.inv.ocarina { 1 } else { 0 }, //TODO return 2 with Ocarina of Time? (currently unused)
+            "Gerudo Membership Card" => self.quest_items.contains(QuestItems::GERUDO_CARD).into(),
+            "Hover Boots" => self.equipment.contains(Equipment::HOVER_BOOTS).into(),
+            "Buy Hylian Shield" => self.equipment.contains(Equipment::HYLIAN_SHIELD).into(),
+            "Kokiri Sword" => self.equipment.contains(Equipment::KOKIRI_SWORD).into(),
+            "Lens of Truth" => self.inv.lens.into(),
+            "Megaton Hammer" => self.inv.hammer.into(),
+            "Mirror Shield" => self.equipment.contains(Equipment::MIRROR_SHIELD).into(),
+            "Nayrus Love" => self.inv.nayrus_love.into(),
+            "Ocarina" => self.inv.ocarina.into(), //TODO return 2 with Ocarina of Time? (currently unused)
             "Progressive Hookshot" => match self.inv.hookshot {
                 Hookshot::None => 0,
                 Hookshot::Hookshot => 1,
@@ -1194,15 +1194,16 @@ impl Save {
                 Upgrades::GORON_BRACELET => 1,
                 _ => 0,
             },
-            "Serenade of Water" => if self.quest_items.contains(QuestItems::SERENADE_OF_WATER) { 1 } else { 0 },
-            "Slingshot" => if self.inv.slingshot { 1 } else { 0 },
+            "Serenade of Water" => self.quest_items.contains(QuestItems::SERENADE_OF_WATER).into(),
+            "Shadow Medallion" => self.quest_items.contains(QuestItems::SHADOW_MEDALLION).into(),
+            "Slingshot" => self.inv.slingshot.into(),
             //TODO add already opened doors (if Keysy is known or off)
             "Small Key (Fire Temple)" => self.small_keys.fire_temple,
             "Small Key (Forest Temple)" => self.small_keys.forest_temple,
             "Small Key (Gerudo Training Grounds)" => self.small_keys.gerudo_training_grounds,
             "Small Key (Spirit Temple)" => self.small_keys.spirit_temple,
             "Small Key (Water Temple)" => self.small_keys.water_temple,
-            "Weird Egg" => if self.inv.child_trade_item == ChildTradeItem::WeirdEgg { 1 } else { 0 },
+            "Weird Egg" => (self.inv.child_trade_item != ChildTradeItem::None).into(),
             name => unimplemented!("check for item {}", name), //TODO (make a list of all items)
         }
     }

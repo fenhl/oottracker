@@ -1,5 +1,6 @@
 use {
     std::{
+        borrow::Cow,
         collections::HashMap,
         fmt,
         io,
@@ -10,6 +11,15 @@ use {
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
     image::DynamicImage,
+    itertools::Itertools as _,
+    rocket::{
+        http::uri::{
+            Formatter,
+            Path,
+            UriDisplay,
+        },
+        request::FromParam,
+    },
     serde::{
         Deserialize,
         Serialize,
@@ -100,7 +110,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoEnumIterator, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoEnumIterator, Deserialize, Serialize, Protocol)]
 #[serde(rename_all = "camelCase")]
 pub enum ElementOrder {
     LightShadowSpirit,
@@ -1361,12 +1371,26 @@ impl From<Medallion> for TrackerCellId {
     }
 }
 
-#[derive(Debug)]
-pub struct TrackerLayout {
-    pub meds: ElementOrder,
-    pub row2: [TrackerCellId; 4],
-    pub rest: [[TrackerCellId; 6]; 4],
-    pub warp_songs: ElementOrder,
+#[derive(Debug, PartialEq, Protocol)]
+pub enum TrackerLayout {
+    Default {
+        auto: bool,
+        meds: ElementOrder,
+        warp_songs: ElementOrder,
+    },
+    MultiworldExpanded,
+    MultiworldCollapsed,
+    MultiworldEdit,
+    RslLeft,
+    RslRight,
+    RslEdit,
+}
+
+pub struct CellLayout {
+    pub idx: usize,
+    pub id: TrackerCellId,
+    pub pos: [u16; 2],
+    pub size: [u16; 2],
 }
 
 impl TrackerLayout {
@@ -1375,9 +1399,114 @@ impl TrackerLayout {
 
     /// The auto-tracking layout for this config, which replaces the Triforce piece count cell with a dynamic big Poe count/Triforce piece count cell.
     pub fn new_auto(config: &Config) -> TrackerLayout {
-        let mut layout = TrackerLayout::from(config);
-        layout.rest[2][5] = TrackerCellId::BigPoeTriforce;
-        layout
+        TrackerLayout::Default {
+            auto: true,
+            meds: config.med_order,
+            warp_songs: config.warp_song_order,
+        }
+    }
+
+    pub fn cells(&self) -> Vec<CellLayout> {
+        use TrackerCellId::*;
+
+        macro_rules! columns {
+            ($width:expr, [$($id:expr,)*]) => {{
+                vec![$($id),*]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, id)| CellLayout { idx, id, pos: [idx as u16 % $width * 60 + 5, idx as u16 / $width * 60 + 5], size: [50, 50] })
+                    .collect()
+            }};
+        }
+
+        match self {
+            TrackerLayout::Default { auto, meds, warp_songs } => {
+                meds.into_iter().enumerate().map(|(idx, med)| CellLayout { idx, id: TrackerCellId::med_location(med), pos: [idx as u16 * 60 + 5, 5], size: [50, 18] })
+                    .chain(meds.into_iter().enumerate().map(|(idx, med)| CellLayout { idx: idx + 6, id: TrackerCellId::from(med), pos: [idx as u16 * 60 + 5, 33], size: [50, 50] }))
+                    .chain(vec![
+                        CellLayout { idx: 12, id: AdultTradeNoChicken, pos: [5, 93], size: [50, 50] },
+                        CellLayout { idx: 13, id: Skulltula, pos: [65, 93], size: [50, 50] },
+                        CellLayout { idx: 14, id: KokiriEmeraldLocation, pos: [125, 93], size: [30, 10] },
+                        CellLayout { idx: 15, id: GoronRubyLocation, pos: [165, 93], size: [30, 10] },
+                        CellLayout { idx: 16, id: ZoraSapphireLocation, pos: [205, 93], size: [30, 10] },
+                        CellLayout { idx: 17, id: Bottle, pos: [245, 93], size: [50, 50] },
+                        CellLayout { idx: 18, id: Scale, pos: [305, 93], size: [50, 50] },
+                        CellLayout { idx: 19, id: KokiriEmerald, pos: [125, 113], size: [30, 30] },
+                        CellLayout { idx: 20, id: GoronRuby, pos: [165, 113], size: [30, 30] },
+                        CellLayout { idx: 21, id: ZoraSapphire, pos: [205, 113], size: [30, 30] },
+                    ]).chain(
+                        vec![
+                            Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
+                            Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
+                            ChildTrade, Ocarina, Beans, SwordCard, Tunics, if *auto { BigPoeTriforce } else { Triforce },
+                            ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
+                        ].into_iter()
+                        .chain(warp_songs.into_iter().map(|med| TrackerCellId::warp_song(med)))
+                        .enumerate()
+                        .map(|(idx, id)| CellLayout { idx: idx + 22, id, pos: [idx as u16 % 6 * 60 + 5, idx as u16 / 6 * 60 + 153], size: [50, 50] })
+                    )
+                    .collect()
+            }
+            TrackerLayout::MultiworldExpanded => columns!(4, [
+                SwordCard, Slingshot, Skulltula, GoBk,
+                Bombs, Bow, ZeldasLullaby, Minuet,
+                Boomerang, Hammer, EponasSong, Bolero,
+                Hookshot, Spells, SariasSong, Serenade,
+                Bottle, Arrows, SunsSong, Requiem,
+                MirrorShield, Strength, SongOfTime, Nocturne,
+                Boots, Scale, SongOfStorms, Prelude,
+            ]),
+            TrackerLayout::MultiworldCollapsed => columns!(10, [
+                SwordCard, Bottle, Skulltula, Strength, Scale, Spells, Slingshot, Bombs, Boomerang, GoBk,
+                ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms, Hookshot, Bow, Hammer, Magic,
+                Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude, MirrorShield, Boots, Arrows, Tunics, //TODO replace tunics with wallets once images exist
+            ]),
+            TrackerLayout::MultiworldEdit => vec![
+                KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, LightMedallionLocation, ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation,
+            ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx, id, pos: [idx as u16 * 40 + 5, 5], size: [30, 10] }).chain(vec![
+                KokiriEmerald, GoronRuby, ZoraSapphire, LightMedallion, ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion,
+            ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx: idx + 9, id, pos: [idx as u16 * 40 + 5, 25], size: [30, 30] })).chain(vec![
+                SwordCard, Bottle, Skulltula, Scale, Tunics, GoBk, //TODO replace tunics with wallets once images exist
+                Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
+                Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
+                ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
+                Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude,
+            ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx: idx + 18, id, pos: [idx as u16 % 6 * 60 + 5, idx as u16 / 6 * 60 + 65], size: [50, 50] })).collect(),
+            TrackerLayout::RslLeft => columns!(9, [
+                Slingshot, Bombs, Boomerang, Skulltula, GoMode, GanonMq, GanonKeys, DekuMq, Blank,
+                Hookshot, Bow, Hammer, ZeldasLullaby, Minuet, ForestMq, ForestKeys, DcMq, Blank,
+                Bottle, Strength, Scale, EponasSong, Bolero, FireMq, FireKeys, JabuMq, Blank,
+                ChildTrade, Beans, SwordCard, SariasSong, Serenade, WaterMq, WaterKeys, IceMq, Blank,
+                AdultTrade, Tunics, Triforce, SunsSong, Requiem, SpiritMq, SpiritKeys, WellMq, WellSmallKeys,
+                Magic, Spells, Arrows, SongOfTime, Nocturne, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
+                MirrorShield, Boots, Ocarina, SongOfStorms, Prelude, FreeReward, Blank, GtgMq, GtgSmallKeys,
+            ]),
+            TrackerLayout::RslRight => TrackerLayout::RslLeft.cells()
+                .into_iter()
+                .chunks(9)
+                .into_iter()
+                .enumerate()
+                .flat_map(|(row_idx, row)| row.collect_vec()
+                    .into_iter()
+                    .rev()
+                    .enumerate()
+                    .map(move |(col_idx, CellLayout { id, size, .. })| CellLayout { idx: row_idx * 9 + col_idx, id, pos: [col_idx as u16 * 60 + 5, row_idx as u16 * 60 + 5], size })
+                )
+                .collect(),
+            TrackerLayout::RslEdit => {
+                let mut cells = TrackerLayout::MultiworldEdit.cells();
+                cells[23].id = GoMode; // unlike multiworld, RSL doesn't track BK mode
+                let num_cells_mw = cells.len();
+                cells.extend(vec![
+                    ForestMq, FireMq, WaterMq, SpiritMq, ShadowMq, GanonMq,
+                    ForestKeys, FireKeys, WaterKeys, SpiritKeys, ShadowKeys, GanonKeys,
+                    DekuMq, DcMq, JabuMq, WellMq, FortressMq, GtgMq,
+                    ChildTrade, Beans, IceMq, WellSmallKeys, FortressSmallKeys, GtgSmallKeys,
+                    AdultTrade, Triforce, Ocarina, Blank, Blank, Blank,
+                ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx: idx + num_cells_mw, id, pos: [idx as u16 % 6 * 60 + 5, idx as u16 / 6 * 60 + 5], size: [50, 50] }));
+                cells
+            }
+        }
     }
 }
 
@@ -1387,19 +1516,161 @@ impl Default for TrackerLayout {
 
 impl<'a> From<&'a Config> for TrackerLayout {
     fn from(config: &Config) -> TrackerLayout {
-        use self::TrackerCellId::*;
-
-        TrackerLayout {
+        TrackerLayout::Default {
+            auto: false,
             meds: config.med_order,
-            row2: [AdultTradeNoChicken, Skulltula, Bottle, Scale],
-            rest: [
-                [Slingshot, Bombs, Boomerang, Strength, Magic, Spells],
-                [Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield],
-                [ChildTrade, Ocarina, Beans, SwordCard, Tunics, Triforce],
-                [ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms],
-            ],
             warp_songs: config.warp_song_order,
         }
+    }
+}
+
+impl fmt::Display for TrackerLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TrackerLayout::Default { .. } if *self == TrackerLayout::default() => write!(f, "default"),
+            TrackerLayout::Default { .. } => unimplemented!(), //TODO
+            TrackerLayout::MultiworldExpanded => write!(f, "mw-expanded"),
+            TrackerLayout::MultiworldCollapsed => write!(f, "mw-collapsed"),
+            TrackerLayout::MultiworldEdit => write!(f, "mw-edit"),
+            TrackerLayout::RslLeft => write!(f, "rsl-left"),
+            TrackerLayout::RslRight => write!(f, "rsl-right"),
+            TrackerLayout::RslEdit => write!(f, "rsl-edit"),
+        }
+    }
+}
+
+impl<'a> FromParam<'a> for TrackerLayout {
+    type Error = ();
+
+    fn from_param(param: &'a str) -> Result<TrackerLayout, ()> {
+        Ok(match param {
+            "default" => TrackerLayout::default(),
+            //TODO parse Default variant with custom fields
+            "mw-expanded" => TrackerLayout::MultiworldExpanded,
+            "mw-collapsed" => TrackerLayout::MultiworldCollapsed,
+            "mw-edit" => TrackerLayout::MultiworldEdit,
+            "rsl-left" => TrackerLayout::RslLeft,
+            "rsl-right" => TrackerLayout::RslRight,
+            "rsl-edit" => TrackerLayout::RslEdit,
+            _ => return Err(()),
+        })
+    }
+}
+
+rocket::http::impl_from_uri_param_identity!([Path] TrackerLayout);
+
+impl UriDisplay<Path> for TrackerLayout {
+    fn fmt(&self, f: &mut Formatter<'_, Path>) -> fmt::Result {
+        f.write_raw(format!("{}", self))
+    }
+}
+
+/// A layout for a tracker displaying data from two players at once.
+///
+/// Used in the web app for more compact dungeon reward layouts on restreams.
+#[derive(Protocol)]
+pub enum DoubleTrackerLayout {
+    DungeonRewards,
+}
+
+impl DoubleTrackerLayout {
+    pub fn cells(&self) -> Vec<DungeonReward> {
+        match self {
+            DoubleTrackerLayout::DungeonRewards => vec![
+                DungeonReward::Stone(Stone::KokiriEmerald),
+                DungeonReward::Stone(Stone::GoronRuby),
+                DungeonReward::Stone(Stone::ZoraSapphire),
+                DungeonReward::Medallion(Medallion::Forest),
+                DungeonReward::Medallion(Medallion::Fire),
+                DungeonReward::Medallion(Medallion::Water),
+                DungeonReward::Medallion(Medallion::Shadow),
+                DungeonReward::Medallion(Medallion::Spirit),
+                DungeonReward::Medallion(Medallion::Light),
+            ],
+        }
+    }
+}
+
+impl<'a> FromParam<'a> for DoubleTrackerLayout {
+    type Error = ();
+
+    fn from_param(param: &'a str) -> Result<DoubleTrackerLayout, ()> {
+        Ok(match param {
+            "dungeon-rewards" => DoubleTrackerLayout::DungeonRewards,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl fmt::Display for DoubleTrackerLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DoubleTrackerLayout::DungeonRewards => write!(f, "dungeon-rewards"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Protocol)]
+pub enum CellStyle {
+    Normal,
+    Dimmed,
+    LeftDimmed,
+    RightDimmed,
+}
+
+#[derive(Clone, PartialEq, Eq, Protocol)]
+pub enum CellOverlay {
+    None,
+    Count(u8),
+    Image {
+        overlay_dir: Cow<'static, str>,
+        overlay_img: Cow<'static, str>,
+    },
+    Location {
+        loc_dir: Cow<'static, str>,
+        loc_img: Cow<'static, str>,
+        style: LocationStyle,
+    },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Protocol)]
+pub enum LocationStyle {
+    Normal,
+    Dimmed,
+    Mq,
+}
+
+#[derive(Clone, PartialEq, Eq, Protocol)]
+pub struct CellRender {
+    pub img_dir: Cow<'static, str>,
+    pub img_filename: Cow<'static, str>,
+    pub style: CellStyle,
+    pub overlay: CellOverlay,
+}
+
+impl CellRender {
+    pub fn to_html(&self) -> String {
+        format!(
+            r#"<img class="{}" src="/static/img/{}/{}.png" />{}"#,
+            match self.style {
+                CellStyle::Normal => "",
+                CellStyle::Dimmed => "dimmed",
+                CellStyle::LeftDimmed => "left-dimmed",
+                CellStyle::RightDimmed => "right-dimmed",
+            },
+            self.img_dir,
+            self.img_filename,
+            match self.overlay {
+                CellOverlay::None => String::default(),
+                CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
+                CellOverlay::Image { ref overlay_dir, ref overlay_img } => format!(r#"<img src="/static/img/{}/{}.png" />"#, overlay_dir, overlay_img),
+                CellOverlay::Location { ref loc_dir, ref loc_img, style } => format!(r#"<img class="{}" src="/static/img/{}/{}.png" />"#, match style {
+                    LocationStyle::Normal => "loc",
+                    LocationStyle::Dimmed => "loc dimmed",
+                    LocationStyle::Mq => "loc mq",
+                }, loc_dir, loc_img),
+            },
+        )
     }
 }
 

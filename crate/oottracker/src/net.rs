@@ -19,11 +19,14 @@ use {
         sync::Arc,
         time::Duration,
     },
+    async_proto::Protocol as _,
     derive_more::From,
     futures::{
         future::Future,
         stream::{
             self,
+            SplitSink,
+            SplitStream,
             Stream,
             StreamExt as _,
             TryStreamExt as _,
@@ -33,11 +36,18 @@ use {
     tokio::{
         net::{
             TcpListener,
+            TcpStream,
             UdpSocket,
         },
+        sync::Mutex,
         time::sleep,
     },
     tokio_stream::wrappers::TcpListenerStream,
+    tokio_tungstenite::{
+        MaybeTlsStream,
+        WebSocketStream,
+        tungstenite,
+    },
     wheel::FromArc,
     crate::{
         ModelState,
@@ -51,6 +61,7 @@ use {
             self,
             Ram,
         },
+        websocket,
     },
 };
 
@@ -62,6 +73,12 @@ pub enum Error {
     Io(Arc<io::Error>),
     Protocol(proto::ReadError),
     RamDecode(ram::DecodeError),
+    UnexpectedWebsocketMessage,
+    Websocket {
+        debug: String,
+        display: String,
+    },
+    Write(async_proto::WriteError),
 }
 
 impl fmt::Display for Error {
@@ -72,6 +89,9 @@ impl fmt::Display for Error {
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::Protocol(e) => e.fmt(f),
             Error::RamDecode(e) => write!(f, "error decoding game RAM: {:?}", e),
+            Error::UnexpectedWebsocketMessage => write!(f, "unexpected WebSocket message kind from server"),
+            Error::Websocket { display, .. } => display.fmt(f),
+            Error::Write(e) => e.fmt(f),
         }
     }
 }
@@ -105,6 +125,74 @@ impl Connection for NullConnection {
 
     fn set_state(&self, _: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
         Box::pin(async { Err(Error::CannotChangeState) })
+    }
+}
+
+type WsStream = Arc<Mutex<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>>;
+type WsSink = Arc<Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>>;
+
+pub struct WebConnection {
+    room: String,
+    sink: WsSink,
+    stream: WsStream,
+}
+
+impl WebConnection {
+    pub async fn new(room: impl ToString) -> Result<WebConnection, async_proto::WriteError> {
+        let (mut sink, stream) = tokio_tungstenite::connect_async("wss://oottracker.fenhl.net/websocket").await?.0.split();
+        websocket::ClientMessage::SubscribeRaw { room: room.to_string() }.write_ws(&mut sink).await?;
+        Ok(WebConnection {
+            room: room.to_string(),
+            sink: Arc::new(Mutex::new(sink)),
+            stream: Arc::new(Mutex::new(stream)),
+        })
+    }
+}
+
+impl fmt::Debug for WebConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "WebConnection {{ room: {:?}, .. }}", self.room) //TODO finish_non_exhaustive
+    }
+}
+
+impl Connection for WebConnection {
+    fn hash(&self) -> u64 {
+        let mut state = DefaultHasher::default();
+        TypeId::of::<Self>().hash(&mut state);
+        self.room.hash(&mut state);
+        state.finish()
+    }
+
+    fn can_change_state(&self) -> bool { true } //TODO support for read-only (passwordless) connections?
+    fn display_kind(&self) -> &'static str { "web" }
+
+    fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>> {
+        let stream = Arc::clone(&self.stream);
+        Box::pin(stream::unfold(stream, |stream| async move {
+            loop {
+                let stream_clone = Arc::clone(&stream);
+                break match websocket::ServerMessage::read_ws(&mut *stream_clone.lock().await).await {
+                    Ok(websocket::ServerMessage::Ping) => continue,
+                    Ok(websocket::ServerMessage::Error { debug, display }) => Some((Err(Error::Websocket { debug, display }), stream)),
+                    Ok(websocket::ServerMessage::Init(_)) | Ok(websocket::ServerMessage::Update { .. }) => Some((Err(Error::UnexpectedWebsocketMessage), stream)),
+                    Ok(websocket::ServerMessage::InitRaw(model)) => Some((Ok(Packet::ModelInit(model)), stream)),
+                    Ok(websocket::ServerMessage::UpdateRaw(delta)) => Some((Ok(Packet::ModelDelta(delta)), stream)),
+                    Err(e) => Some((Err(Error::Protocol(proto::ReadError::Packet(e))), stream)),
+                };
+            }
+        }))
+    }
+
+    fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
+        let room = self.room.clone();
+        let state = model.clone();
+        let sink = Arc::clone(&self.sink);
+        Box::pin(async move {
+            websocket::ClientMessage::SetRaw { room, state }
+                .write_ws(&mut *sink.lock().await)
+                .await?;
+            Ok(())
+        })
     }
 }
 

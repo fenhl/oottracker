@@ -1,7 +1,6 @@
 use {
     std::{
         convert::TryInto as _,
-        fmt,
         sync::Arc,
         time::Duration,
     },
@@ -23,77 +22,20 @@ use {
             WebSocket,
         },
     },
+    oottracker::websocket::{
+        ClientMessage,
+        ServerMessage,
+    },
     crate::{
-        CellRender,
         Error,
         Restreams,
         Rooms,
         TrackerCellKindExt as _,
-        restream::{
-            DoubleTrackerLayout,
-            TrackerLayout,
-            render_double_cell,
-        },
+        restream::render_double_cell,
     },
 };
 
 type WsSink = Arc<Mutex<SplitSink<WebSocket, Message>>>;
-
-#[derive(Protocol)]
-enum ServerMessage {
-    Ping,
-    Error {
-        debug: String,
-        display: String,
-    },
-    Init(Vec<CellRender>),
-    Update {
-        cell_id: u8,
-        new_cell: CellRender,
-    },
-}
-
-impl ServerMessage {
-    fn from_error(e: impl fmt::Debug + fmt::Display) -> ServerMessage {
-        ServerMessage::Error {
-            debug: format!("{:?}", e),
-            display: e.to_string(),
-        }
-    }
-}
-
-#[derive(Protocol)]
-enum ClientMessage {
-    Pong,
-    SubscribeRestream {
-        restream: String,
-        runner: String,
-        layout: TrackerLayout,
-    },
-    SubscribeDoubleRestream {
-        restream: String,
-        runner1: String,
-        runner2: String,
-        layout: DoubleTrackerLayout,
-    },
-    ClickRestream {
-        restream: String,
-        runner: String,
-        layout: TrackerLayout,
-        cell_id: u8,
-        right: bool,
-    },
-    SubscribeRoom {
-        room: String,
-        layout: TrackerLayout,
-    },
-    ClickRoom {
-        room: String,
-        layout: TrackerLayout,
-        cell_id: u8,
-        right: bool,
-    },
-}
 
 async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
     let ping_sink = WsSink::clone(&sink);
@@ -127,7 +69,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                             }
                         };
                         let cells = layout.cells().into_iter()
-                            .map(|(cell, _, _)| cell.kind().render(&runner))
+                            .map(|cell| cell.id.kind().render(&runner))
                             .collect::<Vec<_>>();
                         if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
                         (cells, rx.clone())
@@ -149,7 +91,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                                     return
                                 }
                             };
-                            layout.cells().into_iter().map(|(cell, _, _)| cell.kind().render(&runner)).collect::<Vec<_>>()
+                            layout.cells().into_iter().map(|cell| cell.id.kind().render(&runner)).collect::<Vec<_>>()
                         };
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
                             if old_cell != new_cell {
@@ -245,7 +187,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                     }
                 };
                 let cell = match layout.cells().get(usize::from(cell_id)) {
-                    Some(&(cell, _, _)) => cell,
+                    Some(cell) => cell.id,
                     None => {
                         let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())
@@ -258,6 +200,30 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
+            ClientMessage::SubscribeRaw { room } => {
+                let rooms = Rooms::clone(&rooms);
+                let sink = WsSink::clone(&sink);
+                tokio::spawn(async move {
+                    let (mut old_model, mut rx) = {
+                        let mut rooms = rooms.lock().await;
+                        let room = rooms.entry(room.clone()).or_default();
+                        let model = room.model.clone();
+                        if ServerMessage::InitRaw(model.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                        (model, room.rx.clone())
+                    };
+                    while let Ok(()) = rx.changed().await { //TODO better error handling
+                        let new_model = {
+                            let mut rooms = rooms.lock().await;
+                            let room = rooms.entry(room.clone()).or_default();
+                            room.model.clone()
+                        };
+                        if old_model != new_model {
+                            if (ServerMessage::UpdateRaw(&new_model - &old_model)).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                        }
+                        old_model = new_model;
+                    }
+                });
+            }
             ClientMessage::SubscribeRoom { room, layout } => {
                 let rooms = Rooms::clone(&rooms);
                 let sink = WsSink::clone(&sink);
@@ -266,7 +232,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                         let mut rooms = rooms.lock().await;
                         let room = rooms.entry(room.clone()).or_default();
                         let cells = layout.cells().into_iter()
-                            .map(|(cell, _, _)| cell.kind().render(&room.model))
+                            .map(|cell| cell.id.kind().render(&room.model))
                             .collect::<Vec<_>>();
                         if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
                         (cells, room.rx.clone())
@@ -275,7 +241,7 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                         let new_cells = {
                             let mut rooms = rooms.lock().await;
                             let room = rooms.entry(room.clone()).or_default();
-                            layout.cells().into_iter().map(|(cell, _, _)| cell.kind().render(&room.model)).collect::<Vec<_>>()
+                            layout.cells().into_iter().map(|cell| cell.id.kind().render(&room.model)).collect::<Vec<_>>()
                         };
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
                             if old_cell != new_cell {
@@ -286,11 +252,17 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                     }
                 });
             }
+            ClientMessage::SetRaw { room, state } => {
+                let mut rooms = rooms.lock().await;
+                let room = rooms.entry(room.clone()).or_default();
+                room.model = state;
+                room.tx.send(()).expect("failed to notify websockets about state change");
+            }
             ClientMessage::ClickRoom { room, layout, cell_id, right } => {
                 let mut rooms = rooms.lock().await;
                 let room = rooms.entry(room.clone()).or_default();
                 let cell = match layout.cells().get(usize::from(cell_id)) {
-                    Some(&(cell, _, _)) => cell,
+                    Some(cell) => cell.id,
                     None => {
                         let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())

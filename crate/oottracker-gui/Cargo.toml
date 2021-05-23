@@ -8,6 +8,7 @@ edition = "2018"
 winres = "0.1"
 
 [dependencies]
+async-proto = "0.7"
 derivative = "2"
 futures = "0.3"
 image = "0.23"
