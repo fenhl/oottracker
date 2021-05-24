@@ -2,8 +2,10 @@ use {
     std::convert::TryInto as _,
     itertools::Itertools as _,
     rocket::{
+        FromForm,
         Rocket,
         State,
+        form::Form,
         fs::{
             FileServer,
             relative,
@@ -74,6 +76,17 @@ fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
 #[rocket::get("/")]
 fn index() -> Html<String> {
     Html(format!(include_str!("../../../assets/web/index.html"), env!("CARGO_PKG_VERSION")))
+}
+
+#[derive(FromForm)]
+struct GoRoomForm<'r> {
+    #[field(validate = len(1..))]
+    room: &'r str,
+}
+
+#[rocket::post("/", data = "<form>")]
+fn post_index(form: Form<GoRoomForm<'_>>) -> Redirect {
+    Redirect::to(rocket::uri!(room(form.room.to_owned())))
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>")]
@@ -173,6 +186,7 @@ pub(crate) fn rocket(rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build
     .mount("/static", FileServer::new(relative!("../../assets/web/static"), rocket::fs::Options::None))
     .mount("/", rocket::routes![
         index,
+        post_index,
         restream_room_input,
         restream_room_view,
         restream_click,
