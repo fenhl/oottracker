@@ -584,6 +584,8 @@ impl<A: App> Session<A> {
     pub async fn new(app: A) -> reqwest::Result<Session<A>> {
         let client = reqwest::Client::builder()
             .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+            .use_rustls_tls()
+            .https_only(true)
             .build()?;
         let mut session = Session {
             client, app,

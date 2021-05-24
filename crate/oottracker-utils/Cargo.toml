@@ -72,7 +72,7 @@ path = "../oottracker-web"
 [target.'cfg(windows)'.dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["json", "rustls-tls"]
+features = ["json", "rustls-tls", "trust-dns"]
 
 [target.'cfg(windows)'.dependencies.semver]
 version = "0.11"

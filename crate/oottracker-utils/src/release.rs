@@ -116,7 +116,14 @@ async fn release_client() -> Result<reqwest::Client, Error> {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&format!("token {}", fs::read_to_string("assets/release-token").await?))?);
     headers.insert(reqwest::header::USER_AGENT, reqwest::header::HeaderValue::from_static(concat!("oottracker-release/", env!("CARGO_PKG_VERSION"))));
-    Ok(reqwest::Client::builder().default_headers(headers).timeout(Duration::from_secs(600)).build()?)
+    Ok(reqwest::Client::builder()
+        .user_agent(concat!("oottracker/", env!("CARGO_PKG_VERSION")))
+        .default_headers(headers)
+        .timeout(Duration::from_secs(600))
+        .http2_prior_knowledge()
+        .use_rustls_tls()
+        .https_only(true)
+        .build()?)
 }
 
 #[cfg(windows)]

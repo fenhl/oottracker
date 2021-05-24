@@ -51,7 +51,6 @@ path = "../oottracker"
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["rustls-tls"]
 
 [dependencies.structopt]
 version = "0.3"

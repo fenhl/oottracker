@@ -53,7 +53,7 @@ path = "../oottracker-derive"
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["json", "rustls-tls"]
+features = ["json", "rustls-tls", "trust-dns"]
 
 [dependencies.rocket]
 git = "https://github.com/SergioBenitez/Rocket"
