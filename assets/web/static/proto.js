@@ -66,7 +66,7 @@ function sendClick(cellID, right) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        const layoutBuf = restreamLayoutBuf(restreamMatch[3]);
+        const layoutBuf = layoutBuf(restreamMatch[3]);
         buf = new ArrayBuffer(2);
         bufView = new DataView(buf);
         bufView.setUint8(0, cellID);
