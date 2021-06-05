@@ -4,7 +4,7 @@ const utf8encoder = new TextEncoder();
 
 sock.binaryType = "arraybuffer";
 
-function layoutBuf(layoutString) {
+function makeLayoutBuf(layoutString) {
     let buf = new ArrayBuffer(1);
     switch (layoutString) {
         case 'default':
@@ -66,7 +66,7 @@ function sendClick(cellID, right) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        const layoutBuf = layoutBuf(restreamMatch[3]);
+        const layoutBuf = makeLayoutBuf(restreamMatch[3]);
         buf = new ArrayBuffer(2);
         bufView = new DataView(buf);
         bufView.setUint8(0, cellID);
@@ -206,7 +206,7 @@ sock.addEventListener('open', function(event) {
         const runner = utf8encoder.encode(restreamMatch[2]);
         const runnerLen = new ArrayBuffer(8);
         new DataView(runnerLen).setBigUint64(0, BigInt(runner.length));
-        const restreamLayoutBuf = layoutBuf(restreamMatch[3]);
+        const restreamLayoutBuf = makeLayoutBuf(restreamMatch[3]);
         sock.send(new Blob([restreamSubscription, restreamLen, restream, runnerLen, runner, restreamLayoutBuf]));
     } else if (restreamDoubleMatch) {
         const doubleSubscription = new ArrayBuffer(1);
