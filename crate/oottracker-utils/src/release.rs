@@ -31,16 +31,13 @@ use {
         result::ZipError,
         write::FileOptions,
     },
-    crate::{
-        github::{
-            Release,
-            Repo,
-        },
-        version::version,
+    oottracker::github::{
+        Release,
+        Repo,
     },
+    crate::version::version,
 };
 
-#[cfg(windows)] mod github;
 #[cfg(windows)] mod version;
 
 #[cfg(windows)] const MACOS_ADDR: &str = "192.168.178.63";
@@ -174,6 +171,8 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release,
 
 #[cfg(windows)]
 async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
+    eprintln!("building oottracker-updater.exe");
+    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-pc-windows-msvc").arg("--package=oottracker-updater").check("cargo build --package=oottracker-updater", verbose).await?;
     eprintln!("building oottracker-win64.exe");
     Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo build --package=oottracker-gui", verbose).await?;
     eprintln!("uploading oottracker-win64.exe");

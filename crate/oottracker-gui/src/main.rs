@@ -6,7 +6,10 @@
 use {
     std::{
         collections::HashMap,
+        convert::Infallible as Never,
+        env,
         fmt,
+        io,
         sync::Arc,
     },
     derivative::Derivative,
@@ -25,6 +28,7 @@ use {
             Column,
             Image,
             Row,
+            Space,
             Text,
             button::{
                 self,
@@ -52,8 +56,13 @@ use {
     iced_native::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
+    semver::{
+        SemVerError,
+        Version,
+    },
     smart_default::SmartDefault,
     structopt::StructOpt,
+    tokio::fs,
     url::Url,
     wheel::FromArc,
     ootr::{
@@ -75,6 +84,7 @@ use {
             CheckStatusError,
         },
         firebase,
+        github::Repo,
         net::{
             self,
             Connection,
@@ -82,11 +92,13 @@ use {
         proto::Packet,
         save::*,
         ui::{
+            self,
             *,
             TrackerCellKind::*,
         },
     },
 };
+#[cfg(target_os = "macos")] use std::time::Duration;
 
 mod lang;
 mod logic;
@@ -313,20 +325,22 @@ enum Message<R: Rando> {
     CheckStatusErrorStatic(CheckStatusError<R>),
     ClientDisconnected,
     CloseMenu,
-    ConfigError(oottracker::ui::Error),
+    ConfigError(ui::Error),
     ConnectionError(ConnectionError),
     Connect,
     DismissNotification,
     DismissWelcomeScreen,
+    InstallUpdate,
     KeyboardModifiers(KeyboardModifiers),
     LeftClick(TrackerCellId),
     LoadConfig(Config),
     Logic(logic::Message<R>),
-    MissingConfig,
     MouseMoved([f32; 2]),
     Nop,
     Packet(Packet),
+    ResetUpdateState,
     RightClick,
+    SetAutoUpdateCheck(bool),
     SetMedOrder(ElementOrder),
     SetPasscode(String),
     SetConnection(Arc<dyn Connection>),
@@ -335,6 +349,9 @@ enum Message<R: Rando> {
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
     UpdateAvailableChecks(HashMap<Check<R>, CheckStatus>),
+    UpdateCheck,
+    UpdateCheckComplete(Option<Version>),
+    UpdateCheckError(UpdateCheckError),
 }
 
 impl<R: Rando> fmt::Display for Message<R> {
@@ -432,11 +449,15 @@ impl ConnectionParams {
 #[derive(Debug)]
 struct State<R: Rando + 'static> {
     flags: Args,
-    config: Config,
+    config: Option<Config>,
+    http_client: reqwest::Client,
+    update_check: UpdateCheckState,
     connection: Option<Arc<dyn Connection>>,
     keyboard_modifiers: KeyboardModifiers,
     last_cursor_pos: [f32; 2],
-    dismiss_welcome_screen_button: Option<button::State>,
+    dismiss_welcome_screen_button: button::State,
+    enable_update_checks_button: button::State,
+    disable_update_checks_button: button::State,
     cell_buttons: [button::State; 52],
     rando: Arc<R>,
     model: ModelState,
@@ -452,7 +473,11 @@ impl<R: Rando + 'static> State<R> {
         if self.connection.as_ref().map_or(true, |connection| connection.can_change_state()) {
             TrackerLayout::from(&self.config)
         } else {
-            TrackerLayout::new_auto(&self.config)
+            if let Some(ref config) = self.config {
+                TrackerLayout::new_auto(config)
+            } else {
+                TrackerLayout::default_auto()
+            }
         }
     }
 
@@ -466,13 +491,17 @@ impl<R: Rando + 'static> State<R> {
     }
 
     fn save_config(&self) -> Command<Message<R>> {
-        let config = self.config.clone();
-        async move {
-            match config.save().await {
-                Ok(()) => Message::Nop,
-                Err(e) => Message::ConfigError(e),
-            }
-        }.into()
+        if let Some(ref config) = self.config {
+            let config = config.clone();
+            async move {
+                match config.save().await {
+                    Ok(()) => Message::Nop,
+                    Err(e) => Message::ConfigError(e),
+                }
+            }.into()
+        } else {
+            Command::none()
+        }
     }
 }
 
@@ -480,11 +509,21 @@ impl Default for State<ootr_static::Rando> {
     fn default() -> State<ootr_static::Rando> {
         State {
             flags: Args::default(),
-            config: Config::default(),
+            config: None,
+            http_client: reqwest::Client::builder()
+                .user_agent(concat!("oottracker/", env!("CARGO_PKG_VERSION")))
+                .http2_prior_knowledge()
+                .use_rustls_tls()
+                .https_only(true)
+                .build()
+                .expect("failed to build HTTP client"),
+            update_check: UpdateCheckState::Unknown(button::State::default()),
             connection: None,
             keyboard_modifiers: KeyboardModifiers::default(),
             last_cursor_pos: [0.0, 0.0],
-            dismiss_welcome_screen_button: None,
+            dismiss_welcome_screen_button: button::State::default(),
+            enable_update_checks_button: button::State::default(),
+            disable_update_checks_button: button::State::default(),
             cell_buttons: [
                 button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
                 button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
@@ -524,7 +563,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
         (State::from(flags), async {
             match Config::new().await {
                 Ok(Some(config)) => Message::LoadConfig(config),
-                Ok(None) => Message::MissingConfig,
+                Ok(None) => Message::Nop,
                 Err(e) => Message::ConfigError(e),
             }
         }.into())
@@ -561,8 +600,18 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             Message::ConnectionError(_) => return self.notify(message),
             Message::DismissNotification => self.notification = None,
             Message::DismissWelcomeScreen => {
-                self.dismiss_welcome_screen_button = None;
+                self.config = Some(Config::default());
                 return self.save_config()
+            }
+            Message::InstallUpdate => {
+                self.update_check = UpdateCheckState::Installing;
+                let client = self.http_client.clone();
+                return async move {
+                    match run_updater(&client).await {
+                        Ok(never) => match never {},
+                        Err(e) => Message::UpdateCheckError(e),
+                    }
+                }.into()
             }
             Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
             Message::LeftClick(cell) => if cell.kind().left_click(self.connection.as_ref().map_or(true, |connection| connection.can_change_state()), self.keyboard_modifiers, &mut self.model) {
@@ -579,11 +628,16 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 }
             },
             Message::LoadConfig(config) => match config.version {
-                0 => self.config = config,
+                0 => {
+                    let auto_update_check = config.auto_update_check;
+                    self.config = Some(config);
+                    if auto_update_check == Some(true) {
+                        return async { Message::UpdateCheck }.into()
+                    }
+                }
                 v => unimplemented!("config version from the future: {}", v),
             },
             Message::Logic(msg) => return self.logic.update(msg),
-            Message::MissingConfig => self.dismiss_welcome_screen_button = Some(button::State::default()),
             Message::MouseMoved(pos) => self.last_cursor_pos = pos,
             Message::Nop => {}
             Message::Packet(packet) => {
@@ -627,6 +681,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                     }.into()
                 }
             }
+            Message::ResetUpdateState => self.update_check = UpdateCheckState::Unknown(button::State::default()),
             Message::RightClick => {
                 if self.menu_state.is_none() {
                     if let Some(cell) = self.layout().cell_at(self.last_cursor_pos, self.notification.is_none()) {
@@ -646,12 +701,16 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                     }
                 }
             }
+            Message::SetAutoUpdateCheck(enable) => {
+                self.config.as_mut().expect("config not yet loaded").auto_update_check = Some(enable);
+                return self.save_config()
+            }
             Message::SetConnection(connection) => self.connection = Some(connection),
             Message::SetConnectionKind(kind) => if let Some(MenuState { ref mut connection_params, .. }) = self.menu_state {
                 connection_params.set_kind(kind);
             }
             Message::SetMedOrder(med_order) => {
-                self.config.med_order = med_order;
+                self.config.as_mut().expect("config not yet loaded").med_order = med_order;
                 return self.save_config()
             }
             Message::SetPasscode(new_passcode) => if let Some(MenuState { connection_params: ConnectionParams::Web { ref mut passcode, .. }, .. }) = self.menu_state {
@@ -666,10 +725,30 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 *url = new_url;
             },
             Message::SetWarpSongOrder(warp_song_order) => {
-                self.config.warp_song_order = warp_song_order;
+                self.config.as_mut().expect("config not yet loaded").warp_song_order = warp_song_order;
                 return self.save_config()
             }
             Message::UpdateAvailableChecks(checks) => self.checks = checks,
+            Message::UpdateCheck => {
+                self.update_check = UpdateCheckState::Checking;
+                let client = self.http_client.clone();
+                return async move {
+                    match check_for_updates(&client).await {
+                        Ok(update_available) => Message::UpdateCheckComplete(update_available),
+                        Err(e) => Message::UpdateCheckError(e),
+                    }
+                }.into()
+            }
+            Message::UpdateCheckComplete(Some(new_ver)) => self.update_check = UpdateCheckState::UpdateAvailable {
+                new_ver,
+                update_btn: button::State::default(),
+                reset_btn: button::State::default(),
+            },
+            Message::UpdateCheckComplete(None) => self.update_check = UpdateCheckState::NoUpdateAvailable,
+            Message::UpdateCheckError(e) => self.update_check = UpdateCheckState::Error {
+                e,
+                reset_btn: button::State::default(),
+            },
         }
         Command::none()
     }
@@ -688,13 +767,14 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             return Column::new()
                 .push(Row::new()
                     .push(Button::new(&mut menu_state.dismiss_btn, Text::new("Back")).on_press(Message::CloseMenu))
-                    .push(Text::new(concat!("version ", env!("CARGO_PKG_VERSION"))).horizontal_alignment(HorizontalAlignment::Right).width(Length::Fill))
+                    .push(Space::with_width(Length::Fill))
+                    .push(self.update_check.view())
                 )
                 .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
                 .push(Text::new("Medallion order:"))
-                .push(PickList::new(&mut menu_state.med_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.med_order), Message::SetMedOrder))
+                .push(PickList::new(&mut menu_state.med_order, ElementOrder::into_enum_iter().collect_vec(), self.config.as_ref().map(|cfg| cfg.med_order), Message::SetMedOrder))
                 .push(Text::new("Warp song order:"))
-                .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), Some(self.config.warp_song_order), Message::SetWarpSongOrder))
+                .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), self.config.as_ref().map(|cfg| cfg.warp_song_order), Message::SetWarpSongOrder))
                 .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
                 //TODO replace connection options with “current connection” info when connected
                 .push(PickList::new(&mut menu_state.connection_kind, ConnectionKind::into_enum_iter().collect_vec(), Some(menu_state.connection_params.kind()), Message::SetConnectionKind))
@@ -723,67 +803,91 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 .push(cell!(cells.next().unwrap()))
                 .spacing(10)
             );
-        let view = if let Some(ref mut dismiss_button) = self.dismiss_welcome_screen_button {
+        let view = if let Some(ref config) = self.config {
+            if let UpdateCheckState::UpdateAvailable { ref new_ver, ref mut update_btn, ref mut reset_btn } = self.update_check {
+                view.push(Text::new(format!("OoT Tracker {} is available — you have {}", new_ver, env!("CARGO_PKG_VERSION")))
+                    .color([1.0, 1.0, 1.0])
+                    .width(Length::Fill)
+                    .horizontal_alignment(HorizontalAlignment::Center)
+                )
+                .push(Row::new()
+                    .push(Button::new(update_btn, Text::new("Update")).on_press(Message::InstallUpdate))
+                    .push(Button::new(reset_btn, Text::new("Dismiss")).on_press(Message::ResetUpdateState))
+                    .spacing(5)
+                )
+            } else if config.auto_update_check.is_some() {
+                let mut row2 = Vec::with_capacity(4);
+                let mut stone_locs = Vec::with_capacity(3);
+                row2.push(cells.next().unwrap());
+                row2.push(cells.next().unwrap());
+                stone_locs.push(cells.next().unwrap());
+                stone_locs.push(cells.next().unwrap());
+                stone_locs.push(cells.next().unwrap());
+                row2.push(cells.next().unwrap());
+                row2.push(cells.next().unwrap());
+                let mut view = view.push(Row::new()
+                        .push(cell!(row2[0]))
+                        .push(cell!(row2[1]))
+                        .push(Column::new()
+                            .push(cell!(stone_locs[0]))
+                            .push(cell!(cells.next().unwrap()))
+                            .spacing(10)
+                        )
+                        .push(Column::new()
+                            .push(cell!(stone_locs[1]))
+                            .push(cell!(cells.next().unwrap()))
+                            .spacing(10)
+                        )
+                        .push(Column::new()
+                            .push(cell!(stone_locs[2]))
+                            .push(cell!(cells.next().unwrap()))
+                            .spacing(10)
+                        )
+                        .push(cell!(row2[2]))
+                        .push(cell!(row2[3]))
+                        .spacing(10)
+                    );
+                for i in 0..5 {
+                    if i == 3 && self.notification.is_some() { break }
+                    view = view.push(Row::new()
+                        .push(cell!(cells.next().unwrap()))
+                        .push(cell!(cells.next().unwrap()))
+                        .push(cell!(cells.next().unwrap()))
+                        .push(cell!(cells.next().unwrap()))
+                        .push(cell!(cells.next().unwrap()))
+                        .push(cell!(cells.next().unwrap()))
+                        .spacing(10)
+                    );
+                }
+                if let Some((is_temp, ref notification)) = self.notification {
+                    let mut row = Row::new()
+                        .push(Text::new(format!("{}", notification)).color([1.0, 1.0, 1.0]).width(Length::Fill));
+                    if !is_temp {
+                        row = row.push(Button::new(&mut self.dismiss_notification_button, Text::new("X").color([1.0, 0.0, 0.0])).on_press(Message::DismissNotification));
+                    }
+                    view.push(row.height(Length::Units(101)))
+                } else {
+                    view
+                }
+            } else {
+                view.push(Text::new("Check for updates on startup?")
+                    .color([1.0, 1.0, 1.0])
+                    .width(Length::Fill)
+                    .horizontal_alignment(HorizontalAlignment::Center)
+                )
+                .push(Row::new()
+                    .push(Button::new(&mut self.enable_update_checks_button, Text::new("Yes")).on_press(Message::SetAutoUpdateCheck(true)))
+                    .push(Button::new(&mut self.disable_update_checks_button, Text::new("No")).on_press(Message::SetAutoUpdateCheck(false)))
+                    .spacing(5)
+                )
+            }
+        } else {
             view.push(Text::new("Welcome to the OoT tracker!\nTo change settings, right-click a Medallion.")
                     .color([1.0, 1.0, 1.0])
                     .width(Length::Fill)
                     .horizontal_alignment(HorizontalAlignment::Center)
                 )
-                .push(Button::new(dismiss_button, Text::new("OK")).on_press(Message::DismissWelcomeScreen))
-        } else {
-            let mut row2 = Vec::with_capacity(4);
-            let mut stone_locs = Vec::with_capacity(3);
-            row2.push(cells.next().unwrap());
-            row2.push(cells.next().unwrap());
-            stone_locs.push(cells.next().unwrap());
-            stone_locs.push(cells.next().unwrap());
-            stone_locs.push(cells.next().unwrap());
-            row2.push(cells.next().unwrap());
-            row2.push(cells.next().unwrap());
-            let mut view = view.push(Row::new()
-                    .push(cell!(row2[0]))
-                    .push(cell!(row2[1]))
-                    .push(Column::new()
-                        .push(cell!(stone_locs[0]))
-                        .push(cell!(cells.next().unwrap()))
-                        .spacing(10)
-                    )
-                    .push(Column::new()
-                        .push(cell!(stone_locs[1]))
-                        .push(cell!(cells.next().unwrap()))
-                        .spacing(10)
-                    )
-                    .push(Column::new()
-                        .push(cell!(stone_locs[2]))
-                        .push(cell!(cells.next().unwrap()))
-                        .spacing(10)
-                    )
-                    .push(cell!(row2[2]))
-                    .push(cell!(row2[3]))
-                    .spacing(10)
-                );
-            for i in 0..5 {
-                if i == 3 && self.notification.is_some() { break }
-                view = view.push(Row::new()
-                    .push(cell!(cells.next().unwrap()))
-                    .push(cell!(cells.next().unwrap()))
-                    .push(cell!(cells.next().unwrap()))
-                    .push(cell!(cells.next().unwrap()))
-                    .push(cell!(cells.next().unwrap()))
-                    .push(cell!(cells.next().unwrap()))
-                    .spacing(10)
-                );
-            }
-            if let Some((is_temp, ref notification)) = self.notification {
-                let mut row = Row::new()
-                    .push(Text::new(format!("{}", notification)).color([1.0, 1.0, 1.0]).width(Length::Fill));
-                if !is_temp {
-                    row = row.push(Button::new(&mut self.dismiss_notification_button, Text::new("X").color([1.0, 0.0, 0.0])).on_press(Message::DismissNotification));
-                }
-                view.push(row.height(Length::Units(101)))
-            } else {
-                view
-            }
+                .push(Button::new(&mut self.dismiss_welcome_screen_button, Text::new("OK")).on_press(Message::DismissWelcomeScreen))
         };
         let items_container = Container::new(Container::new(view.spacing(10).padding(5))
                 .width(Length::Units(WIDTH as u16))
@@ -912,6 +1016,122 @@ async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn 
         connection.set_state(&state).await?;
     }
     Ok(connection)
+}
+
+#[derive(Debug)]
+enum UpdateCheckState {
+    Unknown(button::State),
+    Checking,
+    Error {
+        e: UpdateCheckError,
+        reset_btn: button::State,
+    },
+    UpdateAvailable {
+        new_ver: Version,
+        update_btn: button::State,
+        reset_btn: button::State,
+    },
+    NoUpdateAvailable,
+    Installing,
+}
+
+impl UpdateCheckState {
+    fn view(&mut self) -> Element<'_, Message<ootr_static::Rando>> {
+        match self {
+            UpdateCheckState::Unknown(check_btn) => Row::new()
+                .push(Text::new(concat!("version ", env!("CARGO_PKG_VERSION"))))
+                .push(Button::new(check_btn, Text::new("Check for Updates")).on_press(Message::UpdateCheck))
+                .into(),
+            UpdateCheckState::Checking => Text::new(concat!("version ", env!("CARGO_PKG_VERSION"), " — checking for updates…")).into(),
+            UpdateCheckState::Error { e, reset_btn } => Row::new()
+                .push(Text::new(format!("error checking for updates: {}", e)))
+                .push(Button::new(reset_btn, Text::new("Dismiss")).on_press(Message::ResetUpdateState))
+                .into(),
+            UpdateCheckState::UpdateAvailable { new_ver, update_btn, .. } => Row::new()
+                .push(Text::new(format!("{} is available — you have {}", new_ver, env!("CARGO_PKG_VERSION"))))
+                .push(Button::new(update_btn, Text::new("Update")).on_press(Message::InstallUpdate))
+                .into(),
+            UpdateCheckState::NoUpdateAvailable => Text::new(concat!("version ", env!("CARGO_PKG_VERSION"), " — up to date")).into(),
+            UpdateCheckState::Installing => Text::new(concat!("version ", env!("CARGO_PKG_VERSION"), " — Installing update…")).into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, From, FromArc)]
+enum UpdateCheckError {
+    #[from_arc]
+    Io(Arc<io::Error>),
+    #[cfg(target_os = "macos")]
+    MissingAsset,
+    NoReleases,
+    #[from_arc]
+    Reqwest(Arc<reqwest::Error>),
+    #[from]
+    SemVer(SemVerError),
+    #[from]
+    Ui(ui::Error),
+}
+
+impl fmt::Display for UpdateCheckError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UpdateCheckError::Io(e) => write!(f, "I/O error: {}", e),
+            #[cfg(target_os = "macos")]
+            UpdateCheckError::MissingAsset => write!(f, "release does not have a download for this platform"),
+            UpdateCheckError::NoReleases => write!(f, "there are no released versions"),
+            UpdateCheckError::Reqwest(e) => if let Some(url) = e.url() {
+                write!(f, "HTTP error at {}: {}", url, e)
+            } else {
+                write!(f, "HTTP error: {}", e)
+            },
+            UpdateCheckError::SemVer(e) => e.fmt(f),
+            UpdateCheckError::Ui(e) => e.fmt(f),
+        }
+    }
+}
+
+async fn check_for_updates(client: &reqwest::Client) -> Result<Option<Version>, UpdateCheckError> {
+    let repo = Repo::new("fenhl", "oottracker");
+    if let Some(release) = repo.latest_release(client).await? {
+        let new_ver = release.version()?;
+        Ok(if new_ver > Version::parse(env!("CARGO_PKG_VERSION"))? { Some(new_ver) } else { None })
+    } else {
+        Err(UpdateCheckError::NoReleases)
+    }
+}
+
+async fn run_updater(#[cfg_attr(windows, allow(unused))] client: &reqwest::Client) -> Result<Never, UpdateCheckError> {
+    #[cfg(target_os = "macos")] { //TODO use Sparkle or similar on macOS for automation?
+        let release = Repo::new("fenhl", "oottracker").latest_release(&client).await?.ok_or(UpdateCheckError::NoReleases)?;
+        let (asset,) = release.assets.into_iter()
+            .filter(|asset| asset.name.ends_with("-mac.dmg"))
+            .collect_tuple().ok_or(UpdateCheckError::MissingAsset)?;
+        let response = client.get(asset.browser_download_url).send().await?.error_for_status()?;
+        let project_dirs = dirs()?;
+        let cache_dir = project_dirs.cache_dir();
+        fs::create_dir_all(cache_dir).await?;
+        let dmg_download_path = cache_dir.join(asset.name);
+        {
+            let mut data = response.bytes_stream();
+            let mut dmg_file = File::create(&dmg_download_path).await?;
+            while let Some(chunk) = data.try_next().await? {
+                exe_file.write_all(chunk.as_ref()).await?;
+            }
+        }
+        sleep(Duration::from_secs(1)).await; // to make sure the download is closed
+        std::process::Command::new("open").arg(dmg_download_path).spawn()?;
+        std::process::exit(0)
+    }
+    #[cfg(target_os = "windows")] {
+        let project_dirs = dirs()?;
+        let cache_dir = project_dirs.cache_dir();
+        fs::create_dir_all(cache_dir).await?;
+        let updater_path = cache_dir.join("updater.exe");
+        #[cfg(target_arch = "x86_64")] let updater_data = include_bytes!("../../../target/x86_64-pc-windows-msvc/release/oottracker-updater.exe");
+        fs::write(&updater_path, updater_data).await?;
+        let _ = std::process::Command::new(updater_path).arg(env::current_exe()?).spawn()?;
+        std::process::exit(0)
+    }
 }
 
 #[derive(Debug, Default, StructOpt)]

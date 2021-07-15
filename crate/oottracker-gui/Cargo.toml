@@ -14,6 +14,7 @@ futures = "0.3"
 image = "0.23"
 itertools = "0.10"
 num-traits = "0.2"
+semver = "0.11"
 smart-default = "0.6"
 url = "2"
 
@@ -51,6 +52,7 @@ path = "../oottracker"
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
+features = ["rustls-tls", "trust-dns"]
 
 [dependencies.structopt]
 version = "0.3"

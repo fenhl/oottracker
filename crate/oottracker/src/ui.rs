@@ -73,7 +73,7 @@ impl fmt::Display for Error {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, SmartDefault, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[default(ElementOrder::LightShadowSpirit)]
@@ -82,6 +82,7 @@ pub struct Config {
     #[default(ElementOrder::SpiritShadowLight)]
     #[serde(default = "default_warp_song_order")]
     pub warp_song_order: ElementOrder,
+    pub auto_update_check: Option<bool>,
     #[default(VERSION)]
     pub version: u8,
 }
@@ -1521,6 +1522,12 @@ impl<'a> From<&'a Config> for TrackerLayout {
             meds: config.med_order,
             warp_songs: config.warp_song_order,
         }
+    }
+}
+
+impl<'a> From<&'a Option<Config>> for TrackerLayout {
+    fn from(config: &Option<Config>) -> TrackerLayout {
+        config.as_ref().map(TrackerLayout::from).unwrap_or_default()
     }
 }
 

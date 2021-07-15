@@ -37,6 +37,7 @@ pub use crate::{
 
 pub mod checks;
 pub mod firebase;
+pub mod github;
 pub mod info_tables;
 mod item_ids;
 pub mod knowledge;

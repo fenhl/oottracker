@@ -29,6 +29,7 @@ pub async fn version() -> Version {
     assert_eq!(version, oottracker_bizhawk::version());
     //assert_eq!(version, oottracker_csharp::version()); //TODO
     check_cli_version("oottracker-gui", &version).await;
+    check_cli_version("oottracker-updater", &version).await;
     check_cli_version("oottracker-web", &version).await;
     version
 }

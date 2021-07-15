@@ -75,6 +75,10 @@ features = ["net"]
 version = "0.14"
 features = ["rustls-tls"]
 
+[dependencies.url]
+version = "2"
+features = ["serde"]
+
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
