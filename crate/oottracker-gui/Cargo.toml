@@ -52,7 +52,7 @@ path = "../oottracker"
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["rustls-tls", "trust-dns"]
+features = ["rustls-tls", "stream", "trust-dns"]
 
 [dependencies.structopt]
 version = "0.3"
@@ -60,7 +60,7 @@ features = ["paw"]
 
 [dependencies.tokio]
 version = "1"
-features = ["fs", "io-util", "net"]
+features = ["fs", "io-util", "net", "time"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"

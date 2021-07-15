@@ -98,7 +98,15 @@ use {
         },
     },
 };
-#[cfg(target_os = "macos")] use std::time::Duration;
+#[cfg(target_os = "macos")] use {
+    std::time::Duration,
+    futures::stream::TryStreamExt as _,
+    tokio::{
+        fs::File,
+        io::AsyncWriteExt as _,
+        time::sleep,
+    },
+};
 
 mod lang;
 mod logic;
@@ -1115,7 +1123,7 @@ async fn run_updater(#[cfg_attr(windows, allow(unused))] client: &reqwest::Clien
             let mut data = response.bytes_stream();
             let mut dmg_file = File::create(&dmg_download_path).await?;
             while let Some(chunk) = data.try_next().await? {
-                exe_file.write_all(chunk.as_ref()).await?;
+                dmg_file.write_all(chunk.as_ref()).await?;
             }
         }
         sleep(Duration::from_secs(1)).await; // to make sure the download is closed
