@@ -766,7 +766,7 @@ namespace Net.Fenhl.OotAutoTracker
 
     [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
     [ExternalToolEmbeddedIcon("Net.Fenhl.OotAutoTracker.Resources.icon.ico")]
-    public sealed class MainForm : FormBase, IExternalToolForm
+    public sealed class MainForm : ToolFormBase, IExternalToolForm
     {
         private PictureBox[] cells = new PictureBox[52];
         private Label label_Version;

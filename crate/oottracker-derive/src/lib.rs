@@ -904,11 +904,11 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         #(#decls)*
 
         impl Scene {
-            fn from_id(scene_id: u8) -> Scene {
-                Scene(match scene_id {
+            fn from_id(scene_id: u8) -> Option<Scene> {
+                Some(Scene(match scene_id {
                     #(#from_id_arms,)*
-                    _ => panic!("unknown scene ID: {}", scene_id),
-                })
+                    _ => return None,
+                }))
             }
 
             pub(crate) fn region<R: ootr::Rando>(&self, rando: &R, ram: &Ram) -> Result<RegionLookup<R>, RegionLookupError<R>> {

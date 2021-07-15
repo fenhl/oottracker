@@ -27,6 +27,7 @@ pub enum RegionLookupError<R: Rando> {
     MultipleFound,
     NotFound,
     Rando(R::Err),
+    UnknownScene(u8),
 }
 
 impl<R: Rando> From<io::Error> for RegionLookupError<R> { //TODO add support for generics to FromArc derive macro
@@ -44,6 +45,7 @@ impl<R: Rando> fmt::Display for RegionLookupError<R> {
             RegionLookupError::MultipleFound => write!(f, "found multiple regions with the same name"),
             RegionLookupError::NotFound => write!(f, "region not found"),
             RegionLookupError::Rando(e) => e.fmt(f),
+            RegionLookupError::UnknownScene(id) => write!(f, "unknown scene: 0x{:02x}", id),
         }
     }
 }

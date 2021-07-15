@@ -174,7 +174,7 @@ impl Ram {
     }
 
     pub(crate) fn current_region<R: Rando>(&self, rando: &R) -> Result<RegionLookup<R>, RegionLookupError<R>> { //TODO disambiguate MQ-ness
-        Ok(match Scene::current(self).region(rando, self)? {
+        Ok(match Scene::current(self).map_err(RegionLookupError::UnknownScene)?.region(rando, self)? {
             RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, mq)) => {
                 //TODO auto-disambiguate
                 // visibility of MQ-ness per dungeon
@@ -191,7 +191,7 @@ impl Ram {
     /// Returns the scene flags, with flags for the current scene updated properly.
     pub(crate) fn scene_flags(&self) -> SceneFlags {
         let mut flags = self.save.scene_flags;
-        if let Some(flags_scene) = flags.get_mut(Scene::current(self)) {
+        if let Some(flags_scene) = Scene::current(self).ok().and_then(|current_scene| flags.get_mut(current_scene)) {
             flags_scene.set_chests(self.current_scene_chest_flags);
             flags_scene.set_switches(self.current_scene_switch_flags);
             flags_scene.set_room_clear(self.current_scene_room_clear_flags);

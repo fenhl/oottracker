@@ -498,8 +498,8 @@ scene_flags! {
 }
 
 impl Scene {
-    pub(crate) fn current(ram: &Ram) -> Scene {
-        Scene::from_id(ram.current_scene_id)
+    pub(crate) fn current(ram: &Ram) -> Result<Scene, u8> {
+        Scene::from_id(ram.current_scene_id).ok_or(ram.current_scene_id)
     }
 
     pub(crate) fn regions<'a, R: Rando>(&self, rando: &'a R) -> Result<Vec<Arc<Region<R>>>, RegionLookupError<R>> {
