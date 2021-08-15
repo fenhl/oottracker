@@ -98,9 +98,11 @@ pub enum RandoErr {
     Io(Arc<io::Error>),
     InvalidLogicHelper,
     ItemNotFound,
+    NonJsonRegionFile(String),
+    NonUnicodeRegionFilename,
     #[from_arc]
     Py(Arc<PyErr>),
-    RegionFilename,
+    UnknownRegionFilename(String),
 }
 
 impl fmt::Display for RandoErr {
@@ -110,8 +112,10 @@ impl fmt::Display for RandoErr {
             RandoErr::Io(e) => write!(f, "I/O error: {}", e),
             RandoErr::InvalidLogicHelper => write!(f, "multiple ( found in logic helper"),
             RandoErr::ItemNotFound => write!(f, "no such item"),
+            RandoErr::NonJsonRegionFile(name) => write!(f, "expected region filename ending in .json but found {}", name),
+            RandoErr::NonUnicodeRegionFilename => write!(f, "non-Unicode region filename"),
             RandoErr::Py(e) => write!(f, "Python error: {}", e),
-            RandoErr::RegionFilename => write!(f, "unexpected region filename"),
+            RandoErr::UnknownRegionFilename(name) => write!(f, "unexpected region filename: {}", name),
         }
     }
 }
@@ -221,10 +225,13 @@ impl<'p> ootr::Rando for Rando<'p> {
             let mut regions = Vec::default();
             for region_path in fs::read_dir(world_path)? {
                 let region_path = region_path?;
-                let dungeon = parse_dungeon_info(region_path.file_name().to_str().and_then(|filename| filename.strip_suffix(".json")).ok_or(RandoErr::RegionFilename)?)?;
+                let filename = region_path.file_name();
+                let filename = filename.to_str().ok_or(RandoErr::NonUnicodeRegionFilename)?;
+                let dungeon = parse_dungeon_info(filename.strip_suffix(".json").ok_or_else(|| RandoErr::NonJsonRegionFile(filename.to_owned()))?)?;
                 let region_file = File::open(region_path.path())?;
                 for raw_region in read_json_lenient_sync::<_, Vec<RawRegion>>(BufReader::new(region_file))? {
                     let name = raw_region.region_name.clone();
+                    //assert_eq!(dungeon.map(|(dungeon, _)| dungeon.to_string().replace('\'', "")), raw_region.dungeon);
                     regions.push(Arc::new(Region {
                         dungeon,
                         scene: raw_region.scene,

@@ -200,8 +200,8 @@ impl<'a> QuoteValue for RegionWrapper<'a> {
 pub fn derive_rando(input: TokenStream) -> TokenStream {
     let DeriveInput { ident: ty, .. } = parse_macro_input!(input);
     TokenStream::from(derive_rando_inner(ty).unwrap_or_else(|e| {
-        let text = format!("{:?}", e);
-        quote!(compile_error!(#text))
+        let text = format!("failed to generate code for derive(Rando): {:?}", e);
+        quote!(compile_error!(#text);)
     }))
 }
 

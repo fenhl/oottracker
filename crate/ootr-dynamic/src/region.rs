@@ -12,7 +12,8 @@ use {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawRegion {
     pub region_name: String,
-    pub dungeon: Option<String>,
+    #[allow(unused)] // taken from filename
+    dungeon: Option<String>,
     pub scene: Option<String>,
     pub hint: Option<String>,
     #[serde(default)]
@@ -35,6 +36,6 @@ pub(crate) fn parse_dungeon_info(mut s: &str) -> Result<Option<(Dungeon, Mq)>, R
         } else {
             Mq::Vanilla
         };
-        Some((s.parse().map_err(|()| RandoErr::RegionFilename)?, mq))
+        Some((s.parse().map_err(|()| RandoErr::UnknownRegionFilename(s.to_owned()))?, mq))
     })
 }

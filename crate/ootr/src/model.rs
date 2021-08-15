@@ -24,7 +24,7 @@ impl FromStr for Dungeon {
         MainDungeon::from_str(s).map(Dungeon::Main).or_else(|_| match s {
             "Ice Cavern" => Ok(Dungeon::IceCavern),
             "Bottom of the Well" => Ok(Dungeon::BottomOfTheWell),
-            "Gerudo Training Grounds" => Ok(Dungeon::GerudoTrainingGrounds),
+            "Gerudo Training Ground" | "Gerudo Training Grounds" => Ok(Dungeon::GerudoTrainingGrounds),
             "Ganon's Castle" | "Ganons Castle" => Ok(Dungeon::GanonsCastle),
             _ => Err(()),
         })
