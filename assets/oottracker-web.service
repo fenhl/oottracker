@@ -1,6 +1,7 @@
 [Unit]
 Description=Web server for oottracker.fenhl.net
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Restart=always
