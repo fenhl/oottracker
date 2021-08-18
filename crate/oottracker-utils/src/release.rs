@@ -10,10 +10,7 @@ use {
     derive_more::From,
     structopt::StructOpt,
     ::tokio::{
-        fs::{
-            self,
-            File,
-        },
+        fs,
         io,
         process::Command,
     },
@@ -33,6 +30,7 @@ use {
     dir_lock::DirLock,
     itertools::Itertools as _,
     semver::SemVerError,
+    tokio::fs::File,
     zip::{
         ZipWriter,
         result::ZipError,
