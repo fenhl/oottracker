@@ -4,14 +4,17 @@
 use {
     std::{
         fmt,
-        io,
         process::ExitStatus,
     },
     async_trait::async_trait,
     derive_more::From,
     structopt::StructOpt,
     ::tokio::{
-        fs,
+        fs::{
+            self,
+            File,
+        },
+        io,
         process::Command,
     },
 };
@@ -19,13 +22,17 @@ use {
     std::{
         cmp::Ordering::*,
         env,
-        io::Cursor,
+        io::{
+            Cursor,
+            Read as _,
+            Write as _,
+        },
         path::Path,
         time::Duration,
     },
     dir_lock::DirLock,
+    itertools::Itertools as _,
     semver::SemVerError,
-    tempfile::NamedTempFile,
     zip::{
         ZipWriter,
         result::ZipError,
@@ -158,11 +165,11 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release,
     {
         let mut zip = ZipWriter::new(&mut buf); //TODO replace with an async zip writer
         zip.start_file("README.txt", FileOptions::default())?;
-        io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/assets/README.txt")?, &mut zip)?; //TODO auto-update BizHawk version
+        std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/assets/README.txt")?, &mut zip)?; //TODO auto-update BizHawk version
         zip.start_file("OotAutoTracker.dll", FileOptions::default())?;
-        io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/OotAutoTracker.dll")?, &mut zip)?;
+        std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/OotAutoTracker.dll")?, &mut zip)?;
         zip.start_file("oottracker.dll", FileOptions::default())?;
-        io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/oottracker.dll")?, &mut zip)?;
+        std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/oottracker.dll")?, &mut zip)?;
     }
     eprintln!("uploading oottracker-bizhawk-win64.zip");
     repo.release_attach(client, release, "oottracker-bizhawk-win64.zip", "application/zip", buf.into_inner()).await?;
@@ -194,6 +201,25 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release, v
 }
 
 #[cfg(windows)]
+async fn build_pj64(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
+    eprintln!("compiling oottracker-pj64.js");
+    let mut buf = Vec::default();
+    writeln!(&mut buf, "const TCP_PORT = {};", oottracker::proto::TCP_PORT)?;
+    writeln!(&mut buf, "const SAVE_ADDR = {};", oottracker::save::ADDR)?;
+    writeln!(&mut buf, "const SAVE_SIZE = {};", oottracker::save::SIZE)?;
+    writeln!(&mut buf, "const RAM_RANGES = [{}];", oottracker::ram::RANGES.iter()
+        .copied()
+        .tuples()
+        .map(|(start, len)| format!("[{}, {}]", start, len))
+        .join(", ")
+    )?;
+    io::copy(&mut File::open("assets/oottracker-pj64-base.js").await?, &mut buf).await?;
+    eprintln!("uploading oottracker-pj64.js");
+    repo.release_attach(client, release, "oottracker-pj64.js", "text/javascript", buf).await?;
+    Ok(())
+}
+
+#[cfg(windows)]
 async fn build_web(verbose: bool) -> Result<(), Error> {
     Command::new("ssh").arg("mercredi").arg("sudo").arg("systemctl").arg("restart").arg("oottracker-web").check("ssh", verbose).await?;
     Ok(())
@@ -212,7 +238,7 @@ async fn write_release_notes(args: &Args) -> Result<String, Error> {
     }
     cmd.arg(release_notes_file.path()).check("code", args.verbose).await?;
     let mut buf = String::default();
-    <NamedTempFile as io::Read>::read_to_string(&mut release_notes_file, &mut buf)?;
+    release_notes_file.read_to_string(&mut buf)?;
     if buf.is_empty() { return Err(Error::EmptyReleaseNotes) }
     Ok(buf)
 }
@@ -267,19 +293,28 @@ async fn main(args: Args) -> Result<(), Error> {
     };
     eprintln!("creating release");
     let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
-    if args.verbose {
-        build_bizhawk(&client, &repo, &release, args.verbose).await?;
-        build_gui(&client, &repo, &release, args.verbose).await?;
-        build_macos(&client, &repo, &release, args.verbose).await?;
-        build_web(args.verbose).await?;
-    } else {
-        let ((), (), (), ()) = tokio::try_join!(
-            build_bizhawk(&client, &repo, &release, args.verbose),
-            build_gui(&client, &repo, &release, args.verbose),
-            build_macos(&client, &repo, &release, args.verbose),
-            build_web(args.verbose),
-        )?;
+
+    macro_rules! with_metavariable {
+        ($metavariable:tt, $($token:tt)*) => { $($token)* };
     }
+
+    macro_rules! build_tasks {
+        ($($task:expr,)*) => {
+            if args.verbose {
+                $($task.await?;)*
+            } else {
+                let ($(with_metavariable!($task, ())),*) = tokio::try_join!($($task),*)?;
+            }
+        };
+    }
+
+    build_tasks![
+        build_bizhawk(&client, &repo, &release, args.verbose),
+        build_gui(&client, &repo, &release, args.verbose),
+        build_macos(&client, &repo, &release, args.verbose),
+        build_pj64(&client, &repo, &release),
+        build_web(args.verbose),
+    ];
     if !args.no_publish {
         eprintln!("publishing release");
         repo.publish_release(&client, release).await?;

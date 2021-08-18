@@ -386,6 +386,7 @@ struct MenuState {
 
 #[derive(Debug, SmartDefault, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
 enum ConnectionKind {
+    TcpListener,
     #[default]
     RetroArch,
     Web,
@@ -394,6 +395,7 @@ enum ConnectionKind {
 impl fmt::Display for ConnectionKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ConnectionKind::TcpListener => write!(f, "Project64"),
             ConnectionKind::RetroArch => write!(f, "RetroArch"),
             ConnectionKind::Web => write!(f, "web"),
         }
@@ -402,6 +404,7 @@ impl fmt::Display for ConnectionKind {
 
 #[derive(Debug, SmartDefault, Clone)]
 enum ConnectionParams {
+    TcpListener,
     #[default]
     RetroArch {
         #[default = 55355]
@@ -419,6 +422,7 @@ enum ConnectionParams {
 impl ConnectionParams {
     fn kind(&self) -> ConnectionKind {
         match self {
+            ConnectionParams::TcpListener => ConnectionKind::TcpListener,
             ConnectionParams::RetroArch { .. } => ConnectionKind::RetroArch,
             ConnectionParams::Web { .. } => ConnectionKind::Web,
         }
@@ -427,6 +431,7 @@ impl ConnectionParams {
     fn set_kind(&mut self, kind: ConnectionKind) {
         if kind == self.kind() { return }
         *self = match kind {
+            ConnectionKind::TcpListener => ConnectionParams::TcpListener,
             ConnectionKind::RetroArch => ConnectionParams::RetroArch {
                 port: 55355,
                 port_state: text_input::State::default(),
@@ -442,6 +447,7 @@ impl ConnectionParams {
 
     fn view<R: Rando + 'static>(&mut self) -> Element<'_, Message<R>> {
         match self {
+            ConnectionParams::TcpListener => Row::new().into(),
             ConnectionParams::RetroArch { port, port_state } => Row::new()
                 .push(Text::new("Port: "))
                 .push(TextInput::new(port_state, "", &port.to_string(), Message::SetPort))
@@ -661,7 +667,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                     }
                     Packet::KnowledgeInit(knowledge) => self.model.knowledge = knowledge,
                     Packet::RamInit(ram) => {
-                        self.model.ram = ram;
+                        if ram.save.game_mode == GameMode::Gameplay { self.model.ram = ram }
                         self.model.update_knowledge();
                     }
                     Packet::UpdateCell(cell_id, value) => if let Some(ref connection) = self.connection {
@@ -984,6 +990,7 @@ impl fmt::Display for ConnectionError {
 
 async fn connect(params: ConnectionParams, state: ModelState) -> Result<Arc<dyn Connection>, ConnectionError> {
     let connection = match params {
+        ConnectionParams::TcpListener => Arc::new(net::TcpConnection) as Arc<dyn Connection>,
         ConnectionParams::RetroArch { port, .. } => Arc::new(net::RetroArchConnection { port }),
         ConnectionParams::Web { url, passcode, .. } => {
             let url = url.parse::<Url>()?;

@@ -53,7 +53,7 @@ impl Repo {
     pub async fn latest_release(&self, client: &Client) -> reqwest::Result<Option<Release>> {
         let response = client.get(&format!("https://api.github.com/repos/{}/{}/releases/latest", self.user, self.name))
             .send().await?;
-        if response.status() == StatusCode::NOT_FOUND { return Ok(None); } // no releases yet
+        if response.status() == StatusCode::NOT_FOUND { return Ok(None) } // no releases yet
         Ok(Some(
             response.error_for_status()?
                 .json::<Release>().await?

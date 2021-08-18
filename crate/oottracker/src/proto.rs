@@ -51,8 +51,8 @@ impl fmt::Display for ReadError {
         match self {
             ReadError::Packet(e) => e.fmt(f),
             ReadError::VersionMismatch { server, client } => match client.cmp(server) {
-                Less => write!(f, "An outdated auto-tracker attempted to connect. Please update the auto-tracker and try again."),
-                Greater => write!(f, "An auto-tracker failed to connect because this app is outdated. Please update this app and try again."),
+                Less => write!(f, "An outdated auto-tracking plugin attempted to connect. (Plugin uses protocol {} but this app uses protocol {}.) Please update the plugin and try again.", client, server),
+                Greater => write!(f, "An auto-tracking plugin failed to connect because this app is outdated. (Plugin uses protocol {} but this app uses protocol {}.) Please update this app and try again.", client, server),
                 Equal => unreachable!(),
             },
         }

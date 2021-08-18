@@ -2982,7 +2982,7 @@ checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
 
 [[package]]
 name = "ootr"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-proto",
  "derivative",
@@ -2993,7 +2993,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-dynamic"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "derive_more",
  "itertools 0.10.0",
@@ -3009,7 +3009,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "lazy_static",
  "ootr",
@@ -3019,7 +3019,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static-derive"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "convert_case",
  "derive_more",
@@ -3040,7 +3040,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-proto",
  "async-stream 0.3.1",
@@ -3076,14 +3076,14 @@ dependencies = [
 
 [[package]]
 name = "oottracker-bizhawk"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "semver 0.11.0",
 ]
 
 [[package]]
 name = "oottracker-csharp"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-proto",
  "itertools 0.10.0",
@@ -3096,7 +3096,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-derive"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "convert_case",
  "itertools 0.10.0",
@@ -3107,7 +3107,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-gui"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-proto",
  "derivative",
@@ -3135,7 +3135,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-updater"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "derive_more",
  "itertools 0.10.0",
@@ -3149,7 +3149,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-utils"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3176,7 +3176,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-web"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-proto",
  "collect-mac",
