@@ -6,3 +6,7 @@ edition = "2018"
 
 [dependencies]
 semver = "0.11"
+
+[dependencies.winver]
+git = "https://github.com/fenhl/winver"
+branch = "main"

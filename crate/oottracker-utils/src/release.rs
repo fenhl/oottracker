@@ -163,7 +163,9 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release,
     {
         let mut zip = ZipWriter::new(&mut buf); //TODO replace with an async zip writer
         zip.start_file("README.txt", FileOptions::default())?;
-        std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/assets/README.txt")?, &mut zip)?; //TODO auto-update BizHawk version
+        let [major, minor, patch, _] = oottracker_bizhawk::bizhawk_version();
+        //TODO check to make sure BizHawk is up to date
+        write!(&mut zip, include_str!("../../../assets/bizhawk-readme.txt"), major, minor, patch)?;
         zip.start_file("OotAutoTracker.dll", FileOptions::default())?;
         std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/OotAutoTracker.dll")?, &mut zip)?;
         zip.start_file("oottracker.dll", FileOptions::default())?;

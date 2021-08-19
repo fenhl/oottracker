@@ -1,6 +1,6 @@
 HOW TO INSTALL/UPDATE
 
-1. You will need BizHawk version 2.6.2.
+1. You will need BizHawk with the exact version {}.{}.{}. If you have a newer version, please notify Fenhl about updating the tracker.
 2. Move the files OotAutoTracker.dll and oottracker.dll into the ExternalTools subfolder within your BizHawk folder. (The BizHawk folder is the one with EmuHawk.exe in it. You may have to create the ExternalTools folder if it doesn't exist.)
 
 HOW TO USE
