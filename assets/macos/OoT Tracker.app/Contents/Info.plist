@@ -1,39 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-    <dict>
-        <key>CFBundleDevelopmentRegion</key>
-        <string>en</string>
-        <key>CFBundleDisplayName</key>
-        <string>OoT Tracker</string>
-        <key>CFBundleExecutable</key>
-        <string>oottracker-gui</string>
-        <key>CFBundleIconFile</key>
-        <string>AppIcon.icns</string>
-        <key>CFBundleIdentifier</key>
-        <string>net.fenhl.oottracker</string>
-        <key>CFBundleInfoDictionaryVersion</key>
-        <string>6.0</string>
-        <key>CFBundleName</key>
-        <string>OoT Tracker</string>
-        <key>CFBundlePackageType</key>
-        <string>APPL</string>
-        <key>CFBundleShortVersionString</key>
-        <string>0.6.0</string>
-        <key>CFBundleSupportedPlatforms</key>
-        <array>
-            <string>MacOSX</string>
-        </array>
-        <!--TODO make sure this is incremented each time the crate version is incremented-->
-        <key>CFBundleVersion</key>
-        <string>16</string>
-        <key>NSHighResolutionCapable</key>
-        <true/>
-        <key>NSMainNibFile</key>
-        <string></string>
-        <key>NSRequiresAquaSystemAppearance</key>
-        <string>NO</string>
-        <key>NSSupportsAutomaticGraphicsSwitching</key>
-        <true />
-    </dict>
+<dict>
+	<key>CFBundleShortVersionString</key>
+	<string>0.6.0</string>
+	<key>CFBundleVersion</key>
+	<string>16</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>OoT Tracker</string>
+	<key>CFBundleExecutable</key>
+	<string>oottracker-gui</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>net.fenhl.oottracker</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>OoT Tracker</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleSpokenName</key>
+	<string>OOT Tracker</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>NSHighResolutionCapable</key>
+	<true />
+	<key>NSMainNibFile</key>
+	<string></string>
+	<key>NSRequiresAquaSystemAppearance</key>
+	<string>NO</string>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true />
+</dict>
 </plist>
