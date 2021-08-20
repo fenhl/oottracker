@@ -72,6 +72,10 @@ pub fn embed_images(input: TokenStream) -> TokenStream {
     let name = Ident::new(&dir_path.file_name().expect("empty filename").to_string_lossy().to_case(Case::Snake), Span::call_site());
     let name_all = Ident::new(&format!("{}_all", name), Span::call_site());
     let img_consts = fs::read_dir(dir_path).expect("failed to open images dir") //TODO compile error instead of panic
+        .filter_map(|img_path| match img_path {
+            Ok(img_path) => if img_path.file_name().to_str().map_or(false, |file_name| file_name.starts_with('.')) { None } else { Some(Ok(img_path)) },
+            Err(e) => Some(Err(e)),
+        })
         .map(|img_path| img_path.and_then(|img_path| Ok({
             let name = img_path.file_name();
             let name = name.to_string_lossy();
