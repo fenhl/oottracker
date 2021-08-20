@@ -27,7 +27,6 @@ use {
     crate::{
         Restreams,
         Rooms,
-        TrackerCellKindExt as _,
         restream::render_double_cell,
     },
 };

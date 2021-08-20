@@ -4,6 +4,19 @@ const utf8encoder = new TextEncoder();
 
 sock.binaryType = "arraybuffer";
 
+function readImgDir(offset) {
+    switch (view.getUint8(offset)) {
+        case 0:
+            // ImageDir::Xopar
+            return 'xopar-images';
+        case 1:
+            // ImageDir::Extra
+            return 'extra-images';
+        default:
+            throw 'unexpected ImageDir variant';
+    }
+}
+
 function makeLayoutBuf(layoutString) {
     let buf = new ArrayBuffer(1);
     switch (layoutString) {
@@ -83,10 +96,7 @@ function updateCell(cellID, data, offset) {
     //elt.replaceChildren(); //TODO use this instead of the elt.append calls below once OBS browser source updates to Chrome 86+
     elt.innerHTML = '';
     let mainImg = document.createElement('img');
-    const imgDirLen = Number(view.getBigUint64(offset));
-    offset += 8;
-    const imgDir = utf8decoder.decode(data.slice(offset, offset + imgDirLen));
-    offset += imgDirLen;
+    const imgDir = readImgDir(offset++);
     const imgFilenameLen = Number(view.getBigUint64(offset));
     offset += 8;
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
@@ -119,6 +129,11 @@ function updateCell(cellID, data, offset) {
         case 1:
             // Count
             const count = view.getUint8(offset++);
+            readImgDir(offset++);
+            const countImgFilenameLen = Number(view.getBigUint64(offset));
+            offset += 8;
+            utf8decoder.decode(data.slice(offset, offset + countImgFilenameLen));
+            offset += countImgFilenameLen;
             let countOverlay = document.createElement('span');
             countOverlay.setAttribute('class', 'count');
             countOverlay.append('' + count);
@@ -126,10 +141,7 @@ function updateCell(cellID, data, offset) {
             break;
         case 2:
             // Image
-            const overlayDirLen = Number(view.getBigUint64(offset));
-            offset += 8;
-            const overlayDir = utf8decoder.decode(data.slice(offset, offset + overlayDirLen));
-            offset += overlayDirLen;
+            const overlayDir = readImgDir(offset++);
             const overlayImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
@@ -140,10 +152,7 @@ function updateCell(cellID, data, offset) {
             break;
         case 3:
             // Location
-            const locDirLen = Number(view.getBigUint64(offset));
-            offset += 8;
-            const locDir = utf8decoder.decode(data.slice(offset, offset + locDirLen));
-            offset += locDirLen;
+            const locDir = readImgDir(offset++);
             const locImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const locImg = utf8decoder.decode(data.slice(offset, offset + locImgLen));

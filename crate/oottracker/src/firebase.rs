@@ -61,168 +61,6 @@ use {
 // to obtain a Firebase web tracker's API key, open a room in the tracker and copy the element `apiKey` from the local storage entry starting with `firebase:authUser`.
 include!("../../../assets/firebase-api-keys.rs");
 
-trait TrackerCellKindExt {
-    fn render(&self, state: &ModelState) -> Json;
-    fn set(&self, state: &mut ModelState, value: Json) -> Result<(), Json>;
-}
-
-impl TrackerCellKindExt for TrackerCellKind {
-    fn render(&self, state: &ModelState) -> Json {
-        match self {
-            BossKey { active, .. } => json!(active(&state.ram.save.boss_keys)),
-            Composite { active, .. } => json!(match active(state) {
-                (false, false) => 0,
-                (true, false) => 1,
-                (false, true) => 2,
-                (true, true) => 3,
-            }),
-            Count { get, max, step, .. } => json!(get(state).min(*max) / step),
-            FortressMq => json!(state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |values| values.iter().eq(iter::once("normal")))),
-            Medallion(med) => json!(state.ram.save.quest_items.has(med)),
-            MedallionLocation(med) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med)) {
-                None => 0,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => 1,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => 2,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => 3,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => 4,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => 5,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => 6,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => 7,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
-                Some(DungeonRewardLocation::LinksPocket) => 9,
-            }),
-            Mq(dungeon) => json!(state.knowledge.mq.get(dungeon) == Some(&Mq::Mq)),
-            OptionalOverlay { active, .. } | Overlay { active, .. } => json!(active(state).0),
-            Sequence { idx, .. } => json!(idx(state)),
-            Simple { active, .. } => json!(active(state)),
-            SmallKeys { get, .. } => json!(get(&state.ram.save.small_keys)),
-            Song { song, .. } => json!(state.ram.save.quest_items.contains(*song)),
-            SongCheck { check, .. } => json!(Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)), //TODO allow ootr_dynamic::Rando
-            Stone(stone) => json!(state.ram.save.quest_items.has(stone)),
-            StoneLocation(stone) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone)) {
-                None => 0,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => 1,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => 2,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => 3,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => 4,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => 5,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => 6,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => 7,
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
-                Some(DungeonRewardLocation::LinksPocket) => 9,
-            }),
-            BigPoeTriforce | CompositeKeys { .. } | FreeReward => unimplemented!(),
-        }
-    }
-
-    fn set(&self, state: &mut ModelState, value: Json) -> Result<(), Json> {
-        match self {
-            BossKey { active, toggle } => if active(&state.ram.save.boss_keys) != value.as_bool().ok_or_else(|| value.clone())? {
-                toggle(&mut state.ram.save.boss_keys)
-            },
-            Composite { active, toggle_left, toggle_right, .. } => {
-                let (active_left, active_right) = active(state);
-                let (value_left, value_right) = match value.as_u64().ok_or_else(|| value.clone())? {
-                    0 => (false, false),
-                    1 => (true, false),
-                    2 => (false, true),
-                    3 => (true, true),
-                    _ => return Err(value),
-                };
-                if active_left != value_left { toggle_left(state) }
-                if active_right != value_right { toggle_right(state) }
-            }
-            Count { get, set, max, step, .. } => {
-                let value = u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value)?;
-                // only update if the local value doesn't fit into the window received
-                // so that e.g. decrementing skulls from 40 to 39 doesn't immediately set them to 30
-                if get(state).min(*max) / step != value {
-                    set(state, value * step);
-                }
-            }
-            FortressMq => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
-            } else {
-                // don't override local state that's consistent with the value received
-                if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |fort| fort.iter().eq(iter::once("normal"))) {
-                    state.knowledge.string_settings.remove("gerudo_fortress");
-                }
-            },
-            Medallion(med) => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.ram.save.quest_items.insert(med.into());
-            } else {
-                state.ram.save.quest_items.remove(med.into());
-            },
-            MedallionLocation(med) => {
-                match value.as_u64().ok_or_else(|| value.clone())? {
-                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Medallion(*med)),
-                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(*med), DungeonRewardLocation::LinksPocket),
-                    _ => return Err(value),
-                };
-            }
-            Mq(dungeon) => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.knowledge.mq.insert(*dungeon, Mq::Mq);
-            } else {
-                // don't override local state that's consistent with the value received
-                if state.knowledge.mq.get(dungeon).map_or(false, |&mq| mq == Mq::Mq) {
-                    state.knowledge.mq.remove(dungeon);
-                }
-            },
-            OptionalOverlay { active, toggle_main, .. } | Overlay { active, toggle_main, .. } => if active(state).0 != value.as_bool().ok_or_else(|| value.clone())? {
-                toggle_main(state);
-            },
-            Sequence { idx, increment, decrement, .. } => {
-                let mut old_idx = idx(state);
-                let new_idx = u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value.clone())?;
-                while old_idx < new_idx { increment(state); old_idx += 1 }
-                while old_idx > new_idx { decrement(state); old_idx -= 1 }
-            }
-            Simple { active, toggle, .. } => if active(state) != value.as_bool().ok_or_else(|| value.clone())? {
-                toggle(state);
-            },
-            SmallKeys { set, .. } => set(&mut state.ram.save.small_keys, value.as_u64().ok_or_else(|| value.clone())?.try_into().map_err(|_| value.clone())?),
-            Song { song, .. } => if value.as_bool().ok_or(value)? {
-                state.ram.save.quest_items.insert(*song);
-            } else {
-                state.ram.save.quest_items.remove(*song);
-            },
-            SongCheck { check, toggle_overlay } => if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? { //TODO allow ootr_dynamic::Rando
-                toggle_overlay(&mut state.ram.save.event_chk_inf);
-            },
-            Stone(stone) => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.ram.save.quest_items.insert(stone.into());
-            } else {
-                state.ram.save.quest_items.remove(stone.into());
-            },
-            StoneLocation(stone) => {
-                match value.as_u64().ok_or_else(|| value.clone())? {
-                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Stone(*stone)),
-                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(*stone), DungeonRewardLocation::LinksPocket),
-                    _ => return Err(value),
-                };
-            }
-            BigPoeTriforce | CompositeKeys { .. } | FreeReward => unimplemented!(),
-        }
-        Ok(())
-    }
-}
-
 macro_rules! cells {
     ($($cell_name:literal: $id:ident),*$(,)?) => {
         fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId> {
@@ -237,7 +75,7 @@ macro_rules! cells {
         fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
             let mut map = BTreeMap::default();
             $(
-                map.insert($cell_name, serde_json::to_value(TrackerCellId::$id.kind().render(state))?);
+                map.insert($cell_name, serde_json::to_value(render_cell(TrackerCellId::$id.kind(), state))?);
             )*
             Ok(map)
         }
@@ -292,7 +130,110 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
     fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>>;
 
     fn set_cell(&self, state: &mut ModelState, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
-        cell_id.kind().set(state, value)
+        match cell_id.kind() {
+            BossKey { active, toggle } => if active(&state.ram.save.boss_keys) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle(&mut state.ram.save.boss_keys);
+            },
+            Composite { active, toggle_left, toggle_right, .. } => {
+                let (active_left, active_right) = active(state);
+                let (value_left, value_right) = match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => (false, false),
+                    1 => (true, false),
+                    2 => (false, true),
+                    3 => (true, true),
+                    _ => return Err(value),
+                };
+                if active_left != value_left { toggle_left(state) }
+                if active_right != value_right { toggle_right(state) }
+            }
+            Count { get, set, max, step, .. } => {
+                let value = u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value)?;
+                // only update if the local value doesn't fit into the window received
+                // so that e.g. decrementing skulls from 40 to 39 doesn't immediately set them to 30
+                if get(state).min(max) / step != value {
+                    set(state, value * step);
+                }
+            }
+            FortressMq => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
+            } else {
+                // don't override local state that's consistent with the value received
+                if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |fort| fort.iter().eq(iter::once("normal"))) {
+                    state.knowledge.string_settings.remove("gerudo_fortress");
+                }
+            },
+            Medallion(med) => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.ram.save.quest_items.insert(med.into());
+            } else {
+                state.ram.save.quest_items.remove(med.into());
+            },
+            MedallionLocation(med) => {
+                match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Medallion(med)),
+                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
+                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
+                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
+                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
+                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
+                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
+                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
+                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
+                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::LinksPocket),
+                    _ => return Err(value),
+                };
+            }
+            Mq(dungeon) => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.knowledge.mq.insert(dungeon, Mq::Mq);
+            } else {
+                // don't override local state that's consistent with the value received
+                if state.knowledge.mq.get(&dungeon).map_or(false, |&mq| mq == Mq::Mq) {
+                    state.knowledge.mq.remove(&dungeon);
+                }
+            },
+            OptionalOverlay { active, toggle_main, .. } | Overlay { active, toggle_main, .. } => if active(state).0 != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle_main(state);
+            },
+            Sequence { idx, increment, decrement, .. } => {
+                let mut old_idx = idx(state);
+                let new_idx = u8::try_from(value.as_u64().ok_or_else(|| value.clone())?).map_err(|_| value.clone())?;
+                while old_idx < new_idx { increment(state); old_idx += 1 }
+                while old_idx > new_idx { decrement(state); old_idx -= 1 }
+            }
+            Simple { active, toggle, .. } => if active(state) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle(state);
+            },
+            SmallKeys { set, .. } => set(&mut state.ram.save.small_keys, value.as_u64().ok_or_else(|| value.clone())?.try_into().map_err(|_| value.clone())?),
+            Song { song, .. } => if value.as_bool().ok_or(value)? {
+                state.ram.save.quest_items.insert(song);
+            } else {
+                state.ram.save.quest_items.remove(song);
+            },
+            SongCheck { check, toggle_overlay } => if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? { //TODO allow ootr_dynamic::Rando
+                toggle_overlay(&mut state.ram.save.event_chk_inf);
+            },
+            Stone(stone) => if value.as_bool().ok_or_else(|| value.clone())? {
+                state.ram.save.quest_items.insert(stone.into());
+            } else {
+                state.ram.save.quest_items.remove(stone.into());
+            },
+            StoneLocation(stone) => {
+                match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Stone(stone)),
+                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
+                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
+                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
+                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
+                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
+                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
+                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
+                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
+                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::LinksPocket),
+                    _ => return Err(value),
+                };
+            }
+            BigPoeTriforce | CompositeKeys { .. } | GoBk | FreeReward | MagicLens => unimplemented!(),
+        }
+        Ok(())
     }
 }
 
@@ -766,5 +707,53 @@ impl Hash for DynRoom {
         self.app_hash.hash(state);
         self.name.hash(state);
         self.passcode.hash(state);
+    }
+}
+
+fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
+    match cell_kind {
+        BossKey { active, .. } => json!(active(&state.ram.save.boss_keys)),
+        Composite { active, .. } => json!(match active(state) {
+            (false, false) => 0,
+            (true, false) => 1,
+            (false, true) => 2,
+            (true, true) => 3,
+        }),
+        Count { get, max, step, .. } => json!(get(state).min(max) / step),
+        FortressMq => json!(state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |values| values.iter().eq(iter::once("normal")))),
+        Medallion(med) => json!(state.ram.save.quest_items.has(med)),
+        MedallionLocation(med) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(med)) {
+            None => 0,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => 1,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => 2,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => 3,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => 4,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => 5,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => 6,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => 7,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
+            Some(DungeonRewardLocation::LinksPocket) => 9,
+        }),
+        Mq(dungeon) => json!(state.knowledge.mq.get(&dungeon) == Some(&Mq::Mq)),
+        OptionalOverlay { active, .. } | Overlay { active, .. } => json!(active(state).0),
+        Sequence { idx, .. } => json!(idx(state)),
+        Simple { active, .. } => json!(active(state)),
+        SmallKeys { get, .. } => json!(get(&state.ram.save.small_keys)),
+        Song { song, .. } => json!(state.ram.save.quest_items.contains(song)),
+        SongCheck { check, .. } => json!(Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)), //TODO allow ootr_dynamic::Rando
+        Stone(stone) => json!(state.ram.save.quest_items.has(stone)),
+        StoneLocation(stone) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(stone)) {
+            None => 0,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => 1,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => 2,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => 3,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => 4,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => 5,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => 6,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => 7,
+            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
+            Some(DungeonRewardLocation::LinksPocket) => 9,
+        }),
+        BigPoeTriforce | CompositeKeys { .. } | FreeReward | GoBk | MagicLens => unimplemented!(),
     }
 }

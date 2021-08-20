@@ -12,6 +12,7 @@ collect-mac = "0.1"
 derivative = "2"
 directories = "3"
 futures = "0.3"
+iced = "0.3"
 image = "0.23"
 itertools = "0.10"
 lazy_static = "1"
@@ -36,10 +37,6 @@ branch = "fields"
 [dependencies.eventsource-client]
 git = "https://github.com/mraerino/rust-eventsource-client"
 branch = "refactor/tokio-hyper"
-
-[dependencies.iced]
-git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "5fc4210270852d8d633a63168d8a166a235236c6"
 
 [dependencies.ootr]
 path = "../ootr"

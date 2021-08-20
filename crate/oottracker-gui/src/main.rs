@@ -18,6 +18,7 @@ use {
     iced::{
         Application,
         Background,
+        Clipboard,
         Color,
         Command,
         Element,
@@ -68,18 +69,11 @@ use {
     ootr::{
         Rando,
         check::Check,
-        model::{
-            DungeonReward,
-            DungeonRewardLocation,
-            MainDungeon,
-            Stone,
-        },
     },
     oottracker::{
         ModelState,
         checks::{
             self,
-            CheckExt as _,
             CheckStatus,
             CheckStatusError,
         },
@@ -94,7 +88,6 @@ use {
         ui::{
             self,
             *,
-            TrackerCellKind::*,
         },
     },
 };
@@ -130,168 +123,25 @@ impl container::StyleSheet for ContainerStyle {
     }
 }
 
-trait TrackerCellKindExt {
-    fn render(&self, state: &ModelState) -> Image;
-    #[must_use] fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool;
-    #[must_use] fn right_click(&self, can_change_state: bool, state: &mut ModelState) -> bool;
-}
-
-impl TrackerCellKindExt for TrackerCellKind {
-    fn render(&self, state: &ModelState) -> Image {
-        match self {
-            BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
-                images::xopar_images_count(&format!("force_{}", state.ram.save.triforce_pieces()))
-            } else if state.ram.save.big_poes > 0 { //TODO show dimmed Triforce icon if it's known that it's TH
-                images::extra_images_count(&format!("poes_{}", state.ram.save.big_poes))
-            } else {
-                images::extra_images_dimmed("big_poe")
-            },
-            Composite { left_img, right_img, both_img, active, .. } => match active(state) {
-                (false, false) => both_img.embedded(ImageDirContext::Dimmed),
-                (false, true) => right_img.embedded(ImageDirContext::Normal),
-                (true, false) => left_img.embedded(ImageDirContext::Normal),
-                (true, true) => both_img.embedded(ImageDirContext::Normal),
-            },
-            Count { dimmed_img, img, get, .. } => {
-                let count = get(state);
-                if count == 0 {
-                    dimmed_img.embedded(ImageDirContext::Dimmed)
-                } else {
-                    img.embedded(ImageDirContext::Count(count))
-                }
-            }
-            Medallion(med) => {
-                let med_filename = format!("{}_medallion", med.element().to_ascii_lowercase());
-                if state.ram.save.quest_items.has(*med) {
-                    images::xopar_images::<Image>(&med_filename)
-                } else {
-                    images::xopar_images_dimmed(&med_filename)
-                }
-            }
-            MedallionLocation(med) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med)) {
-                None => images::xopar_images_dimmed::<Image>("unknown_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text"),
-                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text"),
-            }.width(Length::Units(CELL_SIZE)),
-            OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => match active(state) {
-                (false, false) => main_img.embedded(ImageDirContext::Dimmed),
-                (true, false) => main_img.embedded(ImageDirContext::Normal),
-                (main_active, true) => main_img.with_overlay(overlay_img).embedded(main_active),
-            },
-            Sequence { img, .. } => match img(state) {
-                (false, img) => img.embedded(ImageDirContext::Dimmed),
-                (true, img) => img.embedded(ImageDirContext::Normal),
-            },
-            Simple { img, active, .. } => if active(state) {
-                img.embedded(ImageDirContext::Normal)
-            } else {
-                img.embedded(ImageDirContext::Dimmed)
-            },
-            Song { song, check, .. } => {
-                let song_filename = match *song {
-                    QuestItems::ZELDAS_LULLABY => "lullaby",
-                    QuestItems::EPONAS_SONG => "epona",
-                    QuestItems::SARIAS_SONG => "saria",
-                    QuestItems::SUNS_SONG => "sun",
-                    QuestItems::SONG_OF_TIME => "time",
-                    QuestItems::SONG_OF_STORMS => "storms",
-                    QuestItems::MINUET_OF_FOREST => "minuet",
-                    QuestItems::BOLERO_OF_FIRE => "bolero",
-                    QuestItems::SERENADE_OF_WATER => "serenade",
-                    QuestItems::NOCTURNE_OF_SHADOW => "nocturne",
-                    QuestItems::REQUIEM_OF_SPIRIT => "requiem",
-                    QuestItems::PRELUDE_OF_LIGHT => "prelude",
-                    _ => unreachable!(),
-                };
-                match (state.ram.save.quest_items.contains(*song), Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)) { //TODO allow ootr_dynamic::Rando
-                    (false, false) => images::xopar_images_dimmed(song_filename),
-                    (false, true) => images::xopar_images_overlay_dimmed(&format!("{}_check", song_filename)),
-                    (true, false) => images::xopar_images(song_filename),
-                    (true, true) => images::xopar_images_overlay(&format!("{}_check", song_filename)),
-                }
-            }
-            Stone(stone) => {
-                let stone_filename = match *stone {
-                    Stone::KokiriEmerald => "kokiri_emerald",
-                    Stone::GoronRuby => "goron_ruby",
-                    Stone::ZoraSapphire => "zora_sapphire",
-                };
-                if state.ram.save.quest_items.has(*stone) {
-                    images::xopar_images::<Image>(stone_filename)
-                } else {
-                    images::xopar_images_dimmed(stone_filename)
-                }.width(Length::Units(STONE_SIZE))
-            }
-            StoneLocation(stone) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone)) {
-                None => images::xopar_images_dimmed::<Image>("unknown_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => images::xopar_images("deku_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => images::xopar_images("dc_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => images::xopar_images("jabu_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => images::xopar_images("forest_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => images::xopar_images("fire_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => images::xopar_images("water_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => images::xopar_images("shadow_text"),
-                Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => images::xopar_images("spirit_text"),
-                Some(DungeonRewardLocation::LinksPocket) => images::xopar_images("free_text"),
-            }.width(Length::Units(STONE_SIZE)),
-            BossKey { .. } | CompositeKeys { .. } | FortressMq | FreeReward | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
-        }
-    }
-
-    #[must_use]
-    /// Returns `true` if the menu should be opened.
-    fn left_click(&self, can_change_state: bool, #[cfg_attr(not(target_os = "macos"), allow(unused))] keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
-        #[cfg(target_os = "macos")] if keyboard_modifiers.control {
-            return self.right_click(can_change_state, state)
-        }
-        if can_change_state {
-            match self {
-                Composite { toggle_left: toggle, .. } | OptionalOverlay { toggle_main: toggle, .. } | Overlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
-                Count { get, set, max, step, .. } => {
-                    let current = get(state);
-                    if current == *max { set(state, 0) } else { set(state, current + step) }
-                }
-                Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
-                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
-                Sequence { increment, .. } => increment(state),
-                Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
-                Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
-                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
-                BigPoeTriforce | BossKey { .. } | CompositeKeys { .. } | FortressMq | FreeReward | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
-            }
-        }
-        false
-    }
-
-    #[must_use]
-    /// Returns `true` if the menu should be opened.
-    fn right_click(&self, can_change_state: bool, state: &mut ModelState) -> bool {
-        if let Medallion(_) = self { return true }
-        if can_change_state {
-            match self {
-                Composite { toggle_right: toggle, .. } | OptionalOverlay { toggle_overlay: toggle, .. } | Overlay { toggle_overlay: toggle, .. } => toggle(state),
-                Count { get, set, max, step, .. } => {
-                    let current = get(state);
-                    if current == 0 { set(state, *max) } else { set(state, current - step) }
-                }
-                Medallion(_) => unreachable!("already handled above"),
-                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
-                Sequence { decrement, .. } => decrement(state),
-                Simple { .. } | Stone(_) => {}
-                Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
-                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
-                BigPoeTriforce | BossKey { .. } | CompositeKeys { .. } | FortressMq | FreeReward | Mq(_) | TrackerCellKind::SmallKeys { .. } | SongCheck { .. } => unimplemented!(),
-            }
-        }
-        false
-    }
+fn cell_image(cell: &TrackerCellId, state: &ModelState) -> Image {
+    let kind = cell.kind();
+    let CellRender { img, style, overlay } = kind.render(state);
+    match (style, overlay) {
+        (CellStyle::Normal, CellOverlay::None) => img.embedded::<Image>(ImageDirContext::Normal),
+        (CellStyle::Normal, CellOverlay::Count { count, count_img }) => count_img.embedded(ImageDirContext::Count(count)),
+        (CellStyle::Normal, CellOverlay::Image(overlay)) => img.with_overlay(&overlay).embedded(true),
+        (CellStyle::Dimmed, CellOverlay::None) => img.embedded(ImageDirContext::Dimmed),
+        (CellStyle::Dimmed, CellOverlay::Image(overlay)) => img.with_overlay(&overlay).embedded(false),
+        (_, CellOverlay::Location { loc, style }) => loc.embedded(match style {
+            LocationStyle::Normal => ImageDirContext::Normal,
+            LocationStyle::Dimmed => ImageDirContext::Dimmed,
+            LocationStyle::Mq => unimplemented!(),
+        }),
+        (CellStyle::Dimmed, CellOverlay::Count { .. }) | (CellStyle::LeftDimmed | CellStyle::RightDimmed, _) => unimplemented!(),
+    }.width(Length::Units(match kind {
+        TrackerCellKind::Stone(_) | TrackerCellKind::StoneLocation(_) => STONE_SIZE,
+        _ => CELL_SIZE,
+    }))
 }
 
 trait TrackerCellIdExt {
@@ -300,7 +150,7 @@ trait TrackerCellIdExt {
 
 impl TrackerCellIdExt for TrackerCellId {
     fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message<ootr_static::Rando>> { //TODO allow ootr_dynamic::Rando
-        Button::new(cell_button, self.kind().render(state))
+        Button::new(cell_button, cell_image(self, state))
             .on_press(Message::LeftClick(*self))
             .padding(0)
             .style(DefaultButtonStyle)
@@ -591,7 +441,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
         }
     }
 
-    fn update(&mut self, message: Message<ootr_static::Rando>) -> Command<Message<ootr_static::Rando>> {
+    fn update(&mut self, message: Message<ootr_static::Rando>, _: &mut Clipboard) -> Command<Message<ootr_static::Rando>> {
         match message {
             Message::CheckStatusErrorStatic(_) => return self.notify(message),
             Message::ClientDisconnected => return self.notify(message),
@@ -699,7 +549,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             Message::RightClick => {
                 if self.menu_state.is_none() {
                     if let Some(cell) = self.layout().cell_at(self.last_cursor_pos, self.notification.is_none()) {
-                        if cell.kind().right_click(self.connection.as_ref().map_or(true, |connection| connection.can_change_state()), &mut self.model) {
+                        if cell.kind().right_click(self.connection.as_ref().map_or(true, |connection| connection.can_change_state()), self.keyboard_modifiers, &mut self.model) {
                             self.menu_state = Some(MenuState::default());
                         } else if let Some(ref connection) = self.connection {
                             if connection.can_change_state() {

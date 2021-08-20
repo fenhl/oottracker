@@ -16,6 +16,7 @@ use {
             CellOverlay,
             CellRender,
             CellStyle,
+            ImageInfo,
             LocationStyle,
             TrackerLayout,
         },
@@ -76,12 +77,10 @@ pub(crate) fn render_double_cell(runner1: &ModelState, runner2: &ModelState, rew
         Some(DungeonRewardLocation::LinksPocket) => "free_text",
     };
     CellRender {
-        img_dir: Cow::Borrowed("xopar-images"),
-        img_filename,
+        img: ImageInfo::new(img_filename),
         style,
         overlay: CellOverlay::Location {
-            loc_dir: Cow::Borrowed("xopar-images"),
-            loc_img: Cow::Borrowed(loc_img_filename),
+            loc: ImageInfo::new(loc_img_filename),
             style: if location.is_some() { LocationStyle::Normal } else { LocationStyle::Dimmed },
         },
     }

@@ -17,18 +17,8 @@ use {
     itertools::Itertools as _,
     libc::c_char,
     semver::Version,
-    ootr::{
-        check::Check,
-        model::{
-            DungeonReward,
-            DungeonRewardLocation,
-            MainDungeon,
-            Stone,
-        },
-    },
     oottracker::{
         ModelState,
-        checks::CheckExt as _,
         knowledge::*,
         proto::{
             self,
@@ -41,13 +31,15 @@ use {
         save::{
             self,
             GameMode,
-            QuestItems,
             Save,
         },
         ui::{
+            CellOverlay,
+            CellRender,
+            CellStyle,
             ImageDirContext,
+            LocationStyle,
             TrackerCellId,
-            TrackerCellKind,
             TrackerLayout,
         },
     },
@@ -163,96 +155,19 @@ pub fn version() -> Version {
 #[no_mangle] pub unsafe extern "C" fn cell_image(model: *const ModelState, cell: *const TrackerCellId) -> StringHandle {
     let state = &*model;
     let cell = &*cell;
-    StringHandle::from_string(match cell.kind() {
-        TrackerCellKind::BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
-            format!("xopar_images_count.force_{}", state.ram.save.triforce_pieces())
-        } else if state.ram.save.big_poes > 0 { //TODO show dimmed Triforce icon if it's known that it's TH
-            format!("extra_images_count.poes_{}", state.ram.save.big_poes)
-        } else {
-            format!("extra_images_dimmed.big_poe")
-        },
-        TrackerCellKind::Composite { left_img, right_img, both_img, active, .. } => match active(state) {
-            (false, false) => both_img.to_string('.', ImageDirContext::Dimmed),
-            (false, true) => right_img.to_string('.', ImageDirContext::Normal),
-            (true, false) => left_img.to_string('.', ImageDirContext::Normal),
-            (true, true) => both_img.to_string('.', ImageDirContext::Normal),
-        },
-        TrackerCellKind::Count { dimmed_img, img, get, .. } => match get(state) {
-            0 => dimmed_img.to_string('.', ImageDirContext::Dimmed),
-            n => format!("{}_{}", img.to_string('.', ImageDirContext::Count(n)), n),
-        },
-        TrackerCellKind::Medallion(med) => format!(
-            "xopar_images{}.{}_medallion",
-            if state.ram.save.quest_items.has(med) { "" } else { "_dimmed" },
-            med.element().to_ascii_lowercase(),
-        ),
-        TrackerCellKind::MedallionLocation(med) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(med)) {
-            None => format!("xopar_images_dimmed.unknown_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => format!("xopar_images.deku_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => format!("xopar_images.dc_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => format!("xopar_images.jabu_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => format!("xopar_images.forest_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => format!("xopar_images.fire_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => format!("xopar_images.water_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => format!("xopar_images.shadow_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => format!("xopar_images.spirit_text"),
-            Some(DungeonRewardLocation::LinksPocket) => format!("xopar_images.free_text"),
-        },
-        TrackerCellKind::OptionalOverlay { main_img, overlay_img, active, .. } | TrackerCellKind::Overlay { main_img, overlay_img, active, .. } => match active(state) {
-            (false, false) => main_img.to_string('.', ImageDirContext::Dimmed),
-            (true, false) => main_img.to_string('.', ImageDirContext::Normal),
-            (main_active, true) => main_img.with_overlay(&overlay_img).to_string('.', main_active),
-        },
-        TrackerCellKind::Sequence { img, .. } => {
-            let (active, img) = img(state);
-            img.to_string('.', if active { ImageDirContext::Normal } else { ImageDirContext::Dimmed })
-        }
-        TrackerCellKind::Simple { img, active, .. } => img.to_string('.', if active(state) { ImageDirContext::Normal } else { ImageDirContext::Dimmed }),
-        TrackerCellKind::Song { song, check, .. } => {
-            let song_filename = match song {
-                QuestItems::ZELDAS_LULLABY => "lullaby",
-                QuestItems::EPONAS_SONG => "epona",
-                QuestItems::SARIAS_SONG => "saria",
-                QuestItems::SUNS_SONG => "sun",
-                QuestItems::SONG_OF_TIME => "time",
-                QuestItems::SONG_OF_STORMS => "storms",
-                QuestItems::MINUET_OF_FOREST => "minuet",
-                QuestItems::BOLERO_OF_FIRE => "bolero",
-                QuestItems::SERENADE_OF_WATER => "serenade",
-                QuestItems::NOCTURNE_OF_SHADOW => "nocturne",
-                QuestItems::REQUIEM_OF_SPIRIT => "requiem",
-                QuestItems::PRELUDE_OF_LIGHT => "prelude",
-                _ => unreachable!(),
-            };
-            match (state.ram.save.quest_items.contains(song), Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)) { //TODO allow ootr_dynamic::Rando
-                (false, false) => format!("xopar_images_dimmed.{}", song_filename),
-                (false, true) => format!("xopar_images_overlay_dimmed.{}_check", song_filename),
-                (true, false) => format!("xopar_images.{}", song_filename),
-                (true, true) => format!("xopar_images_overlay.{}_check", song_filename),
-            }
-        }
-        TrackerCellKind::Stone(stone) => format!(
-            "xopar_images{}.{}",
-            if state.ram.save.quest_items.has(stone) { "" } else { "_dimmed" },
-            match stone {
-                Stone::KokiriEmerald => "kokiri_emerald",
-                Stone::GoronRuby => "goron_ruby",
-                Stone::ZoraSapphire => "zora_sapphire",
-            },
-        ),
-        TrackerCellKind::StoneLocation(stone) => match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(stone)) {
-            None => format!("xopar_images_dimmed.unknown_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => format!("xopar_images.deku_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => format!("xopar_images.dc_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => format!("xopar_images.jabu_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => format!("xopar_images.forest_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => format!("xopar_images.fire_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => format!("xopar_images.water_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => format!("xopar_images.shadow_text"),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => format!("xopar_images.spirit_text"),
-            Some(DungeonRewardLocation::LinksPocket) => format!("xopar_images.free_text"),
-        },
-        TrackerCellKind::BossKey { .. } | TrackerCellKind::CompositeKeys { .. } | TrackerCellKind::FortressMq | TrackerCellKind::FreeReward | TrackerCellKind::Mq(_) | TrackerCellKind::SmallKeys { .. } | TrackerCellKind::SongCheck { .. } => unimplemented!(),
+    let CellRender { img, style, overlay } = cell.kind().render(state);
+    StringHandle::from_string(match (style, overlay) {
+        (CellStyle::Normal, CellOverlay::None) => img.to_string('.', ImageDirContext::Normal),
+        (CellStyle::Normal, CellOverlay::Count { count, count_img }) => format!("{}_{}", count_img.to_string('.', ImageDirContext::Count(count)), count),
+        (CellStyle::Normal, CellOverlay::Image(overlay)) => img.with_overlay(&overlay).to_string('.', true),
+        (CellStyle::Dimmed, CellOverlay::None) => img.to_string('.', ImageDirContext::Dimmed),
+        (CellStyle::Dimmed, CellOverlay::Image(overlay)) => img.with_overlay(&overlay).to_string('.', false),
+        (_, CellOverlay::Location { loc, style }) => loc.to_string('.', match style {
+            LocationStyle::Normal => ImageDirContext::Normal,
+            LocationStyle::Dimmed => ImageDirContext::Dimmed,
+            LocationStyle::Mq => unimplemented!(),
+        }),
+        (CellStyle::Dimmed, CellOverlay::Count { .. }) | (CellStyle::LeftDimmed | CellStyle::RightDimmed, _) => unimplemented!(),
     }.replace('-', "_"))
 }
 

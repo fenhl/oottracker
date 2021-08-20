@@ -11,6 +11,8 @@ winres = "0.1"
 async-proto = "0.7"
 derivative = "2"
 futures = "0.3"
+iced_futures = "0.3"
+iced_native = "0.4"
 image = "0.23"
 itertools = "0.10"
 num-traits = "0.2"
@@ -28,17 +30,8 @@ git = "https://github.com/dasgefolge/enum-iterator"
 branch = "fields"
 
 [dependencies.iced]
-git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "5fc4210270852d8d633a63168d8a166a235236c6"
+version = "0.3"
 features = ["image", "tokio"]
-
-[dependencies.iced_futures]
-git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "5fc4210270852d8d633a63168d8a166a235236c6"
-
-[dependencies.iced_native]
-git = "https://github.com/hecrj/iced" #TODO go back to the version on crates.io once it's compatible with tokio 1
-rev = "5fc4210270852d8d633a63168d8a166a235236c6"
 
 [dependencies.ootr]
 path = "../ootr"

@@ -10,6 +10,7 @@ use {
         Stream,
         StreamExt as _,
     },
+    iced_core::keyboard::Modifiers as KeyboardModifiers,
     tokio::{
         sync::Mutex,
         time::sleep,
@@ -30,7 +31,6 @@ use {
         Error,
         Restreams,
         Rooms,
-        TrackerCellKindExt as _,
         restream::render_double_cell,
     },
 };
@@ -194,9 +194,9 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                     }
                 };
                 if right {
-                    cell.kind().right_click(runner);
+                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), runner);
                 } else {
-                    cell.kind().left_click(runner);
+                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), runner);
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
@@ -269,9 +269,9 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                     }
                 };
                 if right {
-                    cell.kind().right_click(&mut room.model);
+                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
                 } else {
-                    cell.kind().left_click(&mut room.model);
+                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
                 }
                 room.tx.send(()).expect("failed to notify websockets about state change");
             }

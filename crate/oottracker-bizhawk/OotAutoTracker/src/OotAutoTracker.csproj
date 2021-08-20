@@ -15,8 +15,11 @@
     </ItemGroup>
     <ItemGroup>
         <EmbeddedResource Include="Resources/icon.ico" />
+        <EmbeddedResource Include="Resources/extra_images/*.png" />
         <EmbeddedResource Include="Resources/extra_images_count/*.png" />
         <EmbeddedResource Include="Resources/extra_images_dimmed/*.png" />
+        <EmbeddedResource Include="Resources/extra_images_overlay/*.png" />
+        <EmbeddedResource Include="Resources/extra_images_overlay_dimmed/*.png" />
         <EmbeddedResource Include="Resources/xopar_images/*.png" />
         <EmbeddedResource Include="Resources/xopar_images_count/*.png" />
         <EmbeddedResource Include="Resources/xopar_images_dimmed/*.png" />

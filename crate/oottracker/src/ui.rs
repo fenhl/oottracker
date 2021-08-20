@@ -1,15 +1,20 @@
+#![allow(unused_qualifications)] // oottracker::ui::TrackerCellKind::SmallKeys vs oottracker::save::SmallKeys
+
 use {
     std::{
         borrow::Cow,
         collections::HashMap,
         fmt,
         io,
+        iter,
         sync::Arc,
         vec,
     },
     async_proto::Protocol,
+    collect_mac::collect,
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
+    iced::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
     rocket::{
@@ -36,16 +41,21 @@ use {
         },
     },
     wheel::FromArc,
-    ootr::model::{
-        Dungeon,
-        DungeonReward,
-        DungeonRewardLocation,
-        MainDungeon,
-        Medallion,
-        Stone,
+    ootr::{
+        check::Check,
+        model::{
+            Dungeon,
+            DungeonReward,
+            DungeonRewardLocation,
+            MainDungeon,
+            Medallion,
+            Stone,
+        },
+        region::Mq,
     },
     crate::{
         ModelState,
+        checks::CheckExt as _,
         info_tables::*,
         knowledge::ProgressionMode,
         save::*,
@@ -185,7 +195,7 @@ impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> 
 }
 
 pub enum TrackerCellKind {
-    BigPoeTriforce,
+    BigPoeTriforce, // auto-trackers show big Poe count unless at least 1 Triforce piece has been collected, manual mode only shows Triforce pieces
     BossKey {
         active: Box<dyn Fn(&BossKeys) -> bool>,
         toggle: Box<dyn Fn(&mut BossKeys)>,
@@ -212,6 +222,8 @@ pub enum TrackerCellKind {
     },
     FortressMq, // a cell kind used on Xopar's tracker to show whether Gerudo Fortress has 4 carpenters
     FreeReward,
+    GoBk, // a combined go mode/BK mode/finished cell, used on the multiworld restream layout
+    MagicLens, // magic meter with a Lens of Truth overlay, but auto-trackers also show a different icon for double magic
     Medallion(Medallion),
     MedallionLocation(Medallion),
     Mq(Dungeon),
@@ -259,6 +271,445 @@ pub enum TrackerCellKind {
     StoneLocation(Stone),
 }
 
+impl TrackerCellKind {
+    pub fn render(&self, state: &ModelState) -> CellRender {
+        match self {
+            BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
+                CellRender {
+                    img: ImageInfo::new("triforce"),
+                    style: CellStyle::Normal,
+                    overlay: CellOverlay::Count {
+                        count: state.ram.save.triforce_pieces(),
+                        count_img: ImageInfo::new("force"),
+                    },
+                }
+            } else if state.ram.save.big_poes > 0 { //TODO show dimmed Triforce icon if it's known that it's TH
+                CellRender {
+                    img: ImageInfo::extra("big_poe"),
+                    style: CellStyle::Normal,
+                    overlay: CellOverlay::Count {
+                        count: state.ram.save.big_poes,
+                        count_img: ImageInfo::extra("poes"),
+                    },
+                }
+            } else {
+                CellRender {
+                    img: ImageInfo::extra("big_poe"),
+                    style: CellStyle::Dimmed,
+                    overlay: CellOverlay::None,
+                }
+            },
+            BossKey { active, .. } => CellRender {
+                img: ImageInfo::extra("boss_key"),
+                style: if active(&state.ram.save.boss_keys) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
+            Composite { left_img, right_img, both_img, active, .. } => {
+                let is_active = active(state);
+                let img = match is_active {
+                    (false, false) | (true, true) => both_img,
+                    (false, true) => right_img,
+                    (true, false) => left_img,
+                }.clone();
+                CellRender {
+                    img,
+                    style: if let (false, false) = is_active { CellStyle::Dimmed } else { CellStyle::Normal },
+                    overlay: CellOverlay::None,
+                }
+            }
+            CompositeKeys { boss, small } => {
+                let (has_boss_key, num_small_keys) = if let (BossKey { active, .. }, TrackerCellKind::SmallKeys { get, .. }) = (boss.kind(), small.kind()) {
+                    (active(&state.ram.save.boss_keys), get(&state.ram.save.small_keys))
+                } else {
+                    unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
+                };
+                CellRender {
+                    img: ImageInfo::extra("keys"),
+                    style: match (has_boss_key, num_small_keys) {
+                        (false, 0) => CellStyle::Dimmed,
+                        (false, _) => CellStyle::LeftDimmed,
+                        (true, 0) => CellStyle::RightDimmed,
+                        (true, _) => CellStyle::Normal,
+                    },
+                    overlay: if num_small_keys > 0 {
+                        CellOverlay::Count {
+                            count: num_small_keys,
+                            count_img: ImageInfo::new("UNIMPLEMENTED"), //TODO
+                        }
+                    } else {
+                        CellOverlay::None
+                    },
+                }
+            }
+            Count { dimmed_img, img, get, .. } => {
+                let count = get(state);
+                let (style, overlay) = if count == 0 {
+                    (CellStyle::Dimmed, CellOverlay::None)
+                } else {
+                    (CellStyle::Normal, CellOverlay::Count { count, count_img: img.clone() })
+                };
+                CellRender { img: dimmed_img.clone(), style, overlay }
+            }
+            FortressMq => {
+                CellRender {
+                    img: ImageInfo::extra("blank"),
+                    style: CellStyle::Normal,
+                    overlay: CellOverlay::Location {
+                        loc: ImageInfo::extra("fort_text"),
+                        style: if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |values| values.iter().eq(iter::once("normal"))) { LocationStyle::Mq } else { LocationStyle::Normal }, //TODO dim if unknown?
+                    },
+                }
+            }
+            FreeReward => {
+                let reward = state.knowledge.dungeon_reward_locations.iter()
+                    .filter_map(|(reward, &loc)| if loc == DungeonRewardLocation::LinksPocket { Some(reward) } else { None })
+                    .exactly_one()
+                    .ok();
+                CellRender {
+                    img: ImageInfo { dir: if reward.is_some() { ImageDir::Xopar } else { ImageDir::Extra }, name: match reward {
+                        Some(DungeonReward::Medallion(med)) => Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
+                        Some(DungeonReward::Stone(Stone::KokiriEmerald)) => Cow::Borrowed("kokiri_emerald"),
+                        Some(DungeonReward::Stone(Stone::GoronRuby)) => Cow::Borrowed("goron_ruby"),
+                        Some(DungeonReward::Stone(Stone::ZoraSapphire)) => Cow::Borrowed("zora_sapphire"),
+                        None => Cow::Borrowed("blank"), //TODO “unknown dungeon reward” image?
+                    } },
+                    style: CellStyle::Normal,
+                    overlay: CellOverlay::Location {
+                        loc: ImageInfo::new("free_text"),
+                        style: LocationStyle::Normal,
+                    },
+                }
+            }
+            GoBk => CellRender {
+                img: ImageInfo::extra(match state.knowledge.progression_mode {
+                    ProgressionMode::Done => "blank",
+                    ProgressionMode::Bk => "bk_mode",
+                    ProgressionMode::Go | ProgressionMode::Normal => "go_mode",
+                }),
+                style: if state.knowledge.progression_mode == ProgressionMode::Normal { CellStyle::Dimmed } else { CellStyle::Normal },
+                overlay: CellOverlay::None, //TODO overlay with finish time?
+            },
+            MagicLens => CellRender {
+                img: if state.ram.save.magic == MagicCapacity::Large { ImageInfo::new("magic") } else { ImageInfo::extra("small_magic") },
+                style: if state.ram.save.magic == MagicCapacity::None { CellStyle::Dimmed } else { CellStyle::Normal },
+                overlay: if state.ram.save.inv.lens {
+                    CellOverlay::Image(ImageInfo::new("lens"))
+                } else {
+                    CellOverlay::None
+                },
+            },
+            Medallion(med) => CellRender {
+                img: ImageInfo::new(format!("{}_medallion", med.element().to_ascii_lowercase())),
+                style: if state.ram.save.quest_items.has(*med) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
+            MedallionLocation(med) => {
+                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
+                CellRender {
+                    img: ImageInfo::new(match location {
+                        None => "unknown_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+                        Some(DungeonRewardLocation::LinksPocket) => "free_text",
+                    }),
+                    style: if location.is_some() { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::None,
+                }
+            }
+            Mq(dungeon) => {
+                let reward = if let Dungeon::Main(main_dungeon) = *dungeon {
+                    state.knowledge.dungeon_reward_locations.iter()
+                        .filter_map(|(reward, &loc)| if loc == DungeonRewardLocation::Dungeon(main_dungeon) { Some(reward) } else { None })
+                        .exactly_one()
+                        .ok()
+                } else {
+                    None
+                };
+                CellRender {
+                    img: ImageInfo { dir: if reward.is_some() { ImageDir::Xopar } else { ImageDir::Extra }, name: match reward {
+                        Some(DungeonReward::Medallion(med)) => Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
+                        Some(DungeonReward::Stone(Stone::KokiriEmerald)) => Cow::Borrowed("kokiri_emerald"),
+                        Some(DungeonReward::Stone(Stone::GoronRuby)) => Cow::Borrowed("goron_ruby"),
+                        Some(DungeonReward::Stone(Stone::ZoraSapphire)) => Cow::Borrowed("zora_sapphire"),
+                        None => Cow::Borrowed("blank"), //TODO “unknown dungeon reward” image? (only for dungeons that have rewards)
+                    } },
+                    style: if reward.map_or(false, |&reward| state.ram.save.quest_items.has(reward)) { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::Location {
+                        loc: ImageInfo { dir: if let Dungeon::Main(_) = dungeon { ImageDir::Xopar } else { ImageDir::Extra }, name: Cow::Borrowed(match dungeon {
+                            Dungeon::Main(MainDungeon::DekuTree) => "deku_text",
+                            Dungeon::Main(MainDungeon::DodongosCavern) => "dc_text",
+                            Dungeon::Main(MainDungeon::JabuJabu) => "jabu_text",
+                            Dungeon::Main(MainDungeon::ForestTemple) => "forest_text",
+                            Dungeon::Main(MainDungeon::FireTemple) => "fire_text",
+                            Dungeon::Main(MainDungeon::WaterTemple) => "water_text",
+                            Dungeon::Main(MainDungeon::ShadowTemple) => "shadow_text",
+                            Dungeon::Main(MainDungeon::SpiritTemple) => "spirit_text",
+                            Dungeon::IceCavern => "ice_text",
+                            Dungeon::BottomOfTheWell => "well_text",
+                            Dungeon::GerudoTrainingGrounds => "gtg_text",
+                            Dungeon::GanonsCastle => "ganon_text",
+                        }) },
+                        style: if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) { LocationStyle::Mq } else { LocationStyle::Normal },
+                    },
+                }
+            }
+            OptionalOverlay { main_img, overlay_img, active, .. } | Overlay { main_img, overlay_img, active, .. } => {
+                let (main_active, overlay_active) = active(state);
+                CellRender {
+                    img: main_img.clone(),
+                    style: if main_active { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: if overlay_active {
+                        CellOverlay::Image(overlay_img.clone())
+                    } else {
+                        CellOverlay::None
+                    },
+                }
+            }
+            Sequence { img, .. } => {
+                let (is_active, img) = img(state);
+                CellRender {
+                    img,
+                    style: if is_active { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::None,
+                }
+            }
+            Simple { img, active, .. } => CellRender {
+                img: img.clone(),
+                style: if active(state) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
+            TrackerCellKind::SmallKeys { get, .. } => {
+                let num_small_keys = get(&state.ram.save.small_keys);
+                CellRender {
+                    img: ImageInfo::extra("small-key"),
+                    style: if num_small_keys > 0 { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: if num_small_keys > 0 {
+                        CellOverlay::Count {
+                            count: num_small_keys,
+                            count_img: ImageInfo::new("UNIMPLEMENTED"), //TODO
+                        }
+                    } else {
+                        CellOverlay::None
+                    },
+                }
+            },
+            Song { song, check, .. } => CellRender {
+                img: ImageInfo::new(match *song {
+                    QuestItems::ZELDAS_LULLABY => "lullaby",
+                    QuestItems::EPONAS_SONG => "epona",
+                    QuestItems::SARIAS_SONG => "saria",
+                    QuestItems::SUNS_SONG => "sun",
+                    QuestItems::SONG_OF_TIME => "time",
+                    QuestItems::SONG_OF_STORMS => "storms",
+                    QuestItems::MINUET_OF_FOREST => "minuet",
+                    QuestItems::BOLERO_OF_FIRE => "bolero",
+                    QuestItems::SERENADE_OF_WATER => "serenade",
+                    QuestItems::NOCTURNE_OF_SHADOW => "nocturne",
+                    QuestItems::REQUIEM_OF_SPIRIT => "requiem",
+                    QuestItems::PRELUDE_OF_LIGHT => "prelude",
+                    _ => unreachable!(),
+                }),
+                style: if state.ram.save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                    CellOverlay::Image(ImageInfo::new("check"))
+                } else {
+                    CellOverlay::None
+                },
+            },
+            SongCheck { check, .. } => CellRender {
+                img: ImageInfo::extra("blank"),
+                style: CellStyle::Normal,
+                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                    CellOverlay::Image(ImageInfo::new("check"))
+                } else {
+                    CellOverlay::None
+                },
+            },
+            Stone(stone) => CellRender {
+                img: ImageInfo::new(match *stone {
+                    Stone::KokiriEmerald => "kokiri_emerald",
+                    Stone::GoronRuby => "goron_ruby",
+                    Stone::ZoraSapphire => "zora_sapphire",
+                }),
+                style: if state.ram.save.quest_items.has(*stone) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: CellOverlay::None,
+            },
+            StoneLocation(stone) => {
+                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
+                CellRender {
+                    img: ImageInfo::new(match location {
+                        None => "unknown_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+                        Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+                        Some(DungeonRewardLocation::LinksPocket) => "free_text",
+                    }),
+                    style: if location.is_some() { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::None,
+                }
+            },
+        }
+    }
+
+    /// Handle a click action from a frontend that don't distinguish between left and right click.
+    pub fn click(&self, state: &mut ModelState) {
+        match self {
+            Composite { active, toggle_left, toggle_right, .. } | Overlay { active, toggle_main: toggle_left, toggle_overlay: toggle_right, .. } => {
+                let (left, _) = active(state);
+                if left { toggle_right(state) }
+                toggle_left(state);
+            }
+            OptionalOverlay { toggle_main: toggle, .. } | Simple { toggle, .. } => toggle(state),
+            CompositeKeys { boss, small } => {
+                let (toggle_boss, get_small, set_small, max_small_vanilla, max_small_mq) = if let (BossKey { toggle, .. }, TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq }) = (boss.kind(), small.kind()) {
+                    (toggle, get, set, max_vanilla, max_mq)
+                } else {
+                    unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
+                };
+                let num_small = get_small(&state.ram.save.small_keys);
+                if num_small == max_small_vanilla.max(max_small_mq) { //TODO check MQ knowledge? Does plentiful go to +1?
+                    set_small(&mut state.ram.save.small_keys, 0);
+                    toggle_boss(&mut state.ram.save.boss_keys);
+                } else {
+                    set_small(&mut state.ram.save.small_keys, num_small + 1);
+                }
+            }
+            Count { get, set, max, step, .. } => {
+                let current = get(state);
+                set(state, if current == *max { 0 } else { current.saturating_add(*step).min(*max) });
+            }
+            FortressMq => if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |fort| fort.iter().eq(iter::once("normal"))) {
+                state.knowledge.string_settings.remove("gerudo_fortress");
+            } else {
+                state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
+            },
+            GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
+                ProgressionMode::Normal => ProgressionMode::Go,
+                ProgressionMode::Go => ProgressionMode::Bk,
+                ProgressionMode::Bk => ProgressionMode::Done,
+                ProgressionMode::Done => ProgressionMode::Normal,
+            },
+            MagicLens => {
+                if state.ram.save.magic == MagicCapacity::None {
+                    state.ram.save.magic = MagicCapacity::Small;
+                } else {
+                    state.ram.save.magic = MagicCapacity::None;
+                    state.ram.save.inv.lens = !state.ram.save.inv.lens;
+                }
+            }
+            Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
+            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
+            Mq(dungeon) => if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) {
+                state.knowledge.mq.remove(dungeon);
+            } else {
+                state.knowledge.mq.insert(*dungeon, Mq::Mq);
+            },
+            Sequence { increment, .. } => increment(state),
+            TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } => {
+                let num = get(&state.ram.save.small_keys);
+                if num == *max_vanilla.max(max_mq) { //TODO check MQ knowledge? Does plentiful go to +1?
+                    set(&mut state.ram.save.small_keys, 0);
+                } else {
+                    set(&mut state.ram.save.small_keys, num + 1);
+                }
+            }
+            Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
+            Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
+            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            FreeReward => {}
+            BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
+        }
+    }
+
+    /// Returns `true` if the menu should be opened.
+    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
+        #[cfg(target_os = "macos")] if keyboard_modifiers.control {
+            return self.right_click(can_change_state, keyboard_modifiers, state)
+        }
+        if can_change_state {
+            match self {
+                Composite { toggle_left, .. } | Overlay { toggle_main: toggle_left, .. } => toggle_left(state),
+                CompositeKeys { boss, .. } => if let BossKey { toggle, .. } = boss.kind() {
+                    toggle(&mut state.ram.save.boss_keys);
+                } else {
+                    unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
+                },
+                Count { get, set, max, step, .. } => {
+                    let current = get(state);
+                    set(state, if current == *max { 0 } else { current.saturating_add(step * if keyboard_modifiers.shift && *max >= 10 { 10 } else { 1 }).min(*max) });
+                }
+                GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
+                    ProgressionMode::Normal => ProgressionMode::Go,
+                    ProgressionMode::Go => ProgressionMode::Normal,
+                    ProgressionMode::Bk => ProgressionMode::Done,
+                    ProgressionMode::Done => ProgressionMode::Bk,
+                },
+                MagicLens => state.ram.save.magic = if state.ram.save.magic == MagicCapacity::None { MagicCapacity::Small } else { MagicCapacity::None },
+                _ => self.click(state),
+            }
+        }
+        false
+    }
+
+    /// Returns `true` if the menu should be opened.
+    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
+        if let Medallion(_) = self { return true }
+        if can_change_state {
+            match self {
+                Composite { toggle_right, .. } | OptionalOverlay { toggle_overlay: toggle_right, .. } | Overlay { toggle_overlay: toggle_right, .. } => toggle_right(state),
+                CompositeKeys { small, .. } => if let TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } = small.kind() {
+                    let num = get(&state.ram.save.small_keys);
+                    if num == max_vanilla.max(max_mq) { //TODO check MQ knowledge? Does plentiful go to +1?
+                        set(&mut state.ram.save.small_keys, 0);
+                    } else {
+                        set(&mut state.ram.save.small_keys, num + 1);
+                    }
+                } else {
+                    unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
+                },
+                Count { get, set, max, step, .. } => {
+                    let current = get(state);
+                    set(state, if current == 0 { *max } else { current.saturating_sub(step * if keyboard_modifiers.shift && *max >= 10 { 10 } else { 1 }) });
+                }
+                GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
+                    ProgressionMode::Normal => ProgressionMode::Bk,
+                    ProgressionMode::Bk => ProgressionMode::Normal,
+                    ProgressionMode::Go => ProgressionMode::Done,
+                    ProgressionMode::Done => ProgressionMode::Go,
+                },
+                MagicLens => state.ram.save.inv.lens = !state.ram.save.inv.lens,
+                Medallion(_) => unreachable!("already handled above"),
+                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
+                Sequence { decrement, .. } => decrement(state),
+                TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } => {
+                    let num = get(&state.ram.save.small_keys);
+                    if num == 0 {
+                        set(&mut state.ram.save.small_keys, *max_vanilla.max(max_mq)); //TODO check MQ knowledge? Does plentiful go to +1?
+                    } else {
+                        set(&mut state.ram.save.small_keys, num - 1);
+                    }
+                }
+                Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
+                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
+                FreeReward | FortressMq | Mq(_) | Simple { .. } | Stone(_) => {}
+                BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
+            }
+        }
+        false
+    }
+}
+
 use TrackerCellKind::*;
 
 macro_rules! cells {
@@ -272,7 +723,6 @@ macro_rules! cells {
 
         impl TrackerCellId {
             pub fn kind(&self) -> TrackerCellKind {
-                #[allow(unused_qualifications)]
                 match self {
                     $(TrackerCellId::$cell => $kind,)*
                 }
@@ -283,7 +733,7 @@ macro_rules! cells {
 
 cells! {
     GoMode: Simple {
-        img: ImageInfo { dir: ImageDir::Extra, name: "go_mode" },
+        img: ImageInfo::extra("go_mode"),
         active: Box::new(|state| match state.knowledge.progression_mode {
             ProgressionMode::Go | ProgressionMode::Done => true,
             ProgressionMode::Bk | ProgressionMode::Normal => false,
@@ -297,34 +747,7 @@ cells! {
             state.knowledge.progression_mode = new_mode;
         }),
     },
-    GoBk: Overlay {
-        main_img: ImageInfo { dir: ImageDir::Extra, name: "go_mode" },
-        overlay_img: ImageInfo { dir: ImageDir::Extra, name: "bk_mode" },
-        active: Box::new(|state| match state.knowledge.progression_mode {
-            ProgressionMode::Done => (true, true), // rendered as both, with no image
-            ProgressionMode::Go => (true, false),
-            ProgressionMode::Bk => (false, true),
-            ProgressionMode::Normal => (false, false),
-        }),
-        toggle_main: Box::new(|state| {
-            let new_mode = match state.knowledge.progression_mode {
-                ProgressionMode::Normal => ProgressionMode::Go,
-                ProgressionMode::Bk => ProgressionMode::Done,
-                ProgressionMode::Go => ProgressionMode::Normal,
-                ProgressionMode::Done => ProgressionMode::Bk,
-            };
-            state.knowledge.progression_mode = new_mode;
-        }),
-        toggle_overlay: Box::new(|state| {
-            let new_mode = match state.knowledge.progression_mode {
-                ProgressionMode::Normal => ProgressionMode::Bk,
-                ProgressionMode::Bk => ProgressionMode::Normal,
-                ProgressionMode::Go => ProgressionMode::Done,
-                ProgressionMode::Done => ProgressionMode::Go,
-            };
-            state.knowledge.progression_mode = new_mode;
-        }),
-    },
+    GoBk: GoBk,
     LightMedallionLocation: MedallionLocation(Medallion::Light),
     ForestMedallionLocation: MedallionLocation(Medallion::Forest),
     FireMedallionLocation: MedallionLocation(Medallion::Fire),
@@ -639,17 +1062,16 @@ cells! {
             state.ram.save.upgrades.set_strength(new_val);
         }),
     },
-    Magic: Overlay {
-        main_img: ImageInfo::new("magic"),
-        overlay_img: ImageInfo::new("lens"),
-        active: Box::new(|state| (state.ram.save.magic != MagicCapacity::None, state.ram.save.inv.lens)),
-        toggle_main: Box::new(|state| if state.ram.save.magic == MagicCapacity::None {
+    Magic: Simple {
+        img: ImageInfo::new("magic"),
+        active: Box::new(|state| state.ram.save.magic != MagicCapacity::None),
+        toggle: Box::new(|state| if state.ram.save.magic == MagicCapacity::None {
             state.ram.save.magic = MagicCapacity::Small;
         } else {
             state.ram.save.magic = MagicCapacity::None;
         }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
     },
+    MagicLens: MagicLens,
     MagicCapacity: Sequence {
         idx: Box::new(|state| match state.ram.save.magic {
             MagicCapacity::None => 0,
@@ -692,7 +1114,7 @@ cells! {
         toggle: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
     },
     NayrusLove: Simple {
-        img: ImageInfo { dir: ImageDir::Extra, name: "nayrus_love" },
+        img: ImageInfo::extra("nayrus_love"),
         active: Box::new(|state| state.ram.save.inv.nayrus_love),
         toggle: Box::new(|state| state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love),
     },
@@ -970,7 +1392,7 @@ cells! {
     SwordCard: Composite {
         left_img: ImageInfo::new("kokiri_sword"),
         right_img: ImageInfo::new("gerudo_card"),
-        both_img: ImageInfo::new("composite_ksword_gcard"),
+        both_img: ImageInfo::extra("composite_ksword_gcard"),
         active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD))),
         toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
         toggle_right: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
@@ -1329,7 +1751,7 @@ cells! {
         toggle: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::STONE_OF_AGONY)),
     },
     Blank: Simple {
-        img: ImageInfo { dir: ImageDir::Extra, name: "blank" },
+        img: ImageInfo::extra("blank"),
         active: Box::new(|_| false),
         toggle: Box::new(|_| ()),
     },
@@ -1437,7 +1859,7 @@ impl TrackerLayout {
                         CellLayout { idx: 21, id: ZoraSapphire, pos: [205, 113], size: [30, 30] },
                     ]).chain(
                         vec![
-                            Slingshot, Bombs, Boomerang, Strength, Magic, Spells,
+                            Slingshot, Bombs, Boomerang, Strength, MagicLens, Spells,
                             Hookshot, Bow, Arrows, Hammer, Boots, MirrorShield,
                             ChildTrade, Ocarina, Beans, SwordCard, Tunics, if *auto { BigPoeTriforce } else { Triforce },
                             ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
@@ -1479,7 +1901,7 @@ impl TrackerLayout {
                 Bottle, Strength, Scale, EponasSong, Bolero, FireMq, FireKeys, JabuMq, Blank,
                 ChildTrade, Beans, SwordCard, SariasSong, Serenade, WaterMq, WaterKeys, IceMq, Blank,
                 AdultTrade, Tunics, Triforce, SunsSong, Requiem, SpiritMq, SpiritKeys, WellMq, WellSmallKeys,
-                Magic, Spells, Arrows, SongOfTime, Nocturne, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
+                MagicLens, Spells, Arrows, SongOfTime, Nocturne, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
                 MirrorShield, Boots, Ocarina, SongOfStorms, Prelude, FreeReward, Blank, GtgMq, GtgSmallKeys,
             ]),
             TrackerLayout::RslRight => TrackerLayout::RslLeft.cells()
@@ -1628,14 +2050,13 @@ pub enum CellStyle {
 #[derive(Clone, PartialEq, Eq, Protocol)]
 pub enum CellOverlay {
     None,
-    Count(u8),
-    Image {
-        overlay_dir: Cow<'static, str>,
-        overlay_img: Cow<'static, str>,
+    Count {
+        count: u8,
+        count_img: ImageInfo,
     },
+    Image(ImageInfo),
     Location {
-        loc_dir: Cow<'static, str>,
-        loc_img: Cow<'static, str>,
+        loc: ImageInfo,
         style: LocationStyle,
     },
 }
@@ -1649,8 +2070,7 @@ pub enum LocationStyle {
 
 #[derive(Clone, PartialEq, Eq, Protocol)]
 pub struct CellRender {
-    pub img_dir: Cow<'static, str>,
-    pub img_filename: Cow<'static, str>,
+    pub img: ImageInfo,
     pub style: CellStyle,
     pub overlay: CellOverlay,
 }
@@ -1658,24 +2078,23 @@ pub struct CellRender {
 impl CellRender {
     pub fn to_html(&self) -> String {
         format!(
-            r#"<img class="{}" src="/static/img/{}/{}.png" />{}"#,
+            r#"<img class="{}" src="/static/img/{}.png" />{}"#,
             match self.style {
                 CellStyle::Normal => "",
                 CellStyle::Dimmed => "dimmed",
                 CellStyle::LeftDimmed => "left-dimmed",
                 CellStyle::RightDimmed => "right-dimmed",
             },
-            self.img_dir,
-            self.img_filename,
+            self.img.to_string('/', ImageDirContext::Normal),
             match self.overlay {
                 CellOverlay::None => String::default(),
-                CellOverlay::Count(count) => format!(r#"<span class="count">{}</span>"#, count),
-                CellOverlay::Image { ref overlay_dir, ref overlay_img } => format!(r#"<img src="/static/img/{}/{}.png" />"#, overlay_dir, overlay_img),
-                CellOverlay::Location { ref loc_dir, ref loc_img, style } => format!(r#"<img class="{}" src="/static/img/{}/{}.png" />"#, match style {
+                CellOverlay::Count { count, .. } => format!(r#"<span class="count">{}</span>"#, count),
+                CellOverlay::Image(ref overlay) => format!(r#"<img src="/static/img/{}.png" />"#, overlay.to_string('/', ImageDirContext::OverlayOnly)),
+                CellOverlay::Location { ref loc, style } => format!(r#"<img class="{}" src="/static/img/{}.png" />"#, match style {
                     LocationStyle::Normal => "loc",
                     LocationStyle::Dimmed => "loc dimmed",
                     LocationStyle::Mq => "loc mq",
-                }, loc_dir, loc_img),
+                }, loc.to_string('/', ImageDirContext::Normal)),
             },
         )
     }
@@ -1695,10 +2114,10 @@ pub enum ImageDirContext {
     OverlayOnly,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
 pub enum ImageDir {
-    Extra,
     Xopar,
+    Extra,
 }
 
 impl ImageDir {
@@ -1711,30 +2130,36 @@ impl ImageDir {
             (ImageDir::Xopar, ImageDirContext::Dimmed) => "xopar-images-dimmed",
             (ImageDir::Extra, ImageDirContext::Dimmed) => "extra-images-dimmed",
             (ImageDir::Xopar, ImageDirContext::OverlayOnly) => "xopar-overlays",
-            (ImageDir::Extra, ImageDirContext::OverlayOnly) => "extra-images",
+            (ImageDir::Extra, ImageDirContext::OverlayOnly) => "extra-overlays",
         }
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Protocol)]
 pub struct ImageInfo {
     pub dir: ImageDir,
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
 }
 
 impl ImageInfo {
-    fn new(name: &'static str) -> ImageInfo {
-        ImageInfo { dir: ImageDir::Xopar, name }
+    pub fn new(name: impl Into<Cow<'static, str>>) -> ImageInfo {
+        ImageInfo { dir: ImageDir::Xopar, name: name.into() }
+    }
+
+    pub fn extra(name: impl Into<Cow<'static, str>>) -> ImageInfo {
+        ImageInfo { dir: ImageDir::Extra, name: name.into() }
     }
 
     pub fn embedded<T: FromEmbeddedImage>(&self, ctx: ImageDirContext) -> T {
         match (self.dir, ctx) {
-            (ImageDir::Xopar, ImageDirContext::Normal) => images::xopar_images(self.name),
-            (ImageDir::Extra, ImageDirContext::Normal) => images::extra_images(self.name),
+            (ImageDir::Xopar, ImageDirContext::Normal) => images::xopar_images(&self.name),
+            (ImageDir::Extra, ImageDirContext::Normal) => images::extra_images(&self.name),
             (ImageDir::Xopar, ImageDirContext::Count(count)) => images::xopar_images_count(&format!("{}_{}", self.name, count)),
             (ImageDir::Extra, ImageDirContext::Count(count)) => images::extra_images_count(&format!("{}_{}", self.name, count)),
-            (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(self.name),
-            (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(self.name),
-            (_, ImageDirContext::OverlayOnly) => images::extra_images(self.name),
+            (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(&self.name),
+            (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(&self.name),
+            (ImageDir::Xopar, ImageDirContext::OverlayOnly) => images::xopar_overlays(&self.name),
+            (ImageDir::Extra, ImageDirContext::OverlayOnly) => images::extra_overlays(&self.name),
         }
     }
 
@@ -1743,38 +2168,39 @@ impl ImageInfo {
     }
 
     pub fn with_overlay(&self, overlay: &ImageInfo) -> OverlayImageInfo {
-        assert_eq!(self.dir, overlay.dir);
         OverlayImageInfo {
-            dir: self.dir,
-            main: self.name,
-            overlay: overlay.name,
+            dir: if self.dir == ImageDir::Xopar && overlay.dir == ImageDir::Xopar { ImageDir::Xopar } else { ImageDir::Extra },
+            main: self.name.clone(),
+            overlay: overlay.name.clone(),
         }
     }
 }
 
 pub struct OverlayImageInfo {
     dir: ImageDir,
-    main: &'static str,
-    overlay: &'static str,
+    main: Cow<'static, str>,
+    overlay: Cow<'static, str>,
 }
 
 impl OverlayImageInfo {
     pub fn embedded<T: FromEmbeddedImage>(&self, main_active: bool) -> T {
-        match self.dir {
-            ImageDir::Xopar => if main_active {
-                images::xopar_images_overlay(&format!("{}_{}", self.main, self.overlay))
-            } else {
-                images::xopar_images_overlay_dimmed(&format!("{}_{}", self.main, self.overlay))
-            },
-            ImageDir::Extra => images::extra_images(if main_active { "blank" } else { self.overlay }),
-        }
+        (match (self.dir, main_active) {
+            (ImageDir::Xopar, false) => images::xopar_images_overlay_dimmed,
+            (ImageDir::Xopar, true) => images::xopar_images_overlay,
+            (ImageDir::Extra, false) => images::extra_images_overlay_dimmed,
+            (ImageDir::Extra, true) => images::extra_images_overlay,
+        })(&format!("{}_{}", self.main, self.overlay))
     }
 
     pub fn to_string(&self, sep: char, main_active: bool) -> String {
-        match self.dir {
-            ImageDir::Xopar => format!("xopar-images-overlay{}{}{}_{}", if main_active { "" } else { "-dimmed" }, sep, self.main, self.overlay),
-            ImageDir::Extra => format!("extra-images{}{}", sep, if main_active { "blank" } else { self.overlay }),
-        }
+        format!(
+            "{}-images-overlay{}{}{}_{}",
+            match self.dir { ImageDir::Xopar => "xopar", ImageDir::Extra => "extra" },
+            if main_active { "" } else { "-dimmed" },
+            sep,
+            self.main,
+            self.overlay,
+        )
     }
 }
 
@@ -1800,10 +2226,14 @@ pub mod images {
     oottracker_derive::embed_images!("assets/img/extra-images");
     oottracker_derive::embed_images!("assets/img/extra-images-count");
     oottracker_derive::embed_images!("assets/img/extra-images-dimmed");
+    oottracker_derive::embed_images!("assets/img/extra-images-overlay");
+    oottracker_derive::embed_images!("assets/img/extra-images-overlay-dimmed");
+    oottracker_derive::embed_images!("assets/img/extra-overlays");
     oottracker_derive::embed_images!("assets/img/xopar-images");
     oottracker_derive::embed_images!("assets/img/xopar-images-count");
     oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");
     oottracker_derive::embed_images!("assets/img/xopar-images-overlay");
     oottracker_derive::embed_images!("assets/img/xopar-images-overlay-dimmed");
+    oottracker_derive::embed_images!("assets/img/xopar-overlays");
     oottracker_derive::embed_image!("assets/icon.ico");
 }
