@@ -12,6 +12,7 @@ use {
     },
     async_proto::Protocol,
     collect_mac::collect,
+    derivative::Derivative,
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
     iced::keyboard::Modifiers as KeyboardModifiers,
@@ -29,7 +30,6 @@ use {
         Deserialize,
         Serialize,
     },
-    smart_default::SmartDefault,
     tokio::{
         fs::{
             self,
@@ -83,17 +83,18 @@ impl fmt::Display for Error {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Deserialize, Serialize)]
+#[derive(Derivative, Debug, Clone, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
-    #[default(ElementOrder::LightShadowSpirit)]
+    #[derivative(Default(value = "ElementOrder::LightShadowSpirit"))]
     #[serde(default = "default_med_order")]
     pub med_order: ElementOrder,
-    #[default(ElementOrder::SpiritShadowLight)]
+    #[derivative(Default(value = "ElementOrder::SpiritShadowLight"))]
     #[serde(default = "default_warp_song_order")]
     pub warp_song_order: ElementOrder,
     pub auto_update_check: Option<bool>,
-    #[default(VERSION)]
+    #[derivative(Default(value = "VERSION"))]
     pub version: u8,
 }
 

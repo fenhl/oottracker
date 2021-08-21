@@ -10,7 +10,7 @@ use {
         fmt,
         sync::Arc,
     },
-    lazy_static::lazy_static,
+    once_cell::sync::Lazy,
     semver::Version,
     ootr::{
         access::{

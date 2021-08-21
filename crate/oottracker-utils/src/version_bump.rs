@@ -7,7 +7,11 @@ use {
         num::ParseIntError,
     },
     derive_more::From,
-    semver::Version,
+    semver::{
+        BuildMetadata,
+        Prerelease,
+        Version,
+    },
     structopt::StructOpt,
     tokio::{
         fs,
@@ -52,12 +56,34 @@ impl fmt::Display for Error {
     }
 }
 
+//FROM https://github.com/dtolnay/semver/issues/243#issuecomment-854337640
+fn increment_patch(v: &mut Version) {
+    v.patch += 1;
+    v.pre = Prerelease::EMPTY;
+    v.build = BuildMetadata::EMPTY;
+}
+
+fn increment_minor(v: &mut Version) {
+    v.minor += 1;
+    v.patch = 0;
+    v.pre = Prerelease::EMPTY;
+    v.build = BuildMetadata::EMPTY;
+}
+
+fn increment_major(v: &mut Version) {
+    v.major += 1;
+    v.minor = 0;
+    v.patch = 0;
+    v.pre = Prerelease::EMPTY;
+    v.build = BuildMetadata::EMPTY;
+}
+
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
     let version = match args {
-        Args::Major => { let mut version = version().await; version.increment_major(); version }
-        Args::Minor => { let mut version = version().await; version.increment_minor(); version }
-        Args::Patch => { let mut version = version().await; version.increment_patch(); version }
+        Args::Major => { let mut version = version().await; increment_major(&mut version); version }
+        Args::Minor => { let mut version = version().await; increment_minor(&mut version); version }
+        Args::Patch => { let mut version = version().await; increment_patch(&mut version); version }
         Args::Exact { version } => version,
     };
     println!("new version: {}", version);

@@ -5,10 +5,7 @@ use {
         Client,
         StatusCode,
     },
-    semver::{
-        SemVerError,
-        Version,
-    },
+    semver::Version,
     serde::Deserialize,
     serde_json::json,
     url::Url,
@@ -23,7 +20,7 @@ pub struct Release {
 }
 
 impl Release {
-    pub fn version(&self) -> Result<Version, SemVerError> {
+    pub fn version(&self) -> Result<Version, semver::Error> {
         self.tag_name[1..].parse()
     }
 }

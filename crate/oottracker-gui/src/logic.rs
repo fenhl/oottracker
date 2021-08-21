@@ -30,13 +30,13 @@ use {
         },
     },
     itertools::Itertools as _,
-    smart_default::SmartDefault,
     ootr::Rando,
 };
 
-#[derive(Debug, SmartDefault)]
+#[derive(Derivative, Debug)]
+#[derivative(Default)]
 enum SettingsInfo {
-    #[default]
+    #[derivative(Default)]
     String(String),
     Plando(PathBuf),
     Weights(PathBuf),
@@ -61,9 +61,10 @@ impl SettingsInfo {
     }
 }
 
-#[derive(Debug, SmartDefault, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub(crate) enum SettingsInfoKind {
-    #[default]
+    #[derivative(Default)]
     String,
     Plando,
     Weights,
@@ -124,10 +125,11 @@ pub(crate) enum Message<R: Rando> {
     PickSettingsInfo(SettingsInfoKind),
 }
 
-#[derive(Debug, SmartDefault)]
+#[derive(Derivative, Debug)]
+#[derivative(Default)]
 pub(crate) struct State<R: Rando + 'static> {
     //TODO store in model state
-    #[default = "Root"]
+    #[derivative(Default(value = "R::root()"))]
     current_region: R::RegionName,
     region_pick: pick_list::State<R::RegionName>,
     save_btn: button::State,

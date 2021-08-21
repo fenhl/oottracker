@@ -15,7 +15,7 @@ use {
         WriteError,
     },
     collect_mac::collect,
-    smart_default::SmartDefault,
+    derivative::Derivative,
     tokio::io::{
         AsyncRead,
         AsyncWrite,
@@ -26,12 +26,13 @@ use {
     },
 };
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq, Protocol)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq, Protocol)]
+#[derivative(Default)]
 pub enum ProgressionMode {
     /// No progression available. Should only occur in multiworld and no-logic seeds.
     Bk,
     /// The player is neither done nor in go mode nor in BK mode.
-    #[default]
+    #[derivative(Default)]
     Normal,
     /// The player either has or knows the location of every item required to beat the game.
     ///
@@ -41,16 +42,17 @@ pub enum ProgressionMode {
     Done,
 }
 
-#[derive(Debug, SmartDefault, Clone, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, PartialEq, Eq)]
+#[derivative(Default)]
 pub struct Knowledge {
     pub bool_settings: HashMap<String, bool>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
     pub string_settings: HashMap<String, HashSet<String>>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
-    #[default(Some(Default::default()))]
+    #[derivative(Default(value = "Some(HashMap::default())"))]
     pub tricks: Option<HashMap<String, bool>>, //TODO remove option wrapping
     pub mq: HashMap<Dungeon, Mq>,
     pub active_trials: HashMap<Medallion, bool>,
     pub dungeon_reward_locations: HashMap<DungeonReward, DungeonRewardLocation>,
-    #[default(Some(Default::default()))] //TODO include exits that are never shuffled
+    #[derivative(Default(value = "Some(HashMap::default())"))] //TODO include exits that are never shuffled
     pub exits: Option<HashMap<String, HashMap<String, String>>>, //TODO remove option wrapping
     pub progression_mode: ProgressionMode, //TODO automatically determine from remaining model state
 }

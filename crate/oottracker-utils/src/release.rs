@@ -29,7 +29,6 @@ use {
     },
     dir_lock::DirLock,
     itertools::Itertools as _,
-    semver::SemVerError,
     tokio::fs::File,
     zip::{
         ZipWriter,
@@ -64,7 +63,7 @@ enum Error {
     #[cfg(windows)]
     SameVersion,
     #[cfg(windows)]
-    SemVer(SemVerError),
+    SemVer(semver::Error),
     #[cfg(windows)]
     VersionRegression,
     #[cfg(windows)]

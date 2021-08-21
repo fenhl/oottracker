@@ -76,7 +76,7 @@ impl<'p> Rando<'p> {
     /// Imports and returns the given Python module from the randomizer codebase.
     fn import(&self, module: &str) -> PyResult<&'p PyModule> {
         let sys = self.py.import("sys")?;
-        sys.get("path")?.call_method1("append", (self.path.display().to_string(),))?;
+        sys.getattr("path")?.call_method1("append", (self.path.display().to_string(),))?;
         self.py.import(module)
     }
 }
@@ -131,12 +131,12 @@ impl<'p> ootr::Rando for Rando<'p> {
     fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, RandoErr> {
         if self.escaped_items.borrow().is_none() {
             let items = self.import("RuleParser")?
-                .get("escaped_items")?
+                .getattr("escaped_items")?
                 .call_method0("items")?
                 .iter()?
                 .map(|elt| elt
                     .and_then(|elt| elt.extract())
-                    .and_then(|(esc_name, item_name)| Ok((esc_name, item_name, self.import("ItemList")?.get("item_table")?.get_item(item_name)?.get_item(0)?.extract::<&str>()?)))
+                    .and_then(|(esc_name, item_name)| Ok((esc_name, item_name, self.import("ItemList")?.getattr("item_table")?.get_item(item_name)?.get_item(0)?.extract::<&str>()?)))
                 )
                 .filter_map(|elt| match elt {
                     Ok((esc_name, item_name, kind)) => if kind == "Event" && item_name != "Scarecrow Song" { //HACK treat Scarecrow Song as not an event since it's not defined as one in any region
@@ -158,7 +158,7 @@ impl<'p> ootr::Rando for Rando<'p> {
     fn item_table(&self) -> Result<Arc<HashMap<String, Item>>, RandoErr> {
         if self.item_table.borrow().is_none() {
             let items = self.import("ItemList")?
-                .get("item_table")?
+                .getattr("item_table")?
                 .call_method0("items")?
                 .iter()?
                 .map(|elt| {
@@ -211,7 +211,7 @@ impl<'p> ootr::Rando for Rando<'p> {
     fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, RandoErr> {
         if self.logic_tricks.borrow().is_none() {
             let mut tricks = HashSet::default();
-            for trick in self.import("SettingsList")?.get("logic_tricks")?.call_method0("values")?.iter()? {
+            for trick in self.import("SettingsList")?.getattr("logic_tricks")?.call_method0("values")?.iter()? {
                 tricks.insert(trick?.get_item("name")?.extract()?);
             }
             *self.logic_tricks.borrow_mut() = Some(Arc::new(tricks));
@@ -249,10 +249,12 @@ impl<'p> ootr::Rando for Rando<'p> {
         Ok(Arc::clone(self.regions.borrow().as_ref().expect("just inserted")))
     }
 
+    fn root() -> String { format!("Root") }
+
     fn setting_infos(&self) -> Result<Arc<HashSet<String>>, RandoErr> {
         if self.setting_infos.borrow().is_none() {
             let mut settings = HashSet::default();
-            for setting in self.import("SettingsList")?.get("setting_infos")?.iter()? {
+            for setting in self.import("SettingsList")?.getattr("setting_infos")?.iter()? {
                 settings.insert(setting?.getattr("name")?.extract()?);
             }
             *self.setting_infos.borrow_mut() = Some(Arc::new(settings));

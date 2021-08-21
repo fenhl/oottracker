@@ -79,7 +79,7 @@ default-features = false
 features = ["json", "rustls-tls", "trust-dns"]
 
 [target.'cfg(windows)'.dependencies.semver]
-version = "0.11"
+version = "1"
 features = ["serde"]
 
 [target.'cfg(windows)'.dependencies.serde]

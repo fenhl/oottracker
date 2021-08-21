@@ -23,8 +23,8 @@ use {
         BigEndian,
         ByteOrder as _,
     },
+    derivative::Derivative,
     derive_more::From,
-    smart_default::SmartDefault,
     tokio::io::{
         AsyncRead,
         AsyncReadExt as _,
@@ -92,10 +92,11 @@ impl<'a> From<&'a TimeOfDay> for Vec<u8> {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 #[repr(u8)]
 pub enum MagicCapacity {
-    #[default]
+    #[derivative(Default)]
     None = 0,
     Small = 1,
     Large = 2,
@@ -124,9 +125,10 @@ impl<'a> From<&'a MagicCapacity> for u8 {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub enum Hookshot {
-    #[default]
+    #[derivative(Default)]
     None,
     Hookshot,
     Longshot,
@@ -155,9 +157,10 @@ impl From<Hookshot> for u8 {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub enum Bottle {
-    #[default]
+    #[derivative(Default)]
     None,
     Empty,
     RedPotion,
@@ -225,9 +228,10 @@ impl From<Bottle> for u8 {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub enum AdultTradeItem {
-    #[default]
+    #[derivative(Default)]
     None,
     PocketEgg,
     PocketCucco,
@@ -283,9 +287,10 @@ impl From<AdultTradeItem> for u8 {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub enum ChildTradeItem {
-    #[default]
+    #[derivative(Default)]
     None,
     WeirdEgg,
     Chicken,
@@ -901,9 +906,10 @@ impl<'a> From<&'a FishingContext> for Vec<u8> {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub enum GameMode {
-    #[default] // represented as 0x0000_0000
+    #[derivative(Default)] // represented as 0x0000_0000
     Gameplay,
     TitleScreen,
     FileSelect,

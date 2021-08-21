@@ -8,7 +8,7 @@ edition = "2018"
 winres = "0.1"
 
 [dependencies]
-async-proto = "0.7"
+async-proto = "0.8"
 derivative = "2"
 futures = "0.3"
 iced_futures = "0.3"
@@ -16,8 +16,7 @@ iced_native = "0.4"
 image = "0.23"
 itertools = "0.10"
 num-traits = "0.2"
-semver = "0.11"
-smart-default = "0.6"
+semver = "1"
 url = "2"
 
 [dependencies.derive_more]

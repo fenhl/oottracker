@@ -224,9 +224,8 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         .data.ok_or(Error::EmptyResponse)?
         .repository.ok_or(Error::MissingRepo)?
         .object.ok_or(Error::MissingVersionPy)?
-        .on
     {
-        dev_r_version_query::DevRVersionQueryRepositoryObjectOn::Blob(blob) => blob.text.ok_or(Error::MissingVersionText)?,
+        dev_r_version_query::DevRVersionQueryRepositoryObject::Blob(blob) => blob.text.ok_or(Error::MissingVersionText)?,
         on => panic!("unexpected GraphQL interface: {:?}", on),
     };
     let rando_path = cache_dir.join("ootr-latest");
@@ -261,7 +260,7 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         .map(|(name, _, _)| Ident::new(&name.to_case(Case::ScreamingSnake), Span::call_site()))
         .collect_vec();
     let lazy_statics = screaming_idents.iter().zip(&data)
-        .map(|(screaming_ident, (_, ty, value))| quote!(static ref #screaming_ident: Arc<#ty> = #value;));
+        .map(|(screaming_ident, (_, ty, value))| quote!(static #screaming_ident: Lazy<Arc<#ty>> = Lazy::new(|| #value);));
     let trait_fns = screaming_idents.iter().zip(&data)
         .map(|(screaming_ident, (name, ty, _))| {
             let ident = Ident::new(name, Span::call_site());
@@ -272,12 +271,13 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
             }
         });
     Ok(quote! {
-        lazy_static! { #(#lazy_statics)* }
+        #(#lazy_statics)*
 
         impl ootr::Rando for #ty {
             type Err = RandoErr;
             type RegionName = &'static str;
 
+            fn root() -> &'static str { "Root" }
             #(#trait_fns)*
         }
     })

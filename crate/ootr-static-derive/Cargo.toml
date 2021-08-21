@@ -10,10 +10,9 @@ proc-macro = true
 [dependencies]
 convert_case = "0.4"
 directories = "3"
-graphql_client = "0.9"
+graphql_client = "0.10"
 itertools = "0.10"
 proc-macro2 = "1"
-pyo3 = "0.13"
 quote = "1"
 serde = "1"
 syn = "1"
@@ -29,6 +28,10 @@ path = "../ootr"
 
 [dependencies.ootr-dynamic]
 path = "../ootr-dynamic"
+
+[dependencies.pyo3]
+version = "0.14"
+features = ["auto-initialize"]
 
 [dependencies.quote-value]
 git = "https://github.com/fenhl/quote-value" #TODO publish

@@ -7,8 +7,10 @@ use {
     async_proto::Protocol,
     async_stream::try_stream,
     derive_more::From,
-    futures::prelude::*,
-    pin_utils::pin_mut,
+    futures::{
+        pin_mut,
+        prelude::*,
+    },
     serde_json::Value as Json,
     tokio::net::TcpStream,
     crate::{

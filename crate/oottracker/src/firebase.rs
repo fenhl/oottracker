@@ -20,11 +20,13 @@ use {
     },
     async_stream::try_stream,
     collect_mac::collect,
-    futures::stream::{
-        Stream,
-        TryStreamExt as _,
+    futures::{
+        pin_mut,
+        stream::{
+            Stream,
+            TryStreamExt as _,
+        },
     },
-    pin_utils::pin_mut,
     serde::{
         Deserialize,
         de::DeserializeOwned,

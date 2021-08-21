@@ -88,25 +88,21 @@ pub fn embed_images(input: TokenStream) -> TokenStream {
         .try_collect::<_, Vec<_>, _>().expect("failed to read images"); //TODO compile error instead of panic
     TokenStream::from(quote! {
         pub fn #name<T: FromEmbeddedImage>(name: &str) -> T {
-            ::lazy_static::lazy_static! {
-                static ref IMG_CONSTS: ::std::collections::HashMap<&'static str, &'static [u8]> = {
-                    let mut consts = ::std::collections::HashMap::<&'static str, &'static [u8]>::default();
-                    #(#img_consts)*
-                    consts
-                };
-            }
+            static IMG_CONSTS: ::once_cell::sync::Lazy<::std::collections::HashMap<&'static str, &'static [u8]>> = ::once_cell::sync::Lazy::new(|| {
+                let mut consts = ::std::collections::HashMap::<&'static str, &'static [u8]>::default();
+                #(#img_consts)*
+                consts
+            });
 
             T::from_embedded_image(IMG_CONSTS[name])
         }
 
         pub fn #name_all<T: FromEmbeddedImage>() -> impl Iterator<Item = T> {
-            ::lazy_static::lazy_static! {
-                static ref IMG_CONSTS: ::std::collections::HashMap<&'static str, &'static [u8]> = {
-                    let mut consts = ::std::collections::HashMap::<&'static str, &'static [u8]>::default();
-                    #(#img_consts)*
-                    consts
-                };
-            }
+            static IMG_CONSTS: ::once_cell::sync::Lazy<::std::collections::HashMap<&'static str, &'static [u8]>> = ::once_cell::sync::Lazy::new(|| {
+                let mut consts = ::std::collections::HashMap::<&'static str, &'static [u8]>::default();
+                #(#img_consts)*
+                consts
+            });
 
             IMG_CONSTS.values().map(|contents| T::from_embedded_image(contents))
         }

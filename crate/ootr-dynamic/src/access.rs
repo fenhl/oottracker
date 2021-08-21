@@ -7,7 +7,7 @@ use {
         sync::Arc,
     },
     itertools::Itertools as _,
-    lazy_static::lazy_static,
+    once_cell::sync::Lazy,
     pyo3::{
         PyDowncastError,
         prelude::*,
@@ -37,9 +37,7 @@ use {
     },
 };
 
-lazy_static! {
-    static ref EVENT_REGEX: Regex = Regex::new("^\\w+").expect("failed to compile event regex");
-}
+static EVENT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("^\\w+").expect("failed to compile event regex"));
 
 #[derive(Debug, Default)]
 struct Args<'a>(HashMap<&'a str, (&'a PyAny, &'a Args<'a>)>);
@@ -128,15 +126,15 @@ trait ExprExtPrivate<'p> {
 impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
     fn parse_inner(rando: &Rando<'p>, ctx: &Check<Rando<'p>>, helpers: &HashMap<&str, usize>, seq: &mut impl Iterator<Item = usize>, ast: &PyModule, expr: &PyAny, args: &[String]) -> Result<Expr<Rando<'p>>, ParseError> {
         // based on RuleParser.py as of 4f83414c49ff65ef2eb285667bcb153f11f1f9ef
-        Ok(if ast.get("BoolOp")?.downcast::<PyType>()?.is_instance(expr)? {
-            if ast.get("And")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
+        Ok(if ast.getattr("BoolOp")?.downcast::<PyType>()?.is_instance(expr)? {
+            if ast.getattr("And")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
                 Expr::All(expr.getattr("values")?.iter()?.map(|expr| expr.at("next(expr.values)").and_then(|expr| Expr::parse_inner(rando, ctx, helpers, seq, ast, expr, args))).try_collect()?)
-            } else if ast.get("Or")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
+            } else if ast.getattr("Or")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
                 Expr::Any(expr.getattr("values")?.iter()?.map(|expr| expr.at("next(expr.values)").and_then(|expr| Expr::parse_inner(rando, ctx, helpers, seq, ast, expr, args))).try_collect()?)
             } else {
                 unreachable!("found BoolOp expression with neither And nor Or: {}", display_expr(ast, expr))
             }
-        } else if ast.get("Call")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Call")?.downcast::<PyType>()?.is_instance(expr)? {
             let name = expr.getattr("func")?.getattr("id")?.extract::<String>().at("expr.func.id as String")?;
             // attr of Rule_AST_Transformer (at, here)
             //TODO include region and access for the event
@@ -171,7 +169,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             else {
                 unimplemented!("converting call expression with name {} into Expr", name)
             }
-        } else if ast.get("Compare")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Compare")?.downcast::<PyType>()?.is_instance(expr)? {
             Expr::All(
                 iter::once(expr.getattr("left")?)
                     .chain(expr.getattr("comparators")?.iter()?.collect::<PyResult<Vec<_>>>()?.into_iter())
@@ -180,9 +178,9 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
                     .map(|((left, right), op)| {
                         let left = Expr::parse_inner(rando, ctx, helpers, seq, ast, left, args)?;
                         let right = Expr::parse_inner(rando, ctx, helpers, seq, ast, right, args)?;
-                        Ok::<_, ParseError>(if ast.get("Eq")?.downcast::<PyType>()?.is_instance(op)? {
+                        Ok::<_, ParseError>(if ast.getattr("Eq")?.downcast::<PyType>()?.is_instance(op)? {
                             Expr::Eq(Box::new(left), Box::new(right))
-                        } else if ast.get("NotEq")?.downcast::<PyType>()?.is_instance(op)? {
+                        } else if ast.getattr("NotEq")?.downcast::<PyType>()?.is_instance(op)? {
                             Expr::Not(Box::new(Expr::Eq(Box::new(left), Box::new(right))))
                         } else {
                             unimplemented!("found Compare expression with non-Eq operator {}", op)
@@ -190,7 +188,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
                     })
                     .try_collect()?
             )
-        } else if ast.get("Constant")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Constant")?.downcast::<PyType>()?.is_instance(expr)? {
             let constant = expr.getattr("value")?;
             if constant.downcast::<PyBool>().map_or(false, |b| b == PyBool::new(rando.py, true)) {
                 Expr::True
@@ -203,7 +201,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             } else {
                 unimplemented!("converting constant expression {} into Expr", display_expr(ast, expr)) //TODO
             }
-        } else if ast.get("Name")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Name")?.downcast::<PyType>()?.is_instance(expr)? {
             let name = expr.getattr("id")?.extract::<String>().at("expr.id as String")?;
             // logic helper parameter
             if args.contains(&name) { Expr::Param(name) }
@@ -262,7 +260,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             else {
                 unimplemented!("converting name expression {} into Expr", name)
             }
-        } else if ast.get("NameConstant")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("NameConstant")?.downcast::<PyType>()?.is_instance(expr)? {
             // Python 3.7 compat TODO remove when Debian bullseye is released
             let constant = expr.getattr("value")?;
             if constant.downcast::<PyBool>().map_or(false, |b| b == PyBool::new(rando.py, true)) {
@@ -270,7 +268,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             } else {
                 unimplemented!("converting name constant expression {} into Expr", display_expr(ast, expr))
             }
-        } else if ast.get("Str")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Str")?.downcast::<PyType>()?.is_instance(expr)? {
             // Python 3.7 compat TODO remove when Debian bullseye is released
             let name = expr.getattr("s")?.extract::<String>()?;
             if let Ok(item) = Item::from_str(rando, &name) {
@@ -278,7 +276,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             } else {
                 Expr::LitStr(name) //TODO distinguish between events and other strings by going through world files?
             }
-        } else if ast.get("Subscript")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Subscript")?.downcast::<PyType>()?.is_instance(expr)? {
             let value = expr.getattr("value")?.getattr("id")?.extract::<String>()?;
             let slice = expr.getattr("slice")?;
             // “value” is Python 3.7 compat TODO remove when Debian bullseye is released
@@ -296,12 +294,12 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             } else {
                 unimplemented!("converting subscript expression {}[{}] into Expr", value, slice)
             }
-        } else if ast.get("Tuple")?.downcast::<PyType>()?.is_instance(expr)? {
+        } else if ast.getattr("Tuple")?.downcast::<PyType>()?.is_instance(expr)? {
             let (item, count) = expr.getattr("elts")?.iter()?.collect_tuple().ok_or(ParseError::TupleLength)?;
             let (item, count) = (item?, count?);
-            let item_name = if ast.get("Constant")?.downcast::<PyType>()?.is_instance(item)? {
+            let item_name = if ast.getattr("Constant")?.downcast::<PyType>()?.is_instance(item)? {
                 item.getattr("value")?.extract::<String>().at("item.value as String")?
-            } else if ast.get("Name")?.downcast::<PyType>()?.is_instance(item)? {
+            } else if ast.getattr("Name")?.downcast::<PyType>()?.is_instance(item)? {
                 item.getattr("id")?.extract::<String>().at("item.id as String")?
             } else {
                 unimplemented!("converting {} into item to be counted", display_expr(ast, item))
@@ -311,19 +309,19 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             } else {
                 unimplemented!() //TODO unescaped item name or event
             };
-            let count = if ast.get("Constant")?.downcast::<PyType>()?.is_instance(count)? {
+            let count = if ast.getattr("Constant")?.downcast::<PyType>()?.is_instance(count)? {
                 Expr::LitInt(count.getattr("value")?.extract::<u8>().at("count.value as u8")?)
-            } else if ast.get("Name")?.downcast::<PyType>()?.is_instance(count)? {
+            } else if ast.getattr("Name")?.downcast::<PyType>()?.is_instance(count)? {
                 Expr::Setting(count.getattr("id")?.extract::<String>().at("count.id as String")?)
-            } else if ast.get("Num")?.downcast::<PyType>()?.is_instance(count)? {
+            } else if ast.getattr("Num")?.downcast::<PyType>()?.is_instance(count)? {
                 // Python 3.7 compat TODO remove when Debian bullseye is released
                 Expr::LitInt(count.getattr("n")?.extract::<u8>().at("count.n as u8")?)
             } else {
                 unimplemented!("converting {} into item count", display_expr(ast, count))
             };
             Expr::Item(item, Box::new(count))
-        } else if ast.get("UnaryOp")?.downcast::<PyType>()?.is_instance(expr)? {
-            if ast.get("Not")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
+        } else if ast.getattr("UnaryOp")?.downcast::<PyType>()?.is_instance(expr)? {
+            if ast.getattr("Not")?.downcast::<PyType>()?.is_instance(expr.getattr("op")?)? {
                 Expr::Not(Box::new(Expr::parse_inner(rando, ctx, helpers, seq, ast, expr.getattr("operand")?, args)?))
             } else {
                 unimplemented!("found UnaryOp expression other than Not: {}", display_expr(ast, expr))

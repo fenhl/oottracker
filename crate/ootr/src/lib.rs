@@ -41,6 +41,7 @@ pub trait Rando: Sized {
     fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, access::Expr<Self>)>>, Self::Err>;
     fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
     fn regions(&self) -> Result<Arc<Vec<Arc<Region<Self>>>>, Self::Err>;
+    fn root() -> Self::RegionName;
     fn setting_infos(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
 }
 

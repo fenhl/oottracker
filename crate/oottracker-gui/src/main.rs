@@ -57,11 +57,7 @@ use {
     iced_native::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
-    semver::{
-        SemVerError,
-        Version,
-    },
-    smart_default::SmartDefault,
+    semver::Version,
     structopt::StructOpt,
     tokio::fs,
     url::Url,
@@ -234,10 +230,11 @@ struct MenuState {
     connect_btn: button::State,
 }
 
-#[derive(Debug, SmartDefault, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 enum ConnectionKind {
     TcpListener,
-    #[default]
+    #[derivative(Default)]
     RetroArch,
     Web,
 }
@@ -252,12 +249,13 @@ impl fmt::Display for ConnectionKind {
     }
 }
 
-#[derive(Debug, SmartDefault, Clone)]
+#[derive(Derivative, Debug, Clone)]
+#[derivative(Default)]
 enum ConnectionParams {
     TcpListener,
-    #[default]
+    #[derivative(Default)]
     RetroArch {
-        #[default = 55355]
+        #[derivative(Default(value = "55355"))]
         port: u16,
         port_state: text_input::State,
     },
@@ -931,8 +929,8 @@ enum UpdateCheckError {
     NoReleases,
     #[from_arc]
     Reqwest(Arc<reqwest::Error>),
-    #[from]
-    SemVer(SemVerError),
+    #[from_arc]
+    SemVer(Arc<semver::Error>),
     #[from]
     Ui(ui::Error),
 }
