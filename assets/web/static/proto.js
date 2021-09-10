@@ -4,14 +4,14 @@ const utf8encoder = new TextEncoder();
 
 sock.binaryType = "arraybuffer";
 
-function readImgDir(discrim) {
+function readImgDir(discrim, overlay) {
     switch (discrim) {
         case 0:
             // ImageDir::Xopar
-            return 'xopar-images';
+            return overlay ? 'xopar-overlays' : 'xopar-images';
         case 1:
             // ImageDir::Extra
-            return 'extra-images';
+            return overlay ? 'extra-overlays' : 'extra-images';
         default:
             throw 'unexpected ImageDir variant';
     }
@@ -141,7 +141,7 @@ function updateCell(cellID, data, offset) {
             break;
         case 2:
             // Image
-            const overlayDir = readImgDir(view.getUint8(offset++));
+            const overlayDir = readImgDir(view.getUint8(offset++), true);
             const overlayImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
