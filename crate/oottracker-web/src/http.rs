@@ -40,7 +40,7 @@ impl TrackerCellIdExt for TrackerCellId {
         let kind = self.kind();
         let content = kind.render(state);
         let css_classes = if loc { format!("cols{} loc", colspan) } else { format!("cols{}", colspan) };
-        format!(r#"<a id="cell{}" href="/{}/click/{}" class="{}">{}</a>"#, cell_id, room_name, cell_id, css_classes, content.to_html())
+        format!(r#"<a id="cell{}" href="{}" class="{}">{}</a>"#, cell_id, rocket::uri!(click(room_name, cell_id)), css_classes, content.to_html())
     }
 }
 
