@@ -4,8 +4,8 @@ const utf8encoder = new TextEncoder();
 
 sock.binaryType = "arraybuffer";
 
-function readImgDir(offset) {
-    switch (view.getUint8(offset)) {
+function readImgDir(discrim) {
+    switch (discrim) {
         case 0:
             // ImageDir::Xopar
             return 'xopar-images';
@@ -96,7 +96,7 @@ function updateCell(cellID, data, offset) {
     //elt.replaceChildren(); //TODO use this instead of the elt.append calls below once OBS browser source updates to Chrome 86+
     elt.innerHTML = '';
     let mainImg = document.createElement('img');
-    const imgDir = readImgDir(offset++);
+    const imgDir = readImgDir(view.getUint8(offset++));
     const imgFilenameLen = Number(view.getBigUint64(offset));
     offset += 8;
     const imgFilename = utf8decoder.decode(data.slice(offset, offset + imgFilenameLen));
@@ -129,7 +129,7 @@ function updateCell(cellID, data, offset) {
         case 1:
             // Count
             const count = view.getUint8(offset++);
-            readImgDir(offset++);
+            readImgDir(view.getUint8(offset++));
             const countImgFilenameLen = Number(view.getBigUint64(offset));
             offset += 8;
             utf8decoder.decode(data.slice(offset, offset + countImgFilenameLen));
@@ -141,7 +141,7 @@ function updateCell(cellID, data, offset) {
             break;
         case 2:
             // Image
-            const overlayDir = readImgDir(offset++);
+            const overlayDir = readImgDir(view.getUint8(offset++));
             const overlayImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const overlayImg = utf8decoder.decode(data.slice(offset, offset + overlayImgLen));
@@ -152,7 +152,7 @@ function updateCell(cellID, data, offset) {
             break;
         case 3:
             // Location
-            const locDir = readImgDir(offset++);
+            const locDir = readImgDir(view.getUint8(offset++));
             const locImgLen = Number(view.getBigUint64(offset));
             offset += 8;
             const locImg = utf8decoder.decode(data.slice(offset, offset + locImgLen));
