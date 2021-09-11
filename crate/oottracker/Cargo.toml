@@ -13,6 +13,7 @@ derivative = "2"
 directories = "3"
 eventsource-client = "0.6"
 futures = "0.3"
+#horrorshow = "0.8" #TODO PR changes, wait for publish
 iced = "0.3"
 image = "0.23"
 itertools = "0.10"
@@ -33,6 +34,11 @@ features = ["from"]
 [dependencies.enum-iterator]
 git = "https://github.com/dasgefolge/enum-iterator"
 branch = "fields"
+
+[dependencies.horrorshow]
+git = "https://github.com/fenhl/horrorshow-rs"
+branch = "rocket"
+features = ["rocket"]
 
 [dependencies.ootr]
 path = "../ootr"

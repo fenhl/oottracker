@@ -1,6 +1,11 @@
 use {
     std::convert::TryInto as _,
-    itertools::Itertools as _,
+    horrorshow::{
+        box_html,
+        helper::doctype,
+        prelude::*,
+        rocket::TemplateExt as _,
+    },
     rocket::{
         FromForm,
         Rocket,
@@ -32,44 +37,44 @@ use {
 };
 
 trait TrackerCellIdExt {
-    fn view(&self, room_name: &str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> String;
+    fn view<'a>(&self, room_name: &'a str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> Box<dyn RenderBox + 'a>;
 }
 
 impl TrackerCellIdExt for TrackerCellId {
-    fn view(&self, room_name: &str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> String {
+    fn view<'a>(&self, room_name: &'a str, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> Box<dyn RenderBox + 'a> {
         let kind = self.kind();
         let content = kind.render(state);
         let css_classes = if loc { format!("cols{} loc", colspan) } else { format!("cols{}", colspan) };
-        format!(r#"<a id="cell{}" href="{}" class="{}">{}</a>"#, cell_id, rocket::uri!(click(room_name, cell_id)), css_classes, content.to_html())
+        box_html! {
+            a(id = format_args!("cell{}", cell_id), href = rocket::uri!(click(room_name, cell_id)).to_string(), class = css_classes) : content; //TODO horrorshow fork with Render for rocket::uri
+        }
     }
 }
 
-fn tracker_page(layout_name: &str, html_layout: String) -> Html<String> {
-    Html(format!(r#"
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="utf-8" />
-                <title>OoT Tracker</title>
-                <meta name="author" content="Fenhl" /> <!--TODO generate from Cargo.toml? -->
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <link rel="icon" type="image/vnd.microsoft.icon" href="/static/img/icon.ico" />
-                <link rel="stylesheet" href="/static/common.css" />
-            </head>
-            <body>
-                <div class="items {}">
-                    {}
-                </div>
-                <noscript>
-                    <p>live update disabled (requires JavaScript)</p>
-                </noscript>
-                <footer>
-                    <a href="https://fenhl.net/disc">disclaimer / Impressum</a>
-                </footer>
-                <script src="/static/proto.js"></script>
-            </body>
-        </html>
-    "#, layout_name, html_layout))
+fn tracker_page<'a>(layout_name: &'a str, items: Box<dyn RenderBox + 'a>) -> Box<dyn RenderBox + 'a> {
+    box_html! {
+        : doctype::HTML;
+        html {
+            head {
+                meta(charset = "utf-8");
+                title : "OoT Tracker";
+                meta(name = "author", content = "Fenhl");
+                meta(name = "viewport", content = "width=device-width, initial-scale=1");
+                link(rel = "icon", type = "image/vnd.microsoft.icon", href = "/static/img/icon.ico");
+                link(rel = "stylesheet", href = "/static/common.css");
+            }
+            body {
+                div(class = format_args!("items {}", layout_name)) : items;
+                noscript {
+                    p : "live update disabled (requires JavaScript)";
+                }
+                footer {
+                    a(href = "https://fenhl.net/disc") : "disclaimer / Impressum";
+                }
+                script(src = "/static/proto.js");
+            }
+        }
+    }
 }
 
 #[rocket::get("/")]
@@ -89,32 +94,30 @@ fn post_index(form: Form<GoRoomForm<'_>>) -> Redirect {
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>")]
-async fn restream_room_input(restreams: &State<Restreams>, restreamer: String, runner: String) -> Option<Html<String>> {
-    let html_layout = {
-        let restreams = restreams.read().await;
-        let restream = restreams.get(&restreamer)?;
-        let layout = restream.layout();
-        let (_, _, model_state_view) = restream.runner(&runner)?;
-        let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-        layout.cells().into_iter()
-            .map(|cell| cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model_state_view, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30))
-            .join("\n")
-    };
-    Some(tracker_page("default", html_layout))
+async fn restream_room_input(restreams: &State<Restreams>, restreamer: String, runner: String) -> Option<Result<Html<String>, horrorshow::Error>> {
+    let restreams = restreams.read().await;
+    let restream = restreams.get(&restreamer)?;
+    let layout = restream.layout();
+    let (_, _, model_state_view) = restream.runner(&runner)?;
+    let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
+    Some(tracker_page("default", box_html! {
+        @for cell in layout.cells() {
+            : cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model_state_view, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
+        }
+    }).write_to_html())
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>")]
-async fn restream_room_view(restreams: &State<Restreams>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Html<String>> {
-    let html_layout = {
-        let restreams = restreams.read().await;
-        let restream = restreams.get(&restreamer)?;
-        let (_, _, model_state_view) = restream.runner(&runner)?;
-        let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-        layout.cells().into_iter()
-            .map(|cell| cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model_state_view, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30))
-            .join("\n")
-    };
-    Some(tracker_page(&layout.to_string(), html_layout))
+async fn restream_room_view(restreams: &State<Restreams>, restreamer: String, runner: String, layout: TrackerLayout) -> Option<Result<Html<String>, horrorshow::Error>> {
+    let restreams = restreams.read().await;
+    let restream = restreams.get(&restreamer)?;
+    let (_, _, model_state_view) = restream.runner(&runner)?;
+    let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
+    Some(tracker_page(&layout.to_string(), box_html! {
+        @for cell in layout.cells() {
+            : cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model_state_view, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
+        }
+    }).write_to_html())
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>/click/<cell_id>")]
@@ -134,33 +137,30 @@ async fn restream_click(restreams: &State<Restreams>, restreamer: String, runner
 }
 
 #[rocket::get("/restream/<restreamer>/<runner1>/<layout>/with/<runner2>")]
-async fn restream_double_room_layout(restreams: &State<Restreams>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Html<String>> {
-    let html_layout = {
-        let restreams = restreams.read().await;
-        let restream = restreams.get(&restreamer)?;
-        layout.cells()
-            .into_iter()
-            .map(|reward| Some(render_double_cell(restream.runner(&runner1)?.2, restream.runner(&runner2)?.2, reward)))
-            .collect::<Option<Vec<_>>>()?
-            .into_iter()
-            .enumerate()
-            .map(|(cell_id, render)| format!(r#"<div id="cell{}" class="cols3">{}</div>"#, cell_id, render.to_html()))
-            .join("\n")
-    };
-    Some(tracker_page(&layout.to_string(), html_layout))
+async fn restream_double_room_layout(restreams: &State<Restreams>, restreamer: String, runner1: String, layout: DoubleTrackerLayout, runner2: String) -> Option<Result<Html<String>, horrorshow::Error>> {
+    let restreams = restreams.read().await;
+    let restream = restreams.get(&restreamer)?;
+    let cells = layout.cells()
+        .into_iter()
+        .map(|reward| Some(render_double_cell(restream.runner(&runner1)?.2, restream.runner(&runner2)?.2, reward)))
+        .collect::<Option<Vec<_>>>()?;
+    Some(tracker_page(&layout.to_string(), box_html! {
+        @for (cell_id, render) in cells.into_iter().enumerate() {
+            div(id = format_args!("cell{}", cell_id), class = "cols3") : render;
+        }
+    }).write_to_html())
 }
 
 #[rocket::get("/room/<name>")]
-async fn room(rooms: &State<Rooms>, name: String) -> Html<String> {
-    let html_layout = {
-        let mut rooms = rooms.lock().await;
-        let room = rooms.entry(name.clone()).or_default();
-        let layout = TrackerLayout::default();
-        layout.cells().into_iter()
-            .map(|cell| cell.id.view(&name, cell.idx.try_into().expect("too many cells"), &room.model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30))
-            .join("\n")
-    };
-    tracker_page("default", html_layout)
+async fn room(rooms: &State<Rooms>, name: String) -> Result<Html<String>, horrorshow::Error> {
+    let mut rooms = rooms.lock().await;
+    let room = rooms.entry(name.clone()).or_default();
+    let layout = TrackerLayout::default();
+    tracker_page("default", box_html! {
+        @for cell in layout.cells() {
+            : cell.id.view(&name, cell.idx.try_into().expect("too many cells"), &room.model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
+        }
+    }).write_to_html()
 }
 
 #[rocket::get("/room/<name>/click/<cell_id>")]

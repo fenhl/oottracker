@@ -1,4 +1,4 @@
-#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_qualifications, warnings)]
 #![allow(unused_extern_crates)] // apparently rocket-derive still uses `extern crate`
 #![forbid(unsafe_code)]
 

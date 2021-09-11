@@ -15,6 +15,10 @@ use {
     derivative::Derivative,
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
+    horrorshow::{
+        html,
+        prelude::*,
+    },
     iced::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
@@ -2048,6 +2052,17 @@ pub enum CellStyle {
     RightDimmed,
 }
 
+impl CellStyle {
+    fn css_class(&self) -> &'static str {
+        match self {
+            Self::Normal => "",
+            Self::Dimmed => "dimmed",
+            Self::LeftDimmed => "left-dimmed",
+            Self::RightDimmed => "right-dimmed",
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Protocol)]
 pub enum CellOverlay {
     None,
@@ -2069,6 +2084,16 @@ pub enum LocationStyle {
     Mq,
 }
 
+impl LocationStyle {
+    fn css_classes(&self) -> &'static str {
+        match self {
+            Self::Normal => "loc",
+            Self::Dimmed => "loc dimmed",
+            Self::Mq => "loc mq",
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Protocol)]
 pub struct CellRender {
     pub img: ImageInfo,
@@ -2076,28 +2101,35 @@ pub struct CellRender {
     pub overlay: CellOverlay,
 }
 
-impl CellRender {
-    pub fn to_html(&self) -> String {
-        format!(
-            r#"<img class="{}" src="/static/img/{}.png" />{}"#,
-            match self.style {
-                CellStyle::Normal => "",
-                CellStyle::Dimmed => "dimmed",
-                CellStyle::LeftDimmed => "left-dimmed",
-                CellStyle::RightDimmed => "right-dimmed",
+impl RenderOnce for CellRender {
+    fn render_once<'a>(self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
+        self.render(tmpl);
+    }
+}
+
+impl RenderMut for CellRender {
+    fn render_mut<'a>(&mut self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
+        self.render(tmpl);
+    }
+}
+
+impl Render for CellRender {
+    fn render<'a>(&self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
+        (&mut *tmpl) << html! {
+            img(class = self.style.css_class(), src = format_args!("/static/img/{}.png", self.img.to_string('/', ImageDirContext::Normal)));
+        };
+        match self.overlay {
+            CellOverlay::None => {}
+            CellOverlay::Count { count, .. } => tmpl << html! {
+                span(class = "count") : count;
             },
-            self.img.to_string('/', ImageDirContext::Normal),
-            match self.overlay {
-                CellOverlay::None => String::default(),
-                CellOverlay::Count { count, .. } => format!(r#"<span class="count">{}</span>"#, count),
-                CellOverlay::Image(ref overlay) => format!(r#"<img src="/static/img/{}.png" />"#, overlay.to_string('/', ImageDirContext::OverlayOnly)),
-                CellOverlay::Location { ref loc, style } => format!(r#"<img class="{}" src="/static/img/{}.png" />"#, match style {
-                    LocationStyle::Normal => "loc",
-                    LocationStyle::Dimmed => "loc dimmed",
-                    LocationStyle::Mq => "loc mq",
-                }, loc.to_string('/', ImageDirContext::Normal)),
+            CellOverlay::Image(ref overlay) => tmpl << html! {
+                img(src = format_args!("/static/img/{}.png", overlay.to_string('/', ImageDirContext::OverlayOnly)));
             },
-        )
+            CellOverlay::Location { ref loc, style } => tmpl << html! {
+                img(class = style.css_classes(), src = format_args!("/static/img/{}.png", loc.to_string('/', ImageDirContext::Normal)));
+            },
+        }
     }
 }
 
