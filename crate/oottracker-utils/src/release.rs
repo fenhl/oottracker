@@ -22,14 +22,24 @@ use {
         io::{
             Cursor,
             Read as _,
+            SeekFrom,
             Write as _,
         },
+        num::ParseIntError,
         path::Path,
         time::Duration,
     },
     dir_lock::DirLock,
     itertools::Itertools as _,
-    tokio::fs::File,
+    lazy_regex::regex_captures,
+    tokio::{
+        fs::File,
+        io::{
+            AsyncBufReadExt as _,
+            AsyncSeekExt as _,
+            BufReader,
+        },
+    },
     zip::{
         ZipWriter,
         result::ZipError,
@@ -58,6 +68,10 @@ enum Error {
     Io(io::Error),
     #[cfg(windows)]
     MissingEnvar(&'static str),
+    #[cfg(windows)]
+    ParseInt(ParseIntError),
+    #[cfg(windows)]
+    ProtocolVersionMismatch,
     #[cfg(windows)]
     Reqwest(reqwest::Error),
     #[cfg(windows)]
@@ -212,7 +226,18 @@ async fn build_pj64(client: &reqwest::Client, repo: &Repo, release: &Release) ->
         .map(|(start, len)| format!("[{}, {}]", start, len))
         .join(", ")
     )?;
-    io::copy(&mut File::open("assets/oottracker-pj64-base.js").await?, &mut buf).await?;
+    let mut base = BufReader::new(File::open("assets/oottracker-pj64-base.js").await?).lines();
+    while let Some(line) = base.next_line().await? {
+        if let Some((_, version)) = regex_captures!("^const VERSION = ([0-9]+);", &line) {
+            if version.parse::<u8>()? != oottracker::proto::VERSION {
+                return Err(Error::ProtocolVersionMismatch)
+            }
+            break
+        }
+    }
+    let mut base = base.into_inner();
+    base.seek(SeekFrom::Start(0)).await?;
+    io::copy(&mut base, &mut buf).await?;
     eprintln!("uploading oottracker-pj64.js");
     repo.release_attach(client, release, "oottracker-pj64.js", "text/javascript", buf).await?;
     Ok(())

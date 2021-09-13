@@ -1,6 +1,6 @@
 // The constants above are generated from Rust code in crate/oottracker-utils/src/release.rs. If they're missing, you have the wrong file.
 
-const VERSION = 4; //TODO compare with version in Rust code
+const VERSION = 4; // do not rename this variable, the build script checks against it
 var RAM_INIT_PACKET_LENGTH = 1;
 for (var i = 0; i < RAM_RANGES.length; i++) {
     RAM_INIT_PACKET_LENGTH += RAM_RANGES[i][1];

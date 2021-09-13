@@ -7,7 +7,7 @@ use {
         sync::Arc,
     },
     itertools::Itertools as _,
-    once_cell::sync::Lazy,
+    lazy_regex::regex_is_match,
     pyo3::{
         PyDowncastError,
         prelude::*,
@@ -16,7 +16,6 @@ use {
             PyType,
         },
     },
-    regex::Regex,
     wheel::FromArc,
     ootr::{
         Rando as _,
@@ -36,8 +35,6 @@ use {
         RandoErr,
     },
 };
-
-static EVENT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("^\\w+").expect("failed to compile event regex"));
 
 #[derive(Debug, Default)]
 struct Args<'a>(HashMap<&'a str, (&'a PyAny, &'a Args<'a>)>);
@@ -254,7 +251,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
                 Expr::ForAge(ForAge::Either)
             }
             // event
-            else if EVENT_REGEX.is_match(&name) {
+            else if regex_is_match!("^\\w+", &name) {
                 Expr::Event(name.replace('_', " "))
             }
             else {

@@ -41,13 +41,18 @@ git = "https://github.com/fenhl/wheel"
 branch = "main"
 
 [target.'cfg(windows)'.dependencies]
-dir-lock = "0.3"
+#dir-lock = "0.3" #TODO release new version once new heim version is released
 itertools = "0.10"
+lazy-regex = "2"
 plist = "1"
 serde_json = "1"
 tempfile = "3"
 toml_edit = "0.2"
 zip = "0.5"
+
+[target.'cfg(windows)'.dependencies.dir-lock]
+git = "https://github.com/fenhl/rust-dir-lock"
+branch = "main"
 
 [target.'cfg(windows)'.dependencies.ootr]
 path = "../ootr"
