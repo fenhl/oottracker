@@ -39,6 +39,7 @@ use {
             AsyncSeekExt as _,
             BufReader,
         },
+        sync::broadcast,
     },
     zip::{
         ZipWriter,
@@ -58,6 +59,8 @@ use {
 
 #[derive(Debug, From)]
 enum Error {
+    #[cfg(windows)]
+    BroadcastRecv(broadcast::error::RecvError),
     CommandExit(&'static str, ExitStatus),
     #[cfg(windows)]
     DirLock(dir_lock::Error),
@@ -73,11 +76,15 @@ enum Error {
     #[cfg(windows)]
     ProtocolVersionMismatch,
     #[cfg(windows)]
+    ReleaseSend(broadcast::error::SendError<Release>),
+    #[cfg(windows)]
     Reqwest(reqwest::Error),
     #[cfg(windows)]
     SameVersion,
     #[cfg(windows)]
     SemVer(semver::Error),
+    #[cfg(windows)]
+    Task(tokio::task::JoinError),
     #[cfg(windows)]
     VersionRegression,
     #[cfg(windows)]
@@ -166,7 +173,7 @@ async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
 }
 
 #[cfg(windows)]
-async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
+async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool) -> Result<(), Error> {
     eprintln!("building oottracker-csharp");
     Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo build --package=oottracker-csharp", verbose).await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building oottracker-bizhawk");
@@ -185,23 +192,23 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, release: &Release,
         std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/oottracker.dll")?, &mut zip)?;
     }
     eprintln!("uploading oottracker-bizhawk-win64.zip");
-    repo.release_attach(client, release, "oottracker-bizhawk-win64.zip", "application/zip", buf.into_inner()).await?;
+    repo.release_attach(client, &release_rx.recv().await?, "oottracker-bizhawk-win64.zip", "application/zip", buf.into_inner()).await?;
     Ok(())
 }
 
 #[cfg(windows)]
-async fn build_gui(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
+async fn build_gui(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool) -> Result<(), Error> {
     eprintln!("building oottracker-updater.exe");
     Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-pc-windows-msvc").arg("--package=oottracker-updater").check("cargo build --package=oottracker-updater", verbose).await?;
     eprintln!("building oottracker-win64.exe");
     Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo build --package=oottracker-gui", verbose).await?;
     eprintln!("uploading oottracker-win64.exe");
-    repo.release_attach(client, release, "oottracker-win64.exe", "application/vnd.microsoft.portable-executable", fs::read("target/release/oottracker-gui.exe").await?).await?;
+    repo.release_attach(client, &release_rx.recv().await?, "oottracker-win64.exe", "application/vnd.microsoft.portable-executable", fs::read("target/release/oottracker-gui.exe").await?).await?;
     Ok(())
 }
 
 #[cfg(windows)]
-async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release, verbose: bool) -> Result<(), Error> {
+async fn build_macos(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool) -> Result<(), Error> {
     eprintln!("updating repo on Mac");
     Command::new("ssh").arg(MACOS_ADDR).arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh", verbose).await?;
     eprintln!("connecting to Mac");
@@ -209,12 +216,12 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, release: &Release, v
     eprintln!("downloading oottracker-mac.dmg from Mac");
     Command::new("scp").arg(format!("{}:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac.dmg", MACOS_ADDR)).arg("assets/oottracker-mac.dmg").check("scp", verbose).await?;
     eprintln!("uploading oottracker-mac.dmg");
-    repo.release_attach(client, release, "oottracker-mac.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac.dmg").await?).await?;
+    repo.release_attach(client, &release_rx.recv().await?, "oottracker-mac.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac.dmg").await?).await?;
     Ok(())
 }
 
 #[cfg(windows)]
-async fn build_pj64(client: &reqwest::Client, repo: &Repo, release: &Release) -> Result<(), Error> {
+async fn build_pj64(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>) -> Result<(), Error> {
     eprintln!("compiling oottracker-pj64.js");
     let mut buf = Vec::default();
     writeln!(&mut buf, "const TCP_PORT = {};", oottracker::proto::TCP_PORT)?;
@@ -239,7 +246,7 @@ async fn build_pj64(client: &reqwest::Client, repo: &Repo, release: &Release) ->
     base.seek(SeekFrom::Start(0)).await?;
     io::copy(&mut base, &mut buf).await?;
     eprintln!("uploading oottracker-pj64.js");
-    repo.release_attach(client, release, "oottracker-pj64.js", "text/javascript", buf).await?;
+    repo.release_attach(client, &release_rx.recv().await?, "oottracker-pj64.js", "text/javascript", buf).await?;
     Ok(())
 }
 
@@ -267,7 +274,7 @@ async fn write_release_notes(args: &Args) -> Result<String, Error> {
     Ok(buf)
 }
 
-#[derive(StructOpt)]
+#[derive(Clone, StructOpt)]
 struct Args {
     #[cfg(windows)]
     /// Create the GitHub release as a draft
@@ -304,19 +311,21 @@ async fn main(args: Args) -> Result<(), Error> {
 #[cfg(windows)]
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
-    let ((client, repo), release_notes) = if args.verbose {
-        (
-            setup(args.verbose).await?,
-            write_release_notes(&args).await?,
-        )
-    } else {
-        tokio::try_join!(
-            setup(args.verbose),
-            write_release_notes(&args),
-        )?
-    };
-    eprintln!("creating release");
-    let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
+    let (client, repo) = setup(args.verbose).await?; // don't show release notes editor if version check could still fail
+    let (release_tx, release_rx_bizhawk) = broadcast::channel(1);
+    let release_rx_gui = release_tx.subscribe();
+    let release_rx_macos = release_tx.subscribe();
+    let release_rx_pj64 = release_tx.subscribe();
+    let create_release_args = args.clone();
+    let create_release_client = client.clone();
+    let create_release_repo = repo.clone();
+    let create_release = tokio::spawn(async move {
+        let release_notes = write_release_notes(&create_release_args).await?;
+        eprintln!("creating release");
+        let release = create_release_repo.create_release(&create_release_client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), release_notes).await?;
+        release_tx.send(release.clone())?;
+        Ok::<_, Error>(release)
+    });
 
     macro_rules! with_metavariable {
         ($metavariable:tt, $($token:tt)*) => { $($token)* };
@@ -333,12 +342,13 @@ async fn main(args: Args) -> Result<(), Error> {
     }
 
     build_tasks![
-        build_bizhawk(&client, &repo, &release, args.verbose),
-        build_gui(&client, &repo, &release, args.verbose),
-        build_macos(&client, &repo, &release, args.verbose),
-        build_pj64(&client, &repo, &release),
+        build_bizhawk(&client, &repo, release_rx_bizhawk, args.verbose),
+        build_gui(&client, &repo, release_rx_gui, args.verbose),
+        build_macos(&client, &repo, release_rx_macos, args.verbose),
+        build_pj64(&client, &repo, release_rx_pj64),
         build_web(args.verbose),
     ];
+    let release = create_release.await??;
     if !args.no_publish {
         eprintln!("publishing release");
         repo.publish_release(&client, release).await?;

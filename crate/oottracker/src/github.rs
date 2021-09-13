@@ -11,7 +11,7 @@ use {
     url::Url,
 };
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Release {
     pub assets: Vec<ReleaseAsset>,
     id: u64,
@@ -25,13 +25,14 @@ impl Release {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ReleaseAsset {
     pub name: String,
     pub browser_download_url: Url,
 }
 
 /// A GitHub repository. Provides API methods.
+#[derive(Clone)]
 pub struct Repo {
     /// The GitHub user or organization who owns this repo.
     user: String,
