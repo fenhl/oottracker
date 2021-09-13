@@ -272,6 +272,7 @@ pub enum TrackerCellKind {
         check: &'static str,
         toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
     },
+    Spells, // composite Din's Fire & Farore's Wind, but auto-trackers/shift-click also toggle Nayru's Love
     Stone(Stone),
     StoneLocation(Stone),
 }
@@ -536,6 +537,19 @@ impl TrackerCellKind {
                     CellOverlay::None
                 },
             },
+            Spells => CellRender {
+                img: match (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind, state.ram.save.inv.nayrus_love) {
+                    (false, false, false) | (true, true, false) => ImageInfo::new("composite_magic"), //TODO use "spells" for dimmed instead if shift-click is available or auto-tracking?
+                    (false, false, true) => ImageInfo::extra("nayrus_love"),
+                    (false, true, false) => ImageInfo::new("faores_wind"),
+                    (false, true, true) => ImageInfo::extra("farores_nayrus"),
+                    (true, false, false) => ImageInfo::new("dins_fire"),
+                    (true, false, true) => ImageInfo::extra("dins_nayrus"),
+                    (true, true, true) => ImageInfo::extra("spells"),
+                },
+                style: if !state.ram.save.inv.dins_fire && !state.ram.save.inv.farores_wind && !state.ram.save.inv.nayrus_love { CellStyle::Dimmed } else { CellStyle::Normal },
+                overlay: CellOverlay::None,
+            },
             Stone(stone) => CellRender {
                 img: ImageInfo::new(match *stone {
                     Stone::KokiriEmerald => "kokiri_emerald",
@@ -630,6 +644,10 @@ impl TrackerCellKind {
                 }
             }
             Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
+            Spells => {
+                if state.ram.save.inv.dins_fire { state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind }
+                state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
+            }
             Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
             FreeReward => {}
@@ -665,6 +683,11 @@ impl TrackerCellKind {
                     (true, _) => MagicCapacity::Large,
                     (false, MagicCapacity::None) => MagicCapacity::Small,
                     (false, _) => MagicCapacity::None,
+                },
+                Spells => if keyboard_modifiers.shift {
+                    state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love;
+                } else {
+                    state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
                 },
                 _ => self.click(state),
             }
@@ -711,6 +734,7 @@ impl TrackerCellKind {
                     }
                 }
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
+                Spells => state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind,
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
                 FreeReward | FortressMq | Mq(_) | Simple { .. } | Stone(_) => {}
                 BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
@@ -1105,14 +1129,7 @@ cells! {
         active: Box::new(|state| state.ram.save.inv.lens),
         toggle: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
     },
-    Spells: Composite {
-        left_img: ImageInfo::new("dins_fire"),
-        right_img: ImageInfo::new("faores_wind"),
-        both_img: ImageInfo::new("composite_magic"),
-        active: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
-        toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
-        toggle_right: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
-    },
+    Spells: Spells,
     DinsFire: Simple {
         img: ImageInfo::new("dins_fire"),
         active: Box::new(|state| state.ram.save.inv.dins_fire),

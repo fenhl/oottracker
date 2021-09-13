@@ -213,6 +213,17 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
             SongCheck { check, toggle_overlay } => if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? { //TODO allow ootr_dynamic::Rando
                 toggle_overlay(&mut state.ram.save.event_chk_inf);
             },
+            Spells => {
+                let (value_dins, value_farores) = match value.as_u64().ok_or_else(|| value.clone())? {
+                    0 => (false, false),
+                    1 => (true, false),
+                    2 => (false, true),
+                    3 => (true, true),
+                    _ => return Err(value),
+                };
+                state.ram.save.inv.dins_fire = value_dins;
+                state.ram.save.inv.farores_wind = value_farores;
+            }
             Stone(stone) => if value.as_bool().ok_or_else(|| value.clone())? {
                 state.ram.save.quest_items.insert(stone.into());
             } else {
@@ -743,6 +754,12 @@ fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
         SmallKeys { get, .. } => json!(get(&state.ram.save.small_keys)),
         Song { song, .. } => json!(state.ram.save.quest_items.contains(song)),
         SongCheck { check, .. } => json!(Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)), //TODO allow ootr_dynamic::Rando
+        Spells => json!(match (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind) {
+            (false, false) => 0,
+            (true, false) => 1,
+            (false, true) => 2,
+            (true, true) => 3,
+        }),
         Stone(stone) => json!(state.ram.save.quest_items.has(stone)),
         StoneLocation(stone) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(stone)) {
             None => 0,
