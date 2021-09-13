@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleShortVersionString</key>
-	<string>0.6.0</string>
+	<string>0.6.1</string>
 	<key>CFBundleVersion</key>
-	<string>16</string>
+	<string>17</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
@@ -29,12 +29,12 @@
 		<string>MacOSX</string>
 	</array>
 	<key>NSHighResolutionCapable</key>
-	<true />
+	<true/>
 	<key>NSMainNibFile</key>
 	<string></string>
 	<key>NSRequiresAquaSystemAppearance</key>
 	<string>NO</string>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
-	<true />
+	<true/>
 </dict>
 </plist>

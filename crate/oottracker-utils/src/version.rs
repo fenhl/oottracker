@@ -24,7 +24,7 @@ pub(crate) struct Plist {
 
 pub(crate) async fn check_cli_version(package: &str, version: &Version) {
     let cli_output = String::from_utf8(Command::new("cargo").arg("run").arg(format!("--package={}", package)).arg("--").arg("--version").stdout(Stdio::piped()).output().await.expect("failed to run CLI with --version").stdout).expect("CLI version output is invalid UTF-8");
-    let (cli_name, cli_version) = cli_output.split(' ').collect_tuple().expect("no space in CLI version output");
+    let (cli_name, cli_version) = cli_output.trim_end().split(' ').collect_tuple().expect("no space in CLI version output");
     assert_eq!(cli_name, package);
     assert_eq!(*version, cli_version.parse().expect("failed to parse CLI version"));
 }
