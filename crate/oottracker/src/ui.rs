@@ -228,7 +228,7 @@ pub enum TrackerCellKind {
     FortressMq, // a cell kind used on Xopar's tracker to show whether Gerudo Fortress has 4 carpenters
     FreeReward,
     GoBk, // a combined go mode/BK mode/finished cell, used on the multiworld restream layout
-    MagicLens, // magic meter with a Lens of Truth overlay, but auto-trackers also show a different icon for double magic
+    MagicLens, // magic meter with a Lens of Truth overlay, but auto-trackers/shift-click also show a different icon for double magic
     Medallion(Medallion),
     MedallionLocation(Medallion),
     Mq(Dungeon),
@@ -660,7 +660,12 @@ impl TrackerCellKind {
                     ProgressionMode::Bk => ProgressionMode::Done,
                     ProgressionMode::Done => ProgressionMode::Bk,
                 },
-                MagicLens => state.ram.save.magic = if state.ram.save.magic == MagicCapacity::None { MagicCapacity::Small } else { MagicCapacity::None },
+                MagicLens => state.ram.save.magic = match (keyboard_modifiers.shift, state.ram.save.magic) {
+                    (true, MagicCapacity::Large) => MagicCapacity::Small,
+                    (true, _) => MagicCapacity::Large,
+                    (false, MagicCapacity::None) => MagicCapacity::Small,
+                    (false, _) => MagicCapacity::None,
+                },
                 _ => self.click(state),
             }
         }
