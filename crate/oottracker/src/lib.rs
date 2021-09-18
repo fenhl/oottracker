@@ -4,16 +4,27 @@
 use {
     std::{
         collections::HashSet,
+        future::Future,
+        io::prelude::*,
         ops::{
             AddAssign,
             Sub,
         },
+        pin::Pin,
     },
-    async_proto::Protocol,
+    async_proto::{
+        Protocol,
+        ReadError,
+        WriteError,
+    },
     collect_mac::collect,
     enum_iterator::IntoEnumIterator as _,
     itertools::Itertools as _,
     semver::Version,
+    tokio::io::{
+        AsyncRead,
+        AsyncWrite,
+    },
     ootr::{
         Rando,
         access,
@@ -50,13 +61,13 @@ mod scene;
 pub mod ui;
 pub mod websocket;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Protocol)]
-pub struct ModelState {
-    pub knowledge: Knowledge,
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ModelState<R: Rando> {
+    pub knowledge: Knowledge<R>,
     pub ram: Ram,
 }
 
-impl ModelState {
+impl<R: Rando> ModelState<R> {
     pub fn update_knowledge(&mut self) {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
         if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
@@ -65,7 +76,7 @@ impl ModelState {
     }
 
     /// If access depends on other checks (including an event or the value of an unknown setting), those checks are returned.
-    pub(crate) fn can_access<'a, R: Rando>(&self, rando: &R, rule: &'a access::Expr<R>) -> Result<bool, HashSet<Check<R>>> {
+    pub(crate) fn can_access(&self, rando: &R, rule: &access::Expr<R>) -> Result<bool, HashSet<Check<R>>> {
         Ok(match rule {
             access::Expr::All(rules) => {
                 let mut deps = HashSet::default();
@@ -121,7 +132,7 @@ impl ModelState {
         })
     }
 
-    fn access_exprs_eq<'a, R: Rando>(&self, rando: &R, left: &'a access::Expr<R>, right: &'a access::Expr<R>) -> Result<bool, HashSet<Check<R>>> {
+    fn access_exprs_eq<'a>(&self, rando: &R, left: &'a access::Expr<R>, right: &'a access::Expr<R>) -> Result<bool, HashSet<Check<R>>> {
         Ok(match (left, right) {
             (access::Expr::All(exprs), expr) | (expr, access::Expr::All(exprs)) => {
                 let mut deps = HashSet::default();
@@ -168,14 +179,14 @@ impl ModelState {
         })
     }
 
-    fn access_expr_eq_val<R: Rando>(&self, expr: &access::Expr<R>, value: u8) -> Result<bool, HashSet<Check<R>>> {
+    fn access_expr_eq_val(&self, expr: &access::Expr<R>, value: u8) -> Result<bool, HashSet<Check<R>>> {
         Ok(match expr {
             access::Expr::LitInt(n) => *n == value,
             _ => unimplemented!("access expr {:?} == value", expr),
         })
     }
 
-    fn access_expr_le_val<R: Rando>(&self, expr: &access::Expr<R>, value: u8) -> Result<bool, HashSet<Check<R>>> {
+    fn access_expr_le_val(&self, expr: &access::Expr<R>, value: u8) -> Result<bool, HashSet<Check<R>>> {
         Ok(match expr {
             access::Expr::LitInt(n) => *n <= value,
             _ => unimplemented!("access expr {:?} <= value", expr),
@@ -183,17 +194,42 @@ impl ModelState {
     }
 }
 
-impl AddAssign<ModelDelta> for ModelState {
+impl<R: Rando> Protocol for ModelState<R> { //TODO derive
+    fn read<'a, Rd: AsyncRead + Unpin + Send + 'a>(stream: &'a mut Rd) -> Pin<Box<dyn Future<Output = Result<Self, ReadError>> + Send + 'a>> {
+        Box::pin(async move {
+            Ok(Self {
+                knowledge: Knowledge::read(stream).await?,
+                ram: Ram::read(stream).await?,
+            })
+        })
+    }
+
+    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
+        Box::pin(async move {
+            self.knowledge.write(sink).await?;
+            self.ram.write(sink).await?;
+            Ok(())
+        })
+    }
+
+    fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
+        self.knowledge.write_sync(sink)?;
+        self.ram.write_sync(sink)?;
+        Ok(())
+    }
+}
+
+impl AddAssign<ModelDelta> for ModelState<ootr_static::Rando> {
     fn add_assign(&mut self, rhs: ModelDelta) {
         self.knowledge = rhs.knowledge;
         self.ram += rhs.ram;
     }
 }
 
-impl<'a, 'b> Sub<&'b ModelState> for &'a ModelState {
+impl<'a, 'b> Sub<&'b ModelState<ootr_static::Rando>> for &'a ModelState<ootr_static::Rando> {
     type Output = ModelDelta;
 
-    fn sub(self, rhs: &ModelState) -> ModelDelta {
+    fn sub(self, rhs: &ModelState<ootr_static::Rando>) -> ModelDelta {
         ModelDelta {
             knowledge: self.knowledge.clone(), //TODO only include new knowledge?
             ram: &self.ram - &rhs.ram,
@@ -204,7 +240,7 @@ impl<'a, 'b> Sub<&'b ModelState> for &'a ModelState {
 /// The difference between two model states.
 #[derive(Debug, Clone, Protocol)]
 pub struct ModelDelta {
-    knowledge: Knowledge, //TODO use a separate knowledge delta format?
+    knowledge: Knowledge<ootr_static::Rando>, //TODO support other Rando impls? //TODO use a separate knowledge delta format?
     ram: ram::Delta,
 }
 

@@ -49,13 +49,35 @@ pub enum DungeonReward {
     Stone(Stone),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoEnumIterator, Protocol)]
 pub enum DungeonRewardLocation {
     LinksPocket,
     Dungeon(MainDungeon),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
+impl DungeonRewardLocation {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::LinksPocket => "Links Pocket",
+            Self::Dungeon(MainDungeon::DekuTree) => "Queen Gohma",
+            Self::Dungeon(MainDungeon::DodongosCavern) => "King Dodongo",
+            Self::Dungeon(MainDungeon::JabuJabu) => "Barinade",
+            Self::Dungeon(MainDungeon::ForestTemple) => "Phantom Ganon",
+            Self::Dungeon(MainDungeon::FireTemple) => "Volvagia",
+            Self::Dungeon(MainDungeon::WaterTemple) => "Morpha",
+            Self::Dungeon(MainDungeon::ShadowTemple) => "Bongo Bongo",
+            Self::Dungeon(MainDungeon::SpiritTemple) => "Twinrova",
+        }
+    }
+}
+
+impl fmt::Display for DungeonRewardLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
 pub enum MainDungeon {
     DekuTree,
     DodongosCavern,

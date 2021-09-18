@@ -46,6 +46,7 @@ use {
         tungstenite,
     },
     wheel::FromArc,
+    ootr::Rando,
     crate::{
         ModelState,
         firebase,
@@ -98,9 +99,9 @@ pub trait Connection: fmt::Debug + Send + Sync {
     fn can_change_state(&self) -> bool;
     fn display_kind(&self) -> &'static str;
     fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>>;
-    fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
+    fn set_state<R: Rando>(&self, model: &ModelState<R>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
 
-    fn firebase_app(&self) -> Option<&dyn firebase::App> { None }
+    fn firebase_app<R: Rando>(&self) -> Option<&dyn firebase::App<R>> { None }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -120,7 +121,7 @@ impl Connection for NullConnection {
         Box::pin(stream::pending())
     }
 
-    fn set_state(&self, _: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
+    fn set_state<R: Rando>(&self, _: &ModelState<R>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
         Box::pin(async { Err(Error::CannotChangeState) })
     }
 }
@@ -180,7 +181,7 @@ impl Connection for WebConnection {
         }))
     }
 
-    fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
+    fn set_state<R: Rando>(&self, model: &ModelState<R>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
         let room = self.room.clone();
         let state = model.clone();
         let sink = Arc::clone(&self.sink);
@@ -194,21 +195,21 @@ impl Connection for WebConnection {
 }
 
 #[derive(Debug)]
-pub struct FirebaseConnection {
-    app: Box<dyn firebase::App>,
-    room: firebase::DynRoom,
+pub struct FirebaseConnection<R: Rando> {
+    app: Box<dyn firebase::App<R>>,
+    room: firebase::DynRoom<R>,
 }
 
-impl FirebaseConnection {
-    pub fn new<A: firebase::App + Default + Clone + Send>(room: firebase::Room<A>) -> FirebaseConnection {
-        FirebaseConnection {
+impl<R: Rando> FirebaseConnection<R> {
+    pub fn new<A: firebase::App<R> + Default + Clone + Send>(room: firebase::Room<R, A>) -> Self {
+        Self {
             app: Box::new(A::default()),
             room: room.to_dyn(),
         }
     }
 }
 
-impl Connection for FirebaseConnection {
+impl<R: Rando> Connection for FirebaseConnection<R> {
     fn hash(&self) -> u64 {
         let mut state = DefaultHasher::default();
         TypeId::of::<Self>().hash(&mut state);
@@ -227,7 +228,7 @@ impl Connection for FirebaseConnection {
         )
     }
 
-    fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
+    fn set_state(&self, model: &ModelState<R>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
         let room = self.room.clone();
         let model = model.clone();
         Box::pin(async move {
@@ -235,7 +236,7 @@ impl Connection for FirebaseConnection {
         })
     }
 
-    fn firebase_app(&self) -> Option<&dyn firebase::App> {
+    fn firebase_app(&self) -> Option<&dyn firebase::App<R>> {
         Some(&self.app)
     }
 }
@@ -263,7 +264,7 @@ impl Connection for TcpConnection {
         )
     }
 
-    fn set_state(&self, _: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
+    fn set_state<R: Rando>(&self, _: &ModelState<R>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
         Box::pin(async { Err(Error::CannotChangeState) })
     }
 }
@@ -298,7 +299,7 @@ impl Connection for RetroArchConnection {
         }))
     }
 
-    fn set_state(&self, _: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
+    fn set_state<R: Rando>(&self, _: &ModelState<R>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
         Box::pin(async { Err(Error::CannotChangeState) })
     }
 }

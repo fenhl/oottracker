@@ -48,7 +48,7 @@ pub enum ClientMessage {
     },
     SetRaw {
         room: String,
-        state: ModelState,
+        state: ModelState<ootr_static::Rando>, //TODO support other Rando impls?
     },
 }
 
@@ -64,7 +64,7 @@ pub enum ServerMessage {
         cell_id: u8,
         new_cell: CellRender,
     },
-    InitRaw(ModelState),
+    InitRaw(ModelState<ootr_static::Rando>), //TODO support other Rando impls?
     UpdateRaw(ModelDelta),
 }
 

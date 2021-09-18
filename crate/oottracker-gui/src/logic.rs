@@ -127,7 +127,7 @@ pub(crate) enum Message<R: Rando> {
 
 #[derive(Derivative, Debug)]
 #[derivative(Default)]
-pub(crate) struct State<R: Rando + 'static> {
+pub(crate) struct State<R: Rando> {
     //TODO store in model state
     #[derivative(Default(value = "R::root()"))]
     current_region: R::RegionName,
@@ -147,7 +147,7 @@ pub(crate) struct State<R: Rando + 'static> {
     starting_inv_btns_row6: [button::State; 4],
 }
 
-impl<R: Rando + 'static> State<R> {
+impl<R: Rando> State<R> {
     pub(crate) fn update(&mut self, msg: Message<R>) -> Command<crate::Message<R>> {
         match msg {
             Message::EditPlandoPath(new_path) => if let Ok(new_path) = new_path.parse() {

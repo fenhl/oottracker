@@ -3,6 +3,7 @@ use {
         any::TypeId,
         collections::{
             BTreeMap,
+            HashSet,
             hash_map::DefaultHasher,
         },
         convert::{
@@ -19,7 +20,6 @@ use {
         sync::Arc,
     },
     async_stream::try_stream,
-    collect_mac::collect,
     futures::{
         pin_mut,
         stream::{
@@ -39,6 +39,7 @@ use {
     tokio::sync::Mutex,
     wheel::FromArc,
     ootr::{
+        Rando,
         check::Check,
         model::{
             DungeonReward,
@@ -46,6 +47,7 @@ use {
             MainDungeon,
         },
         region::Mq,
+        settings::Knowledge as _,
     },
     crate::{
         ModelState,
@@ -74,7 +76,7 @@ macro_rules! cells {
             }
         }
 
-        fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
+        fn serialize_state(&self, state: &ModelState<R>) -> serde_json::Result<BTreeMap<&'static str, Json>> {
             let mut map = BTreeMap::default();
             $(
                 map.insert($cell_name, serde_json::to_value(render_cell(TrackerCellId::$id.kind(), state))?);
@@ -125,13 +127,13 @@ impl fmt::Display for Error {
     }
 }
 
-pub trait App: fmt::Debug + Send + Sync + 'static {
+pub trait App<R: Rando>: fmt::Debug + Send + Sync + 'static {
     fn base_url(&self) -> &'static str;
     fn api_key(&self) -> &'static str;
     fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId>;
-    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>>;
+    fn serialize_state(&self, state: &ModelState<R>) -> serde_json::Result<BTreeMap<&'static str, Json>>;
 
-    fn set_cell(&self, state: &mut ModelState, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
+    fn set_cell(&self, state: &mut ModelState<R>, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
         match cell_id.kind() {
             BossKey { active, toggle } => if active(&state.ram.save.boss_keys) != value.as_bool().ok_or_else(|| value.clone())? {
                 toggle(&mut state.ram.save.boss_keys);
@@ -157,11 +159,11 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
                 }
             }
             FortressMq => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
+                state.knowledge.settings.update("gerudo_fortress", "normal").expect("failed to update Gerudo Fortress setting");
             } else {
                 // don't override local state that's consistent with the value received
-                if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |fort| fort.iter().eq(iter::once("normal"))) {
-                    state.knowledge.string_settings.remove("gerudo_fortress");
+                if state.knowledge.settings.get::<HashSet<&'static str>>("gerudo_fortress").expect("failed to get Gerudo Fortress setting").map_or(false, |fort| fort.iter().copied().eq(iter::once("normal"))) {
+                    state.knowledge.settings.remove("gerudo_fortress");
                 }
             },
             Medallion(med) => if value.as_bool().ok_or_else(|| value.clone())? {
@@ -171,25 +173,25 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
             },
             MedallionLocation(med) => {
                 match value.as_u64().ok_or_else(|| value.clone())? {
-                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Medallion(med)),
-                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Medallion(med), DungeonRewardLocation::LinksPocket),
+                    0 => state.knowledge.remove_dungeon_reward_location(DungeonReward::Medallion(med)),
+                    1 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
+                    2 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
+                    3 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
+                    4 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
+                    5 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
+                    6 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
+                    7 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
+                    8 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
+                    9 => state.knowledge.set_dungeon_reward_location(DungeonReward::Medallion(med), DungeonRewardLocation::LinksPocket),
                     _ => return Err(value),
                 };
             }
             Mq(dungeon) => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.knowledge.mq.insert(dungeon, Mq::Mq);
+                state.knowledge.dungeons.insert(dungeon, Mq::Mq);
             } else {
                 // don't override local state that's consistent with the value received
-                if state.knowledge.mq.get(&dungeon).map_or(false, |&mq| mq == Mq::Mq) {
-                    state.knowledge.mq.remove(&dungeon);
+                if state.knowledge.dungeons.get(&dungeon).map_or(false, |&mq| mq == Mq::Mq) {
+                    state.knowledge.dungeons.remove(&dungeon);
                 }
             },
             OptionalOverlay { active, toggle_main, .. } | Overlay { active, toggle_main, .. } => if active(state).0 != value.as_bool().ok_or_else(|| value.clone())? {
@@ -210,7 +212,7 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
             } else {
                 state.ram.save.quest_items.remove(song);
             },
-            SongCheck { check, toggle_overlay } => if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? { //TODO allow ootr_dynamic::Rando
+            SongCheck { check, toggle_overlay } => if Check::<R>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? {
                 toggle_overlay(&mut state.ram.save.event_chk_inf);
             },
             Spells => {
@@ -231,16 +233,16 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
             },
             StoneLocation(stone) => {
                 match value.as_u64().ok_or_else(|| value.clone())? {
-                    0 => state.knowledge.dungeon_reward_locations.remove(&DungeonReward::Stone(stone)),
-                    1 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-                    2 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-                    3 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-                    4 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-                    5 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-                    6 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-                    7 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-                    8 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-                    9 => state.knowledge.dungeon_reward_locations.insert(DungeonReward::Stone(stone), DungeonRewardLocation::LinksPocket),
+                    0 => state.knowledge.remove_dungeon_reward_location(DungeonReward::Stone(stone)),
+                    1 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
+                    2 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
+                    3 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
+                    4 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
+                    5 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
+                    6 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
+                    7 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
+                    8 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
+                    9 => state.knowledge.set_dungeon_reward_location(DungeonReward::Stone(stone), DungeonRewardLocation::LinksPocket),
                     _ => return Err(value),
                 };
             }
@@ -250,17 +252,17 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
     }
 }
 
-impl App for Box<dyn App> {
+impl<R: Rando> App<R> for Box<dyn App<R>> {
     fn base_url(&self) -> &'static str { (**self).base_url() }
     fn api_key(&self) -> &'static str { (**self).api_key() }
     fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId> { (**self).cell_id(cell_id) }
-    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> { (**self).serialize_state(state) }
+    fn serialize_state(&self, state: &ModelState<R>) -> serde_json::Result<BTreeMap<&'static str, Json>> { (**self).serialize_state(state) }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OldRestreamTracker;
 
-impl App for OldRestreamTracker {
+impl<R: Rando> App<R> for OldRestreamTracker {
     fn base_url(&self) -> &'static str { "https://oot-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { OLD_RESTREAM_API_KEY }
 
@@ -321,7 +323,7 @@ impl App for OldRestreamTracker {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RestreamTracker;
 
-impl App for RestreamTracker {
+impl<R: Rando> App<R> for RestreamTracker {
     fn base_url(&self) -> &'static str { "https://ootr-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RESTREAM_API_KEY }
 
@@ -390,7 +392,7 @@ impl App for RestreamTracker {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RslItemTracker;
 
-impl App for RslItemTracker {
+impl<R: Rando> App<R> for RslItemTracker {
     fn base_url(&self) -> &'static str { "https://ootr-random-settings-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RSL_API_KEY }
 
@@ -527,15 +529,15 @@ struct PatchData {
 }
 
 #[derive(Clone)]
-pub struct Session<A: App> {
+pub struct Session<R: Rando, A: App<R>> {
     client: reqwest::Client,
     local_id: String,
     id_token: String,
     app: A,
 }
 
-impl<A: App> Session<A> {
-    pub async fn new(app: A) -> reqwest::Result<Session<A>> {
+impl<R: Rando, A: App<R>> Session<R, A> {
+    pub async fn new(app: A) -> reqwest::Result<Session<R, A>> {
         let client = reqwest::Client::builder()
             .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
             .use_rustls_tls()
@@ -607,7 +609,7 @@ impl<A: App> Session<A> {
         Ok(())
     }
 
-    fn to_dyn(&self) -> Session<Box<dyn App>>
+    fn to_dyn(&self) -> Session<R, Box<dyn App<R>>>
     where A: Clone {
         Session {
             client: self.client.clone(),
@@ -619,14 +621,14 @@ impl<A: App> Session<A> {
 }
 
 #[derive(Clone)]
-pub struct Room<A: App> {
-    pub session: Session<A>,
+pub struct Room<R: Rando, A: App<R>> {
+    pub session: Session<R, A>,
     pub name: String,
     pub passcode: String,
 }
 
-impl<A: App> Room<A> {
-    pub fn to_dyn(&self) -> DynRoom
+impl<R: Rando, A: App<R>> Room<R, A> {
+    pub fn to_dyn(&self) -> DynRoom<R>
     where A: Clone + Send {
         let mut hasher = DefaultHasher::default();
         TypeId::of::<A>().hash(&mut hasher);
@@ -640,15 +642,15 @@ impl<A: App> Room<A> {
 }
 
 #[derive(Clone)]
-pub struct DynRoom {
+pub struct DynRoom<R: Rando> {
     app_hash: u64,
-    session: Arc<Mutex<Session<Box<dyn App>>>>,
+    session: Arc<Mutex<Session<R, Box<dyn App<R>>>>>,
     name: String,
     passcode: String,
 }
 
-impl DynRoom {
-    pub async fn set_state(&self, new_state: &ModelState) -> Result<(), Error> {
+impl<R: Rando> DynRoom<R> {
+    pub async fn set_state(&self, new_state: &ModelState<R>) -> Result<(), Error> {
         let mut session = self.session.lock().await;
         let url = format!("{}/games/{}/items.json", session.app.base_url(), self.name);
         let state = session.app.serialize_state(new_state)?;
@@ -709,13 +711,13 @@ impl DynRoom {
     }
 }
 
-impl fmt::Debug for DynRoom {
+impl<R: Rando> fmt::Debug for DynRoom<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "DynRoom {{ name: {:?}, session: _ }}", self.name) //TODO use debug_struct with finish_non_exhaustive
     }
 }
 
-impl Hash for DynRoom {
+impl<R: Rando> Hash for DynRoom<R> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.app_hash.hash(state);
         self.name.hash(state);
@@ -723,7 +725,7 @@ impl Hash for DynRoom {
     }
 }
 
-fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
+fn render_cell<R: Rando>(cell_kind: TrackerCellKind, state: &ModelState<R>) -> Json {
     match cell_kind {
         BossKey { active, .. } => json!(active(&state.ram.save.boss_keys)),
         Composite { active, .. } => json!(match active(state) {
@@ -733,9 +735,9 @@ fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
             (true, true) => 3,
         }),
         Count { get, max, step, .. } => json!(get(state).min(max) / step),
-        FortressMq => json!(state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |values| values.iter().eq(iter::once("normal")))),
+        FortressMq => json!(state.knowledge.settings.get::<HashSet<&'static str>>("gerudo_fortress").expect("failed to get Gerudo Fortress setting").map_or(false, |fort| fort.iter().copied().eq(iter::once("normal")))),
         Medallion(med) => json!(state.ram.save.quest_items.has(med)),
-        MedallionLocation(med) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(med)) {
+        MedallionLocation(med) => json!(match state.knowledge.get_dungeon_reward_location(DungeonReward::Medallion(med)) {
             None => 0,
             Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => 1,
             Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => 2,
@@ -747,13 +749,13 @@ fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
             Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
             Some(DungeonRewardLocation::LinksPocket) => 9,
         }),
-        Mq(dungeon) => json!(state.knowledge.mq.get(&dungeon) == Some(&Mq::Mq)),
+        Mq(dungeon) => json!(state.knowledge.dungeons.get(&dungeon) == Some(&Mq::Mq)),
         OptionalOverlay { active, .. } | Overlay { active, .. } => json!(active(state).0),
         Sequence { idx, .. } => json!(idx(state)),
         Simple { active, .. } => json!(active(state)),
         SmallKeys { get, .. } => json!(get(&state.ram.save.small_keys)),
         Song { song, .. } => json!(state.ram.save.quest_items.contains(song)),
-        SongCheck { check, .. } => json!(Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false)), //TODO allow ootr_dynamic::Rando
+        SongCheck { check, .. } => json!(Check::<R>::Location(check.to_string()).checked(state).unwrap_or(false)),
         Spells => json!(match (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind) {
             (false, false) => 0,
             (true, false) => 1,
@@ -761,7 +763,7 @@ fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
             (true, true) => 3,
         }),
         Stone(stone) => json!(state.ram.save.quest_items.has(stone)),
-        StoneLocation(stone) => json!(match state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(stone)) {
+        StoneLocation(stone) => json!(match state.knowledge.get_dungeon_reward_location(DungeonReward::Stone(stone)) {
             None => 0,
             Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => 1,
             Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => 2,

@@ -24,17 +24,17 @@ use {
 };
 
 pub const TCP_PORT: u16 = 24801;
-pub const VERSION: u8 = 4;
+pub const VERSION: u8 = 5;
 
 #[derive(Debug, Clone, Protocol)]
 pub enum Packet {
     Goodbye,
     SaveDelta(save::Delta),
     SaveInit(save::Save),
-    KnowledgeInit(knowledge::Knowledge),
+    KnowledgeInit(knowledge::Knowledge<ootr_static::Rando>), //TODO support other Rando impls?
     RamInit(Ram),
     UpdateCell(TrackerCellId, Json),
-    ModelInit(ModelState),
+    ModelInit(ModelState<ootr_static::Rando>), //TODO support other Rando impls?
     ModelDelta(ModelDelta),
 }
 

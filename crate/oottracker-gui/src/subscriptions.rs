@@ -18,12 +18,12 @@ use {
     crate::Message,
 };
 
-pub(crate) struct Subscription<R: Rando + 'static> {
+pub(crate) struct Subscription<R: Rando> {
     conn: Arc<dyn Connection>,
     _rando: PhantomData<R>,
 }
 
-impl<R: Rando + 'static> Subscription<R> {
+impl<R: Rando> Subscription<R> {
     pub(crate) fn new(conn: Arc<dyn Connection>) -> Subscription<R> {
         Subscription {
             conn,
@@ -32,7 +32,7 @@ impl<R: Rando + 'static> Subscription<R> {
     }
 }
 
-impl<R: Rando + 'static, H: Hasher, I> Recipe<H, I> for Subscription<R> {
+impl<R: Rando, H: Hasher, I> Recipe<H, I> for Subscription<R> {
     type Output = Message<R>;
 
     fn hash(&self, state: &mut H) {

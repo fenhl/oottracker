@@ -26,6 +26,7 @@ use {
     crate::{
         Check,
         ModelState,
+        knowledge::Entrance,
         region::{
             RegionExt as _,
             RegionLookup,
@@ -35,11 +36,15 @@ use {
 };
 
 pub trait CheckExt {
-    fn checked(&self, model: &ModelState) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
+    type Rando: Rando;
+
+    fn checked(&self, model: &ModelState<Self::Rando>) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
 }
 
 impl<R: Rando> CheckExt for Check<R> {
-    fn checked(&self, model: &ModelState) -> Option<bool> {
+    type Rando = R;
+
+    fn checked(&self, model: &ModelState<R>) -> Option<bool> {
         // event and location lists from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
         if let Some(checked) = model.ram.save.gold_skulltulas.checked(self) { return Some(checked) }
         if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) }
@@ -152,7 +157,7 @@ impl<R: Rando> CheckExt for Check<R> {
 
                 _ => panic!("unknown event name: {}", event),
             },
-            Check::Exit { from, to, .. } => Some(model.knowledge.get_exit(from.as_ref(), to.as_ref()).is_some()),
+            Check::Exit { from, to, .. } => Some(model.knowledge.entrances.contains_key(&Entrance { from: from.clone(), to: to.clone() })), //TODO check if value is a single entrance
             Check::Location(loc) => match &loc[..] {
                 "LH Child Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::CHILD_PRIZE_OBTAINED)),
                 "LH Adult Fishing" => Some(model.ram.save.fishing_context.contains(crate::save::FishingContext::ADULT_PRIZE_OBTAINED)),
@@ -773,7 +778,7 @@ impl<R: Rando> fmt::Display for CheckStatusError<R> {
     }
 }
 
-pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check<R>, CheckStatus>, CheckStatusError<R>> {
+pub fn status<R: Rando>(rando: &R, model: &ModelState<R>) -> Result<HashMap<Check<R>, CheckStatus>, CheckStatusError<R>> {
     let mut map = HashMap::default();
     let all_regions = Region::all(rando)?;
     let mut reachable_regions = collect![as HashSet<_>: Region::root(rando)?];

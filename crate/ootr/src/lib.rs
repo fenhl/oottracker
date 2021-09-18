@@ -13,8 +13,10 @@ use {
         },
         fmt,
         hash::Hash,
+        str::FromStr,
         sync::Arc,
     },
+    async_proto::Protocol,
     semver::Version,
     crate::{
         item::Item,
@@ -27,14 +29,16 @@ pub mod check;
 pub mod item;
 pub mod model;
 pub mod region;
+pub mod settings;
 
 pub trait RandoErr: fmt::Debug + fmt::Display + Clone + Send {
     const ITEM_NOT_FOUND: Self;
 }
 
-pub trait Rando: Sized {
+pub trait Rando: fmt::Debug + Sized {
     type Err: RandoErr;
-    type RegionName: Clone + Eq + Hash + From<&'static str> + AsRef<str> + for<'a> PartialEq<&'a str> + fmt::Debug + fmt::Display + Send;
+    type RegionName: Clone + Eq + Hash + FromStr + AsRef<str> + for<'a> PartialEq<&'a str> + fmt::Debug + fmt::Display + Protocol + Send;
+    type SettingsKnowledge: settings::Knowledge<Self>;
 
     fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
     fn item_table(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
@@ -42,7 +46,7 @@ pub trait Rando: Sized {
     fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
     fn regions(&self) -> Result<Arc<Vec<Arc<Region<Self>>>>, Self::Err>;
     fn root() -> Self::RegionName;
-    fn setting_infos(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
+    fn setting_names(&self) -> Result<Arc<HashMap<String, String>>, Self::Err>;
 }
 
 pub fn version() -> Version {

@@ -7,6 +7,11 @@ edition = "2018"
 [dependencies]
 once_cell = "1"
 semver = "1"
+tokio = "1"
+
+[dependencies.async-proto]
+version = "0.8"
+features = ["write-sync"]
 
 [dependencies.ootr]
 path = "../ootr"

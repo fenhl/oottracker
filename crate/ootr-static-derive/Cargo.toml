@@ -11,7 +11,7 @@ proc-macro = true
 convert_case = "0.4"
 directories = "3"
 graphql_client = "0.10"
-itertools = "0.10"
+#itertools = "0.10" #TODO update once itertools commit fa3fffb0741c59785dcbf9ed168e3def122621c9 is released
 proc-macro2 = "1"
 quote = "1"
 serde = "1"
@@ -22,6 +22,10 @@ zip = "0.5"
 version = "0.99"
 default-features = false
 features = ["from"]
+
+[dependencies.itertools]
+git = "https://github.com/rust-itertools/itertools"
+rev = "fa3fffb0741c59785dcbf9ed168e3def122621c9"
 
 [dependencies.ootr]
 path = "../ootr"

@@ -293,7 +293,7 @@ impl ConnectionParams {
         };
     }
 
-    fn view<R: Rando + 'static>(&mut self) -> Element<'_, Message<R>> {
+    fn view<R: Rando>(&mut self) -> Element<'_, Message<R>> {
         match self {
             ConnectionParams::TcpListener => Row::new().into(),
             ConnectionParams::RetroArch { port, port_state } => Row::new()
@@ -309,7 +309,7 @@ impl ConnectionParams {
 }
 
 #[derive(Debug)]
-struct State<R: Rando + 'static> {
+struct State<R: Rando> {
     flags: Args,
     config: Option<Config>,
     http_client: reqwest::Client,
@@ -330,7 +330,7 @@ struct State<R: Rando + 'static> {
     menu_state: Option<MenuState>,
 }
 
-impl<R: Rando + 'static> State<R> {
+impl<R: Rando> State<R> {
     fn layout(&self) -> TrackerLayout {
         if self.connection.as_ref().map_or(true, |connection| connection.can_change_state()) {
             TrackerLayout::from(&self.config)

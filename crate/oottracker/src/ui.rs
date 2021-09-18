@@ -209,9 +209,9 @@ pub enum TrackerCellKind {
         left_img: ImageInfo,
         right_img: ImageInfo,
         both_img: ImageInfo,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_left: Box<dyn Fn(&mut ModelState)>,
-        toggle_right: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, bool)>,
+        toggle_left: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        toggle_right: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
     },
     CompositeKeys {
         small: TrackerCellId,
@@ -220,8 +220,8 @@ pub enum TrackerCellKind {
     Count {
         dimmed_img: ImageInfo,
         img: ImageInfo,
-        get: Box<dyn Fn(&ModelState) -> u8>,
-        set: Box<dyn Fn(&mut ModelState, u8)>,
+        get: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> u8>,
+        set: Box<dyn Fn(&mut ModelState<ootr_static::Rando>, u8)>,
         max: u8,
         step: u8,
     },
@@ -235,27 +235,27 @@ pub enum TrackerCellKind {
     OptionalOverlay {
         main_img: ImageInfo,
         overlay_img: ImageInfo,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        toggle_overlay: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
     },
     Overlay {
         main_img: ImageInfo,
         overlay_img: ImageInfo,
-        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        toggle_overlay: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
     },
     Sequence {
-        idx: Box<dyn Fn(&ModelState) -> u8>,
-        img: Box<dyn Fn(&ModelState) -> (bool, ImageInfo)>,
-        increment: Box<dyn Fn(&mut ModelState)>,
-        decrement: Box<dyn Fn(&mut ModelState)>,
+        idx: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> u8>,
+        img: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, ImageInfo)>,
+        increment: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        decrement: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
     },
     Simple {
         img: ImageInfo,
-        active: Box<dyn Fn(&ModelState) -> bool>,
-        toggle: Box<dyn Fn(&mut ModelState)>,
+        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> bool>,
+        toggle: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
     },
     SmallKeys {
         get: Box<dyn Fn(&crate::save::SmallKeys) -> u8>,
@@ -278,7 +278,7 @@ pub enum TrackerCellKind {
 }
 
 impl TrackerCellKind {
-    pub fn render(&self, state: &ModelState) -> CellRender {
+    pub fn render(&self, state: &ModelState<ootr_static::Rando>) -> CellRender {
         match self {
             BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
                 CellRender {
@@ -582,7 +582,7 @@ impl TrackerCellKind {
     }
 
     /// Handle a click action from a frontend that don't distinguish between left and right click.
-    pub fn click(&self, state: &mut ModelState) {
+    pub fn click(&self, state: &mut ModelState<ootr_static::Rando>) {
         match self {
             Composite { active, toggle_left, toggle_right, .. } | Overlay { active, toggle_main: toggle_left, toggle_overlay: toggle_right, .. } => {
                 let (left, _) = active(state);
@@ -656,7 +656,7 @@ impl TrackerCellKind {
     }
 
     /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
+    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState<ootr_static::Rando>) -> bool {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
             return self.right_click(can_change_state, keyboard_modifiers, state)
         }
@@ -696,7 +696,7 @@ impl TrackerCellKind {
     }
 
     /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
+    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState<ootr_static::Rando>) -> bool {
         if let Medallion(_) = self { return true }
         if can_change_state {
             match self {

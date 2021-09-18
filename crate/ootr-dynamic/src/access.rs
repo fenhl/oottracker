@@ -229,7 +229,7 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
                 Expr::StartingAge
             }
             // setting or trick (SettingsList.py)
-            else if rando.setting_infos()?.contains(&name) {
+            else if rando.setting_names()?.contains_key(&name) {
                 Expr::Setting(name)
             } else if rando.logic_tricks()?.contains(&name) {
                 Expr::Trick(name)
