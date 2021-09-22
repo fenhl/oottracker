@@ -30,7 +30,7 @@ use {
         },
     },
     itertools::Itertools as _,
-    ootr::Rando,
+    oottracker::region::Region,
 };
 
 #[derive(Derivative, Debug)]
@@ -115,23 +115,22 @@ impl text_input::StyleSheet for TextInputStyle {
     fn selection_color(&self) -> Color { Color::from_rgb8(0x0d, 0x7a, 0xff) }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""), Clone(bound = ""))]
-pub(crate) enum Message<R: Rando> {
+#[derive(Debug, Clone)]
+pub(crate) enum Message {
     EditPlandoPath(String),
     EditSettingsString(String),
     EditWeightsPath(String),
-    PickRegion(R::RegionName),
+    PickRegion(Region),
     PickSettingsInfo(SettingsInfoKind),
 }
 
 #[derive(Derivative, Debug)]
 #[derivative(Default)]
-pub(crate) struct State<R: Rando> {
+pub(crate) struct State {
     //TODO store in model state
-    #[derivative(Default(value = "R::root()"))]
-    current_region: R::RegionName,
-    region_pick: pick_list::State<R::RegionName>,
+    #[derivative(Default(value = "Region::Root"))]
+    current_region: Region,
+    region_pick: pick_list::State<Region>,
     save_btn: button::State,
     reset_btn: button::State,
     //TODO store in knowledge
@@ -147,8 +146,8 @@ pub(crate) struct State<R: Rando> {
     starting_inv_btns_row6: [button::State; 4],
 }
 
-impl<R: Rando> State<R> {
-    pub(crate) fn update(&mut self, msg: Message<R>) -> Command<crate::Message<R>> {
+impl State {
+    pub(crate) fn update(&mut self, msg: Message) -> Command<crate::Message> {
         match msg {
             Message::EditPlandoPath(new_path) => if let Ok(new_path) = new_path.parse() {
                 if let SettingsInfo::Plando(ref mut path) = self.settings_info {
@@ -169,11 +168,11 @@ impl<R: Rando> State<R> {
         Command::none()
     }
 
-    pub(crate) fn view(&mut self, rando: &R) -> Element<'_, Message<R>> {
+    pub(crate) fn view(&mut self) -> Element<'_, Message> {
         let mut col = Column::new().push(Row::new()
             .push(PickList::new(
                 &mut self.region_pick,
-                rando.regions().expect("failed to load regions" /*TODO better error handling */).iter().map(|region| region.name.clone()).collect_vec(),
+                Region::into_enum_iter().map(|region| region.to_string().clone()).collect_vec(),
                 Some(self.current_region.clone()),
                 Message::PickRegion,
             ))

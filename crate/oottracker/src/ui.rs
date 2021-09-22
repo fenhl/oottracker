@@ -3,15 +3,13 @@
 use {
     std::{
         borrow::Cow,
-        collections::HashMap,
+        convert::TryInto as _,
         fmt,
         io,
-        iter,
         sync::Arc,
         vec,
     },
     async_proto::Protocol,
-    collect_mac::collect,
     derivative::Derivative,
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
@@ -45,8 +43,12 @@ use {
         },
     },
     wheel::FromArc,
-    ootr::{
+    crate::{
+        ModelState,
         check::Check,
+        checks::CheckExt as _,
+        info_tables::*,
+        knowledge::ProgressionMode,
         model::{
             Dungeon,
             DungeonReward,
@@ -56,13 +58,8 @@ use {
             Stone,
         },
         region::Mq,
-    },
-    crate::{
-        ModelState,
-        checks::CheckExt as _,
-        info_tables::*,
-        knowledge::ProgressionMode,
         save::*,
+        settings::GerudoFortressKnowledge,
     },
 };
 
@@ -162,56 +159,19 @@ impl fmt::Display for ElementOrder {
     }
 }
 
-pub trait DungeonRewardLocationExt {
-    fn increment(&mut self, key: DungeonReward);
-    fn decrement(&mut self, key: DungeonReward);
-}
-
-impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> {
-    fn increment(&mut self, key: DungeonReward) {
-        match self.get(&key) {
-            None => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => self.insert(key, DungeonRewardLocation::LinksPocket),
-            Some(DungeonRewardLocation::LinksPocket) => self.remove(&key),
-        };
-    }
-
-    fn decrement(&mut self, key: DungeonReward) {
-        match self.get(&key) {
-            None => self.insert(key, DungeonRewardLocation::LinksPocket),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => self.remove(&key),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)),
-            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)),
-            Some(DungeonRewardLocation::LinksPocket) => self.insert(key, DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)),
-        };
-    }
-}
-
 pub enum TrackerCellKind {
     BigPoeTriforce, // auto-trackers show big Poe count unless at least 1 Triforce piece has been collected, manual mode only shows Triforce pieces
     BossKey {
-        active: Box<dyn Fn(&BossKeys) -> bool>,
-        toggle: Box<dyn Fn(&mut BossKeys)>,
+        active: Box<dyn Fn(&DungeonItems) -> bool>,
+        toggle: Box<dyn Fn(&mut DungeonItems)>,
     },
     Composite {
         left_img: ImageInfo,
         right_img: ImageInfo,
         both_img: ImageInfo,
-        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, bool)>,
-        toggle_left: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
-        toggle_right: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        toggle_left: Box<dyn Fn(&mut ModelState)>,
+        toggle_right: Box<dyn Fn(&mut ModelState)>,
     },
     CompositeKeys {
         small: TrackerCellId,
@@ -220,8 +180,8 @@ pub enum TrackerCellKind {
     Count {
         dimmed_img: ImageInfo,
         img: ImageInfo,
-        get: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> u8>,
-        set: Box<dyn Fn(&mut ModelState<ootr_static::Rando>, u8)>,
+        get: Box<dyn Fn(&ModelState) -> u8>,
+        set: Box<dyn Fn(&mut ModelState, u8)>,
         max: u8,
         step: u8,
     },
@@ -235,27 +195,27 @@ pub enum TrackerCellKind {
     OptionalOverlay {
         main_img: ImageInfo,
         overlay_img: ImageInfo,
-        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut ModelState)>,
+        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
     },
     Overlay {
         main_img: ImageInfo,
         overlay_img: ImageInfo,
-        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, bool)>,
-        toggle_main: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
-        toggle_overlay: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        active: Box<dyn Fn(&ModelState) -> (bool, bool)>,
+        toggle_main: Box<dyn Fn(&mut ModelState)>,
+        toggle_overlay: Box<dyn Fn(&mut ModelState)>,
     },
     Sequence {
-        idx: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> u8>,
-        img: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> (bool, ImageInfo)>,
-        increment: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
-        decrement: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        idx: Box<dyn Fn(&ModelState) -> u8>,
+        img: Box<dyn Fn(&ModelState) -> (bool, ImageInfo)>,
+        increment: Box<dyn Fn(&mut ModelState)>,
+        decrement: Box<dyn Fn(&mut ModelState)>,
     },
     Simple {
         img: ImageInfo,
-        active: Box<dyn Fn(&ModelState<ootr_static::Rando>) -> bool>,
-        toggle: Box<dyn Fn(&mut ModelState<ootr_static::Rando>)>,
+        active: Box<dyn Fn(&ModelState) -> bool>,
+        toggle: Box<dyn Fn(&mut ModelState)>,
     },
     SmallKeys {
         get: Box<dyn Fn(&crate::save::SmallKeys) -> u8>,
@@ -278,7 +238,7 @@ pub enum TrackerCellKind {
 }
 
 impl TrackerCellKind {
-    pub fn render(&self, state: &ModelState<ootr_static::Rando>) -> CellRender {
+    pub fn render(&self, state: &ModelState) -> CellRender {
         match self {
             BigPoeTriforce => if state.ram.save.triforce_pieces() > 0 {
                 CellRender {
@@ -307,7 +267,7 @@ impl TrackerCellKind {
             },
             BossKey { active, .. } => CellRender {
                 img: ImageInfo::extra("boss_key"),
-                style: if active(&state.ram.save.boss_keys) { CellStyle::Normal } else { CellStyle::Dimmed },
+                style: if active(&state.ram.save.dungeon_items) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
             },
             Composite { left_img, right_img, both_img, active, .. } => {
@@ -325,7 +285,7 @@ impl TrackerCellKind {
             }
             CompositeKeys { boss, small } => {
                 let (has_boss_key, num_small_keys) = if let (BossKey { active, .. }, TrackerCellKind::SmallKeys { get, .. }) = (boss.kind(), small.kind()) {
-                    (active(&state.ram.save.boss_keys), get(&state.ram.save.small_keys))
+                    (active(&state.ram.save.dungeon_items), get(&state.ram.save.small_keys))
                 } else {
                     unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
                 };
@@ -362,15 +322,18 @@ impl TrackerCellKind {
                     style: CellStyle::Normal,
                     overlay: CellOverlay::Location {
                         loc: ImageInfo::extra("fort_text"),
-                        style: if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |values| values.iter().eq(iter::once("normal"))) { LocationStyle::Mq } else { LocationStyle::Normal }, //TODO dim if unknown?
+                        style: if state.knowledge.settings.gerudo_fortress == GerudoFortressKnowledge::normal() { LocationStyle::Mq } else { LocationStyle::Normal }, //TODO dim if unknown?
                     },
                 }
             }
             FreeReward => {
-                let reward = state.knowledge.dungeon_reward_locations.iter()
-                    .filter_map(|(reward, &loc)| if loc == DungeonRewardLocation::LinksPocket { Some(reward) } else { None })
+                //TODO if auto-tracking, use a method on Knowledge to display dungeon rewards that are known under functional equivalence
+                let reward = state.knowledge.locations.get("Links Pocket").and_then(|k| k
+                    .into_iter()
+                    .filter_map(|item| item.try_into().ok())
                     .exactly_one()
-                    .ok();
+                    .ok()
+                );
                 CellRender {
                     img: ImageInfo { dir: if reward.is_some() { ImageDir::Xopar } else { ImageDir::Extra }, name: match reward {
                         Some(DungeonReward::Medallion(med)) => Cow::Owned(format!("{}_medallion", med.element().to_ascii_lowercase())),
@@ -410,7 +373,7 @@ impl TrackerCellKind {
                 overlay: CellOverlay::None,
             },
             MedallionLocation(med) => {
-                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
+                let location = state.knowledge.get_dungeon_reward_location(DungeonReward::Medallion(*med));
                 CellRender {
                     img: ImageInfo::new(match location {
                         None => "unknown_text",
@@ -430,10 +393,13 @@ impl TrackerCellKind {
             }
             Mq(dungeon) => {
                 let reward = if let Dungeon::Main(main_dungeon) = *dungeon {
-                    state.knowledge.dungeon_reward_locations.iter()
-                        .filter_map(|(reward, &loc)| if loc == DungeonRewardLocation::Dungeon(main_dungeon) { Some(reward) } else { None })
+                    //TODO if auto-tracking, use a method on Knowledge to display dungeon rewards that are known under functional equivalence
+                    state.knowledge.locations.get(main_dungeon.reward_location()).and_then(|k| k
+                        .into_iter()
+                        .filter_map(|item| item.try_into().ok())
                         .exactly_one()
                         .ok()
+                    )
                 } else {
                     None
                 };
@@ -445,7 +411,7 @@ impl TrackerCellKind {
                         Some(DungeonReward::Stone(Stone::ZoraSapphire)) => Cow::Borrowed("zora_sapphire"),
                         None => Cow::Borrowed("blank"), //TODO “unknown dungeon reward” image? (only for dungeons that have rewards)
                     } },
-                    style: if reward.map_or(false, |&reward| state.ram.save.quest_items.has(reward)) { CellStyle::Normal } else { CellStyle::Dimmed },
+                    style: if reward.map_or(false, |reward| state.ram.save.quest_items.has(reward)) { CellStyle::Normal } else { CellStyle::Dimmed },
                     overlay: CellOverlay::Location {
                         loc: ImageInfo { dir: if let Dungeon::Main(_) = dungeon { ImageDir::Xopar } else { ImageDir::Extra }, name: Cow::Borrowed(match dungeon {
                             Dungeon::Main(MainDungeon::DekuTree) => "deku_text",
@@ -458,10 +424,10 @@ impl TrackerCellKind {
                             Dungeon::Main(MainDungeon::SpiritTemple) => "spirit_text",
                             Dungeon::IceCavern => "ice_text",
                             Dungeon::BottomOfTheWell => "well_text",
-                            Dungeon::GerudoTrainingGrounds => "gtg_text",
+                            Dungeon::GerudoTrainingGround => "gtg_text",
                             Dungeon::GanonsCastle => "ganon_text",
                         }) },
-                        style: if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) { LocationStyle::Mq } else { LocationStyle::Normal },
+                        style: if state.knowledge.dungeons.get(dungeon) == Some(&Mq::Mq) { LocationStyle::Mq } else { LocationStyle::Normal },
                     },
                 }
             }
@@ -522,7 +488,7 @@ impl TrackerCellKind {
                     _ => unreachable!(),
                 }),
                 style: if state.ram.save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
-                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                overlay: if Check::Location(check.to_string()).checked(state).unwrap_or(false) {
                     CellOverlay::Image(ImageInfo::new("check"))
                 } else {
                     CellOverlay::None
@@ -531,7 +497,7 @@ impl TrackerCellKind {
             SongCheck { check, .. } => CellRender {
                 img: ImageInfo::extra("blank"),
                 style: CellStyle::Normal,
-                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                overlay: if Check::Location(check.to_string()).checked(state).unwrap_or(false) {
                     CellOverlay::Image(ImageInfo::new("check"))
                 } else {
                     CellOverlay::None
@@ -560,7 +526,7 @@ impl TrackerCellKind {
                 overlay: CellOverlay::None,
             },
             StoneLocation(stone) => {
-                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
+                let location = state.knowledge.get_dungeon_reward_location(DungeonReward::Stone(*stone));
                 CellRender {
                     img: ImageInfo::new(match location {
                         None => "unknown_text",
@@ -582,7 +548,7 @@ impl TrackerCellKind {
     }
 
     /// Handle a click action from a frontend that don't distinguish between left and right click.
-    pub fn click(&self, state: &mut ModelState<ootr_static::Rando>) {
+    pub fn click(&self, state: &mut ModelState) {
         match self {
             Composite { active, toggle_left, toggle_right, .. } | Overlay { active, toggle_main: toggle_left, toggle_overlay: toggle_right, .. } => {
                 let (left, _) = active(state);
@@ -599,7 +565,7 @@ impl TrackerCellKind {
                 let num_small = get_small(&state.ram.save.small_keys);
                 if num_small == max_small_vanilla.max(max_small_mq) { //TODO check MQ knowledge? Does plentiful go to +1?
                     set_small(&mut state.ram.save.small_keys, 0);
-                    toggle_boss(&mut state.ram.save.boss_keys);
+                    toggle_boss(&mut state.ram.save.dungeon_items);
                 } else {
                     set_small(&mut state.ram.save.small_keys, num_small + 1);
                 }
@@ -608,10 +574,10 @@ impl TrackerCellKind {
                 let current = get(state);
                 set(state, if current == *max { 0 } else { current.saturating_add(*step).min(*max) });
             }
-            FortressMq => if state.knowledge.string_settings.get("gerudo_fortress").map_or(false, |fort| fort.iter().eq(iter::once("normal"))) {
-                state.knowledge.string_settings.remove("gerudo_fortress");
+            FortressMq => if state.knowledge.settings.gerudo_fortress == GerudoFortressKnowledge::normal() {
+                state.knowledge.settings.gerudo_fortress = GerudoFortressKnowledge::default();
             } else {
-                state.knowledge.string_settings.insert(format!("gerudo_fortress"), collect![format!("normal")]);
+                state.knowledge.settings.gerudo_fortress = GerudoFortressKnowledge::normal();
             },
             GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
                 ProgressionMode::Normal => ProgressionMode::Go,
@@ -628,11 +594,11 @@ impl TrackerCellKind {
                 }
             }
             Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
-            MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
-            Mq(dungeon) => if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) {
-                state.knowledge.mq.remove(dungeon);
+            MedallionLocation(med) => state.knowledge.increment_dungeon_reward_location(DungeonReward::Medallion(*med)),
+            Mq(dungeon) => if state.knowledge.dungeons.get(dungeon) == Some(&Mq::Mq) {
+                state.knowledge.dungeons.remove(dungeon);
             } else {
-                state.knowledge.mq.insert(*dungeon, Mq::Mq);
+                state.knowledge.dungeons.insert(*dungeon, Mq::Mq);
             },
             Sequence { increment, .. } => increment(state),
             TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } => {
@@ -649,14 +615,14 @@ impl TrackerCellKind {
                 state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
             }
             Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
-            StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            StoneLocation(stone) => state.knowledge.increment_dungeon_reward_location(DungeonReward::Stone(*stone)),
             FreeReward => {}
             BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
         }
     }
 
     /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState<ootr_static::Rando>) -> bool {
+    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control {
             return self.right_click(can_change_state, keyboard_modifiers, state)
         }
@@ -664,7 +630,7 @@ impl TrackerCellKind {
             match self {
                 Composite { toggle_left, .. } | Overlay { toggle_main: toggle_left, .. } => toggle_left(state),
                 CompositeKeys { boss, .. } => if let BossKey { toggle, .. } = boss.kind() {
-                    toggle(&mut state.ram.save.boss_keys);
+                    toggle(&mut state.ram.save.dungeon_items);
                 } else {
                     unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
                 },
@@ -696,7 +662,7 @@ impl TrackerCellKind {
     }
 
     /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState<ootr_static::Rando>) -> bool {
+    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool {
         if let Medallion(_) = self { return true }
         if can_change_state {
             match self {
@@ -723,7 +689,7 @@ impl TrackerCellKind {
                 },
                 MagicLens => state.ram.save.inv.lens = !state.ram.save.inv.lens,
                 Medallion(_) => unreachable!("already handled above"),
-                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
+                MedallionLocation(med) => state.knowledge.decrement_dungeon_reward_location(DungeonReward::Medallion(*med)),
                 Sequence { decrement, .. } => decrement(state),
                 TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } => {
                     let num = get(&state.ram.save.small_keys);
@@ -735,7 +701,7 @@ impl TrackerCellKind {
                 }
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
                 Spells => state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind,
-                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
+                StoneLocation(stone) => state.knowledge.decrement_dungeon_reward_location(DungeonReward::Stone(*stone)),
                 FreeReward | FortressMq | Mq(_) | Simple { .. } | Stone(_) => {}
                 BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
             }
@@ -1633,8 +1599,8 @@ cells! {
         max_mq: 6,
     },
     ForestBossKey: BossKey {
-        active: Box::new(|keys| keys.forest_temple),
-        toggle: Box::new(|keys| keys.forest_temple = !keys.forest_temple),
+        active: Box::new(|items| items.forest_temple.boss_key),
+        toggle: Box::new(|items| items.forest_temple.boss_key = !items.forest_temple.boss_key),
     },
     ForestKeys: CompositeKeys {
         small: TrackerCellId::ForestSmallKeys,
@@ -1648,8 +1614,8 @@ cells! {
         max_mq: 5,
     },
     FireBossKey: BossKey {
-        active: Box::new(|keys| keys.fire_temple),
-        toggle: Box::new(|keys| keys.fire_temple = !keys.fire_temple),
+        active: Box::new(|items| items.fire_temple.boss_key),
+        toggle: Box::new(|items| items.fire_temple.boss_key = !items.fire_temple.boss_key),
     },
     FireKeys: CompositeKeys {
         small: TrackerCellId::FireSmallKeys,
@@ -1663,8 +1629,8 @@ cells! {
         max_mq: 2,
     },
     WaterBossKey: BossKey {
-        active: Box::new(|keys| keys.water_temple),
-        toggle: Box::new(|keys| keys.water_temple = !keys.water_temple),
+        active: Box::new(|items| items.water_temple.boss_key),
+        toggle: Box::new(|items| items.water_temple.boss_key = !items.water_temple.boss_key),
     },
     WaterKeys: CompositeKeys {
         small: TrackerCellId::WaterSmallKeys,
@@ -1678,8 +1644,8 @@ cells! {
         max_mq: 6,
     },
     ShadowBossKey: BossKey {
-        active: Box::new(|keys| keys.shadow_temple),
-        toggle: Box::new(|keys| keys.shadow_temple = !keys.shadow_temple),
+        active: Box::new(|items| items.shadow_temple.boss_key),
+        toggle: Box::new(|items| items.shadow_temple.boss_key = !items.shadow_temple.boss_key),
     },
     ShadowKeys: CompositeKeys {
         small: TrackerCellId::ShadowSmallKeys,
@@ -1693,8 +1659,8 @@ cells! {
         max_mq: 7,
     },
     SpiritBossKey: BossKey {
-        active: Box::new(|keys| keys.spirit_temple),
-        toggle: Box::new(|keys| keys.spirit_temple = !keys.spirit_temple),
+        active: Box::new(|items| items.spirit_temple.boss_key),
+        toggle: Box::new(|items| items.spirit_temple.boss_key = !items.spirit_temple.boss_key),
     },
     SpiritKeys: CompositeKeys {
         small: TrackerCellId::SpiritSmallKeys,
@@ -1715,10 +1681,10 @@ cells! {
         max_vanilla: 4,
         max_mq: 4,
     },
-    GtgMq: Mq(Dungeon::GerudoTrainingGrounds),
+    GtgMq: Mq(Dungeon::GerudoTrainingGround),
     GtgSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.gerudo_training_grounds),
-        set: Box::new(|keys, value| keys.gerudo_training_grounds = value),
+        get: Box::new(|keys| keys.gerudo_training_ground),
+        set: Box::new(|keys, value| keys.gerudo_training_ground = value),
         max_vanilla: 9,
         max_mq: 3,
     },
@@ -1730,8 +1696,8 @@ cells! {
         max_mq: 3,
     },
     GanonBossKey: BossKey {
-        active: Box::new(|keys| keys.ganons_castle),
-        toggle: Box::new(|keys| keys.ganons_castle = !keys.ganons_castle),
+        active: Box::new(|items| items.ganons_castle.boss_key),
+        toggle: Box::new(|items| items.ganons_castle.boss_key = !items.ganons_castle.boss_key),
     },
     GanonKeys: CompositeKeys {
         small: TrackerCellId::GanonSmallKeys,

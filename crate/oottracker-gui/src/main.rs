@@ -5,7 +5,7 @@
 
 use {
     std::{
-        collections::HashMap,
+        //collections::HashMap,
         convert::Infallible as Never,
         env,
         fmt,
@@ -62,17 +62,8 @@ use {
     tokio::fs,
     url::Url,
     wheel::FromArc,
-    ootr::{
-        Rando,
-        check::Check,
-    },
     oottracker::{
         ModelState,
-        checks::{
-            self,
-            CheckStatus,
-            CheckStatusError,
-        },
         firebase,
         github::Repo,
         net::{
@@ -98,7 +89,7 @@ use {
 };
 
 mod lang;
-mod logic;
+//mod logic; //TODO
 mod subscriptions;
 
 const CELL_SIZE: u16 = 50;
@@ -141,11 +132,11 @@ fn cell_image(cell: &TrackerCellId, state: &ModelState) -> Image {
 }
 
 trait TrackerCellIdExt {
-    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message<ootr_static::Rando>>; //TODO allow ootr_dynamic::Rando
+    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message>;
 }
 
 impl TrackerCellIdExt for TrackerCellId {
-    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message<ootr_static::Rando>> { //TODO allow ootr_dynamic::Rando
+    fn view<'a>(&self, state: &ModelState, cell_button: &'a mut button::State) -> Element<'a, Message> {
         Button::new(cell_button, cell_image(self, state))
             .on_press(Message::LeftClick(*self))
             .padding(0)
@@ -173,10 +164,9 @@ impl TrackerLayoutExt for TrackerLayout {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""), Clone(bound = ""))]
-enum Message<R: Rando> {
-    CheckStatusErrorStatic(CheckStatusError<R>),
+#[derive(Debug, Clone)]
+enum Message {
+    //CheckStatusError(CheckStatusError),
     ClientDisconnected,
     CloseMenu,
     ConfigError(ui::Error),
@@ -188,7 +178,7 @@ enum Message<R: Rando> {
     KeyboardModifiers(KeyboardModifiers),
     LeftClick(TrackerCellId),
     LoadConfig(Config),
-    Logic(logic::Message<R>),
+    //Logic(logic::Message),
     MouseMoved([f32; 2]),
     Nop,
     Packet(Packet),
@@ -202,16 +192,16 @@ enum Message<R: Rando> {
     SetPort(String),
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
-    UpdateAvailableChecks(HashMap<Check<R>, CheckStatus>),
+    //UpdateAvailableChecks(HashMap<Check, CheckStatus>),
     UpdateCheck,
     UpdateCheckComplete(Option<Version>),
     UpdateCheckError(UpdateCheckError),
 }
 
-impl<R: Rando> fmt::Display for Message<R> {
+impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Message::CheckStatusErrorStatic(e) => write!(f, "error calculating checks: {}", e),
+            //Message::CheckStatusError(e) => write!(f, "error calculating checks: {}", e),
             Message::ClientDisconnected => write!(f, "connection lost"),
             Message::ConfigError(e) => write!(f, "error loading/saving preferences: {}", e),
             Message::ConnectionError(e) => write!(f, "connection error: {}", e),
@@ -293,7 +283,7 @@ impl ConnectionParams {
         };
     }
 
-    fn view<R: Rando>(&mut self) -> Element<'_, Message<R>> {
+    fn view(&mut self) -> Element<'_, Message> {
         match self {
             ConnectionParams::TcpListener => Row::new().into(),
             ConnectionParams::RetroArch { port, port_state } => Row::new()
@@ -309,7 +299,7 @@ impl ConnectionParams {
 }
 
 #[derive(Debug)]
-struct State<R: Rando> {
+struct State {
     flags: Args,
     config: Option<Config>,
     http_client: reqwest::Client,
@@ -321,16 +311,15 @@ struct State<R: Rando> {
     enable_update_checks_button: button::State,
     disable_update_checks_button: button::State,
     cell_buttons: [button::State; 52],
-    rando: Arc<R>,
     model: ModelState,
-    checks: HashMap<Check<R>, CheckStatus>,
-    logic: logic::State<R>,
-    notification: Option<(bool, Message<R>)>,
+    //checks: HashMap<Check, CheckStatus>, //TODO
+    //logic: logic::State,
+    notification: Option<(bool, Message)>,
     dismiss_notification_button: button::State,
     menu_state: Option<MenuState>,
 }
 
-impl<R: Rando> State<R> {
+impl State {
     fn layout(&self) -> TrackerLayout {
         if self.connection.as_ref().map_or(true, |connection| connection.can_change_state()) {
             TrackerLayout::from(&self.config)
@@ -347,12 +336,12 @@ impl<R: Rando> State<R> {
     ///
     /// Implemented as a separate method in case the way this is displayed is changed later, e.g. to allow multiple notifications.
     #[must_use]
-    fn notify(&mut self, message: Message<R>) -> Command<Message<R>> {
+    fn notify(&mut self, message: Message) -> Command<Message> {
         self.notification = Some((false, message));
         Command::none()
     }
 
-    fn save_config(&self) -> Command<Message<R>> {
+    fn save_config(&self) -> Command<Message> {
         if let Some(ref config) = self.config {
             let config = config.clone();
             async move {
@@ -367,9 +356,9 @@ impl<R: Rando> State<R> {
     }
 }
 
-impl Default for State<ootr_static::Rando> {
-    fn default() -> State<ootr_static::Rando> {
-        State {
+impl Default for State {
+    fn default() -> Self {
+        Self {
             flags: Args::default(),
             config: None,
             http_client: reqwest::Client::builder()
@@ -396,10 +385,9 @@ impl Default for State<ootr_static::Rando> {
                 button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
                 button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
             ],
-            rando: Arc::new(ootr_static::Rando),
             model: ModelState::default(),
-            checks: HashMap::default(),
-            logic: logic::State::default(),
+            //checks: HashMap::default(),
+            //logic: logic::State::default(),
             notification: None,
             dismiss_notification_button: button::State::default(),
             menu_state: None,
@@ -407,22 +395,22 @@ impl Default for State<ootr_static::Rando> {
     }
 }
 
-impl From<Args> for State<ootr_static::Rando> { //TODO include Rando in flags and make this impl generic
-    fn from(flags: Args) -> State<ootr_static::Rando> {
-        State {
+impl From<Args> for State {
+    fn from(flags: Args) -> Self {
+        Self {
             flags,
-            ..State::default()
+            ..Self::default()
         }
     }
 }
 
-impl Application for State<ootr_static::Rando> { //TODO include Rando in flags and make this impl generic
+impl Application for State {
     type Executor = iced::executor::Default;
-    type Message = Message<ootr_static::Rando>;
+    type Message = Message;
     type Flags = Args;
 
-    fn new(flags: Args) -> (State<ootr_static::Rando>, Command<Message<ootr_static::Rando>>) {
-        (State::from(flags), async {
+    fn new(flags: Args) -> (Self, Command<Message>) {
+        (flags.into(), async {
             match Config::new().await {
                 Ok(Some(config)) => Message::LoadConfig(config),
                 Ok(None) => Message::Nop,
@@ -439,9 +427,9 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
         }
     }
 
-    fn update(&mut self, message: Message<ootr_static::Rando>, _: &mut Clipboard) -> Command<Message<ootr_static::Rando>> {
+    fn update(&mut self, message: Message, _: &mut Clipboard) -> Command<Message> {
         match message {
-            Message::CheckStatusErrorStatic(_) => return self.notify(message),
+            //Message::CheckStatusError(_) => return self.notify(message),
             Message::ClientDisconnected => return self.notify(message),
             Message::CloseMenu => self.menu_state = None,
             Message::ConfigError(_) => return self.notify(message),
@@ -499,7 +487,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 }
                 v => unimplemented!("config version from the future: {}", v),
             },
-            Message::Logic(msg) => return self.logic.update(msg),
+            //Message::Logic(msg) => return self.logic.update(msg),
             Message::MouseMoved(pos) => self.last_cursor_pos = pos,
             Message::Nop => {}
             Message::Packet(packet) => {
@@ -532,6 +520,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                         self.model.update_knowledge();
                     }
                 }
+                /*
                 if self.flags.show_available_checks {
                     let rando = self.rando.clone();
                     let model = self.model.clone();
@@ -542,6 +531,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                         }).await.expect("status checks task panicked")
                     }.into()
                 }
+                */ //TODO
             }
             Message::ResetUpdateState => self.update_check = UpdateCheckState::Unknown(button::State::default()),
             Message::RightClick => {
@@ -590,7 +580,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 self.config.as_mut().expect("config not yet loaded").warp_song_order = warp_song_order;
                 return self.save_config()
             }
-            Message::UpdateAvailableChecks(checks) => self.checks = checks,
+            //Message::UpdateAvailableChecks(checks) => self.checks = checks,
             Message::UpdateCheck => {
                 self.update_check = UpdateCheckState::Checking;
                 let client = self.http_client.clone();
@@ -615,7 +605,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
         Command::none()
     }
 
-    fn view(&mut self) -> Element<'_, Message<ootr_static::Rando>> {
+    fn view(&mut self) -> Element<'_, Message> {
         let layout = self.layout();
         let mut cell_buttons = self.cell_buttons.iter_mut();
 
@@ -760,7 +750,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             .width(if self.flags.show_logic_tracker { Length::Units(WIDTH as u16 + 2) } else { Length::Fill })
             .height(if self.flags.show_available_checks { Length::Units(HEIGHT as u16 + 2) } else { Length::Fill })
             .into();
-        let left_column = if self.flags.show_available_checks {
+        let left_column = /*if self.flags.show_available_checks {
             let check_status_map = self.checks.iter().map(|(check, status)| (status, check)).into_group_map();
             let mut col = Column::new()
                 .push(Text::new(format!("{} checked", lang::plural(check_status_map.get(&CheckStatus::Checked).map_or(0, Vec::len), "location"))))
@@ -775,19 +765,20 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 .into()
         } else {
             items_container
-        };
+        }*/ items_container; //TODO
+        /*
         if self.flags.show_logic_tracker {
             Row::new()
                 .push(left_column)
-                .push(self.logic.view(&self.rando).map(Message::Logic))
+                .push(self.logic.view().map(Message::Logic))
                 .width(Length::Fill)
                 .into()
         } else {
             left_column
-        }
+        }*/ left_column //TODO
     }
 
-    fn subscription(&self) -> iced::Subscription<Message<ootr_static::Rando>> {
+    fn subscription(&self) -> iced::Subscription<Message> {
         Subscription::batch(vec![
             iced_native::subscription::events_with(|event, status| match (event, status) {
                 (iced_native::Event::Keyboard(iced_native::keyboard::Event::ModifiersChanged(modifiers)), _) => Some(Message::KeyboardModifiers(modifiers)),
@@ -899,7 +890,7 @@ enum UpdateCheckState {
 }
 
 impl UpdateCheckState {
-    fn view(&mut self) -> Element<'_, Message<ootr_static::Rando>> {
+    fn view(&mut self) -> Element<'_, Message> {
         match self {
             UpdateCheckState::Unknown(check_btn) => Row::new()
                 .push(Text::new(concat!("version ", env!("CARGO_PKG_VERSION"))))

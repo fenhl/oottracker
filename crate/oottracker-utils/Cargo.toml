@@ -54,15 +54,6 @@ zip = "0.5"
 git = "https://github.com/fenhl/rust-dir-lock"
 branch = "main"
 
-[target.'cfg(windows)'.dependencies.ootr]
-path = "../ootr"
-
-[target.'cfg(windows)'.dependencies.ootr-dynamic]
-path = "../ootr-dynamic"
-
-[target.'cfg(windows)'.dependencies.ootr-static]
-path = "../ootr-static"
-
 [target.'cfg(windows)'.dependencies.oottracker]
 path = "../oottracker"
 

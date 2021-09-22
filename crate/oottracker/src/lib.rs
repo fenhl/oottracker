@@ -2,41 +2,19 @@
 #![forbid(unsafe_code)]
 
 use {
-    std::{
-        collections::HashSet,
-        future::Future,
-        io::prelude::*,
-        ops::{
-            AddAssign,
-            Sub,
-        },
-        pin::Pin,
+    std::ops::{
+        AddAssign,
+        Sub,
     },
-    async_proto::{
-        Protocol,
-        ReadError,
-        WriteError,
-    },
-    collect_mac::collect,
+    async_proto::Protocol,
     enum_iterator::IntoEnumIterator as _,
     itertools::Itertools as _,
     semver::Version,
-    tokio::io::{
-        AsyncRead,
-        AsyncWrite,
-    },
-    ootr::{
-        Rando,
-        access,
-        check::Check,
-        item::Item,
+    crate::{
         model::{
             DungeonReward,
             DungeonRewardLocation,
         },
-    },
-    crate::{
-        checks::CheckExt as _,
         save::GameMode,
     },
 };
@@ -46,190 +24,51 @@ pub use crate::{
     save::Save,
 };
 
+mod check;
 pub mod checks;
 pub mod firebase;
 pub mod github;
 pub mod info_tables;
+mod item;
 mod item_ids;
 pub mod knowledge;
+pub mod model;
 pub mod net;
 pub mod proto;
 pub mod ram;
 pub mod region;
 pub mod save;
 mod scene;
+mod settings;
 pub mod ui;
 pub mod websocket;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ModelState<R: Rando> {
-    pub knowledge: Knowledge<R>,
+#[derive(Debug, Default, Clone, PartialEq, Eq, Protocol)]
+pub struct ModelState {
+    pub knowledge: Knowledge,
     pub ram: Ram,
 }
 
-impl<R: Rando> ModelState<R> {
+impl ModelState {
     pub fn update_knowledge(&mut self) {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
         if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
-            self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::LinksPocket);
+            self.knowledge.set_dungeon_reward_location(reward, DungeonRewardLocation::LinksPocket);
         }
     }
-
-    /// If access depends on other checks (including an event or the value of an unknown setting), those checks are returned.
-    pub(crate) fn can_access(&self, rando: &R, rule: &access::Expr<R>) -> Result<bool, HashSet<Check<R>>> {
-        Ok(match rule {
-            access::Expr::All(rules) => {
-                let mut deps = HashSet::default();
-                for rule in rules {
-                    match self.can_access(rando, rule) {
-                        Ok(true) => {}
-                        Ok(false) => return Ok(false),
-                        Err(part_deps) => deps.extend(part_deps),
-                    }
-                }
-                if deps.is_empty() { true } else { return Err(deps) }
-            }
-            access::Expr::Any(rules) => {
-                let mut deps = HashSet::default();
-                for rule in rules {
-                    match self.can_access(rando, rule) {
-                        Ok(true) => return Ok(true),
-                        Ok(false) => {}
-                        Err(part_deps) => deps.extend(part_deps),
-                    }
-                }
-                if deps.is_empty() { false } else { return Err(deps) }
-            }
-            access::Expr::AnonymousEvent(at_check, id) => Check::AnonymousEvent(Box::new(at_check.clone()), *id).checked(self).expect(&format!("unimplemented anonymous event check: {} for {}", id, at_check)),
-            access::Expr::Eq(left, right) => self.access_exprs_eq(rando, left, right)?,
-            access::Expr::Event(event) | access::Expr::LitStr(event) => Check::<R>::Event(event.clone()).checked(self).expect(&format!("unimplemented event check: {}", event)),
-            access::Expr::HasStones(count) => self.access_expr_le_val(count, self.ram.save.quest_items.num_stones())?,
-            access::Expr::Item(item, count) => self.access_expr_le_val(count, self.ram.save.amount_of_item(item))?,
-            access::Expr::LogicHelper(helper_name, args) => {
-                let helpers = rando.logic_helpers().expect("failed to load logic helpers");
-                let (params, helper) = helpers.get(helper_name).expect("no such logic helper");
-                self.can_access(rando, &helper.resolve_args(params, args))?
-            }
-            access::Expr::Not(inner) => !self.can_access(rando, inner)?,
-            access::Expr::Setting(setting) => if let Some(&setting_value) = self.knowledge.bool_settings.get(setting) {
-                setting_value
-            } else {
-                return Err(collect![Check::Setting(setting.clone())])
-            },
-            access::Expr::TrialActive(trial) => if let Some(&trial_active) = self.knowledge.active_trials.get(trial) {
-                trial_active
-            } else {
-                return Err(collect![Check::TrialActive(*trial)])
-            },
-            access::Expr::Trick(trick) => if let Some(trick_value) = self.knowledge.tricks.as_ref().map_or(Some(false), |tricks| tricks.get(trick).copied()) {
-                trick_value
-            } else {
-                return Err(collect![Check::Trick(trick.clone())])
-            },
-            access::Expr::Time(range) => self.ram.save.time_of_day.matches(*range), //TODO take location of check into account, as well as available ways to pass time
-            access::Expr::True => true,
-            _ => unimplemented!("can_access for {:?}", rule),
-        })
-    }
-
-    fn access_exprs_eq<'a>(&self, rando: &R, left: &'a access::Expr<R>, right: &'a access::Expr<R>) -> Result<bool, HashSet<Check<R>>> {
-        Ok(match (left, right) {
-            (access::Expr::All(exprs), expr) | (expr, access::Expr::All(exprs)) => {
-                let mut deps = HashSet::default();
-                for other in exprs {
-                    match self.access_exprs_eq(rando, expr, other) {
-                        Ok(true) => {}
-                        Ok(false) => return Ok(false),
-                        Err(part_deps) => deps.extend(part_deps),
-                    }
-                }
-                if deps.is_empty() { true } else { return Err(deps) }
-            }
-            (access::Expr::Any(exprs), expr) | (expr, access::Expr::Any(exprs)) => {
-                let mut deps = HashSet::default();
-                for other in exprs {
-                    match self.access_exprs_eq(rando, expr, other) {
-                        Ok(true) => return Ok(true),
-                        Ok(false) => {}
-                        Err(part_deps) => deps.extend(part_deps),
-                    }
-                }
-                if deps.is_empty() { false } else { return Err(deps) }
-            }
-            (access::Expr::Age, access::Expr::LitStr(s)) if s == "child" => !self.ram.save.is_adult,
-            (access::Expr::Age, access::Expr::LitStr(s)) if s == "adult" => self.ram.save.is_adult,
-            (access::Expr::Age, access::Expr::StartingAge) => true, // we always assume that we started as the current age, since going to the other age requires finding the Temple of Time first
-            (access::Expr::ForAge(age1), access::Expr::ForAge(age2)) => age1 == age2,
-            (access::Expr::Item(item1, count1), access::Expr::Item(item2, count2)) => item1 == item2 && self.access_exprs_eq(rando, count1, count2)?,
-            (access::Expr::Item(item, count), access::Expr::LitStr(s)) |
-            (access::Expr::LitStr(s), access::Expr::Item(item, count)) => if self.access_expr_eq_val(count, 1)? {
-                *item == Item::from_str(rando, s).expect(&format!("tried to compare item with non-item string literal {}", s))
-            } else {
-                false // multiple items are never the same as another single item
-            },
-            (access::Expr::LitInt(n1), access::Expr::LitInt(n2)) => n1 == n2,
-            (access::Expr::LitStr(s1), access::Expr::LitStr(s2)) => s1 == s2,
-            (access::Expr::LogicHelper(helper_name, args), expr) | (expr, access::Expr::LogicHelper(helper_name, args)) => {
-                let helpers = rando.logic_helpers().expect("failed to load logic helpers");
-                let (params, helper) = helpers.get(helper_name).expect("no such logic helper");
-                self.access_exprs_eq(rando, &helper.resolve_args(params, args), expr)?
-            }
-            (access::Expr::Setting(setting), access::Expr::LitStr(_)) => return Err(collect![Check::Setting(setting.clone())]), //TODO check knowledge
-            (_, _) => unimplemented!("comparison of access expressions {:?} and {:?}", left, right),
-        })
-    }
-
-    fn access_expr_eq_val(&self, expr: &access::Expr<R>, value: u8) -> Result<bool, HashSet<Check<R>>> {
-        Ok(match expr {
-            access::Expr::LitInt(n) => *n == value,
-            _ => unimplemented!("access expr {:?} == value", expr),
-        })
-    }
-
-    fn access_expr_le_val(&self, expr: &access::Expr<R>, value: u8) -> Result<bool, HashSet<Check<R>>> {
-        Ok(match expr {
-            access::Expr::LitInt(n) => *n <= value,
-            _ => unimplemented!("access expr {:?} <= value", expr),
-        })
-    }
 }
 
-impl<R: Rando> Protocol for ModelState<R> { //TODO derive
-    fn read<'a, Rd: AsyncRead + Unpin + Send + 'a>(stream: &'a mut Rd) -> Pin<Box<dyn Future<Output = Result<Self, ReadError>> + Send + 'a>> {
-        Box::pin(async move {
-            Ok(Self {
-                knowledge: Knowledge::read(stream).await?,
-                ram: Ram::read(stream).await?,
-            })
-        })
-    }
-
-    fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.knowledge.write(sink).await?;
-            self.ram.write(sink).await?;
-            Ok(())
-        })
-    }
-
-    fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
-        self.knowledge.write_sync(sink)?;
-        self.ram.write_sync(sink)?;
-        Ok(())
-    }
-}
-
-impl AddAssign<ModelDelta> for ModelState<ootr_static::Rando> {
+impl AddAssign<ModelDelta> for ModelState {
     fn add_assign(&mut self, rhs: ModelDelta) {
         self.knowledge = rhs.knowledge;
         self.ram += rhs.ram;
     }
 }
 
-impl<'a, 'b> Sub<&'b ModelState<ootr_static::Rando>> for &'a ModelState<ootr_static::Rando> {
+impl<'a, 'b> Sub<&'b ModelState> for &'a ModelState {
     type Output = ModelDelta;
 
-    fn sub(self, rhs: &ModelState<ootr_static::Rando>) -> ModelDelta {
+    fn sub(self, rhs: &ModelState) -> ModelDelta {
         ModelDelta {
             knowledge: self.knowledge.clone(), //TODO only include new knowledge?
             ram: &self.ram - &rhs.ram,
@@ -240,7 +79,7 @@ impl<'a, 'b> Sub<&'b ModelState<ootr_static::Rando>> for &'a ModelState<ootr_sta
 /// The difference between two model states.
 #[derive(Debug, Clone, Protocol)]
 pub struct ModelDelta {
-    knowledge: Knowledge<ootr_static::Rando>, //TODO support other Rando impls? //TODO use a separate knowledge delta format?
+    knowledge: Knowledge, //TODO use a separate knowledge delta format?
     ram: ram::Delta,
 }
 

@@ -14,7 +14,8 @@ libc = "0.2"
 semver = "1"
 
 [dependencies.async-proto]
-version = "0.8"
+#version = "0.8"
+path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto" #TODO publish changes
 features = ["write-sync"]
 
 [dependencies.oottracker]

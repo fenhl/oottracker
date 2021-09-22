@@ -14,7 +14,6 @@ use {
         },
         io::{
             self,
-            Cursor,
             prelude::*,
         },
         sync::Arc,
@@ -22,12 +21,6 @@ use {
     convert_case::{
         Case,
         Casing as _,
-    },
-    derive_more::From,
-    directories::ProjectDirs,
-    graphql_client::{
-        GraphQLQuery,
-        Response,
     },
     itertools::Itertools as _,
     proc_macro::TokenStream,
@@ -58,27 +51,11 @@ pub fn version(_: TokenStream) -> TokenStream {
     })
 }
 
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "../../assets/graphql/github-schema.graphql",
-    query_path = "../../assets/graphql/github-devr-version.graphql",
-    response_derives = "Debug",
-)]
-struct DevRVersionQuery;
-
 #[derive(Debug, From)]
 enum Error {
-    EmptyResponse,
-    Io(io::Error),
-    MissingHomeDir,
-    MissingRepo,
     MissingVanillaSetting(String),
-    MissingVersionPy,
-    MissingVersionText,
     Rando(ootr_dynamic::RandoErr),
-    Reqwest(reqwest::Error),
     SettingsKnowledge(ootr::settings::KnowledgeTypeError),
-    Zip(ZipError),
 }
 
 /// A wrapper type around `Expr<ootr_dynamic::Rando>` that's quoted as if it were an `Expr<ootr_static::Rando>`
@@ -226,44 +203,6 @@ pub fn derive_rando(input: TokenStream) -> TokenStream {
 }
 
 fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
-    let project_dirs = ProjectDirs::from("net", "Fenhl", "RSL").ok_or(Error::MissingHomeDir)?; // re-use rando copy from https://github.com/fenhl/plando-random-settings/tree/riir
-    let cache_dir = project_dirs.cache_dir();
-    let client = reqwest::blocking::Client::builder()
-        .user_agent(concat!("oottracker/", env!("CARGO_PKG_VERSION")))
-        .http2_prior_knowledge()
-        .use_rustls_tls()
-        .https_only(true)
-        .build()?;
-    // ensure the correct randomizer version is installed
-    let remote_version_string = match client.post("https://api.github.com/graphql")
-        .bearer_auth(include_str!("../../../assets/release-token"))
-        .json(&DevRVersionQuery::build_query(dev_r_version_query::Variables {}))
-        .send()?
-        .error_for_status()?
-        .json::<Response<dev_r_version_query::ResponseData>>()?
-        .data.ok_or(Error::EmptyResponse)?
-        .repository.ok_or(Error::MissingRepo)?
-        .object.ok_or(Error::MissingVersionPy)?
-    {
-        dev_r_version_query::DevRVersionQueryRepositoryObject::Blob(blob) => blob.text.ok_or(Error::MissingVersionText)?,
-        on => panic!("unexpected GraphQL interface: {:?}", on),
-    };
-    let rando_path = cache_dir.join("ootr-latest");
-    if rando_path.join("version.py").exists() {
-        let mut local_version_string = String::default();
-        File::open(rando_path.join("version.py"))?.read_to_string(&mut local_version_string)?;
-        if remote_version_string.trim() != local_version_string.trim() {
-            fs::remove_dir_all(&rando_path)?;
-        }
-    }
-    if !rando_path.exists() {
-        let rando_download = client.get("https://github.com/Roman971/OoT-Randomizer/archive/Dev-R.zip")
-            .send()?
-            .error_for_status()?
-            .bytes()?;
-        ZipArchive::new(Cursor::new(rando_download))?.extract(&cache_dir)?;
-        fs::rename(cache_dir.join("OoT-Randomizer-Dev-R"), &rando_path)?;
-    }
     let (region_names, default_settings, vanilla_settings, data) = Python::with_gil(|py| {
         let rando = ootr_dynamic::Rando::new(py, rando_path);
         let region_names = rando.regions()?.iter().map(|region| region.name.clone()).collect::<BTreeSet<_>>();
@@ -299,133 +238,6 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
             (quote!(#region_name => Ok(Self::#ident),), quote!(Self::#ident => #region_name,), ident)
         })
         .multiunzip::<(Vec<_>, Vec<_>, Vec<_>)>();
-    let (
-        settings_knowledge_types,
-        settings_knowledge_fields,
-        settings_knowledge_defaults,
-        settings_knowledge_vanilla,
-        settings_knowledge_get_arms,
-        settings_knowledge_update_arms,
-        settings_knowledge_remove_arms,
-    ) = default_settings.0.into_iter()
-        .map(|(name, value)| {
-            let name_ident = Ident::new(&name, Span::call_site());
-            Ok::<_, Error>(match value {
-                ootr::settings::KnowledgeValue::Bool(_) => {
-                    let quoted_vanilla = vanilla_settings.get::<bool>(&name)?
-                        .ok_or_else(|| Error::MissingVanillaSetting(name.to_string()))?
-                        .quote();
-                    (
-                        quote!(),
-                        quote!(#name_ident: Option<bool>),
-                        quote!(#name_ident: None),
-                        quote!(#name_ident: Some(#quoted_vanilla)),
-                        quote!(#name => Some(T::from_bool(self.#name_ident)?)),
-                        quote!(#name => self.#name_ident = value.into_bool()?),
-                        quote!(#name => self.#name_ident = None),
-                    )
-                }
-                ootr::settings::KnowledgeValue::Int(range) => {
-                    let quoted_range = range.quote();
-                    let quoted_vanilla = vanilla_settings.get::<u8>(&name)?
-                        .ok_or_else(|| Error::MissingVanillaSetting(name.to_string()))?
-                        .quote();
-                    (
-                        quote!(),
-                        quote!(#name_ident: RangeInclusive<u8>), //TODO bounds checks?
-                        quote!(#name_ident: #quoted_range),
-                        quote!(#name_ident: #quoted_vanilla..=#quoted_vanilla),
-                        quote!(#name => Some(T::from_int(self.#name_ident.clone())?)),
-                        quote!(#name => self.#name_ident = value.into_int()?),
-                        quote!(#name => self.#name_ident = #quoted_range),
-                    )
-                }
-                ootr::settings::KnowledgeValue::String(choices) => {
-                    let vanilla_choice = vanilla_settings.get::<Cow<'static, str>>(&name)?
-                        .ok_or_else(|| Error::MissingVanillaSetting(name.to_string()))?;
-                    let type_ident = Ident::new(&format!("{}Knowledge", name.to_case(Case::Pascal)), Span::call_site());
-                    let (choice_idents, vanilla_choices, choices) = choices.into_iter()
-                        .map(|choice| (
-                            Ident::new(match &*choice {
-                                "0" => "zero",
-                                "1" => "one",
-                                "2" => "two",
-                                "3" => "three",
-                                "4" => "four",
-                                "witching-hour" => "witching_hour",
-                                _ => &choice,
-                            }, Span::call_site()),
-                            (*choice == vanilla_choice).quote(),
-                            choice,
-                        ))
-                        .multiunzip::<(Vec<_>, Vec<_>, Vec<_>)>();
-                    (
-                        quote! {
-                            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-                            pub struct #type_ident {
-                                #(#choice_idents: bool,)*
-                            }
-
-                            impl Default for #type_ident {
-                                fn default() -> Self {
-                                    Self {
-                                        #(#choice_idents: true,)*
-                                    }
-                                }
-                            }
-
-                            impl TryFrom<HashSet<Cow<'static, str>>> for #type_ident {
-                                type Error = ootr::settings::KnowledgeTypeError;
-
-                                fn try_from(mut set: HashSet<Cow<'static, str>>) -> Result<Self, ootr::settings::KnowledgeTypeError> {
-                                    let choices = Self {
-                                        #(#choice_idents: set.remove(#choices),)*
-                                    };
-                                    if set.is_empty() {
-                                        Ok(choices)
-                                    } else {
-                                        Err(ootr::settings::KnowledgeTypeError::StrInvalid)
-                                    }
-                                }
-                            }
-
-                            impl From<#type_ident> for HashSet<Cow<'static, str>> {
-                                fn from(choices: #type_ident) -> Self {
-                                    let mut set = HashSet::default();
-                                    #(
-                                        if choices.#choice_idents { set.insert(Cow::Borrowed(#choices)); }
-                                    )*
-                                    set
-                                }
-                            }
-                        },
-                        quote!(#name_ident: #type_ident),
-                        quote!(#name_ident: Default::default()),
-                        quote!(#name_ident: #type_ident { #(#choice_idents: #vanilla_choices,)* }),
-                        quote!(#name => Some(T::from_string(&self.#name_ident.into())?)),
-                        quote!(#name => self.#name_ident = #type_ident::try_from(value.into_string()?)?),
-                        quote!(#name => self.#name_ident = Default::default()),
-                    )
-                }
-                ootr::settings::KnowledgeValue::List(_) => {
-                    let quoted_vanilla = vanilla_settings.get::<HashMap<Cow<'static, str>, bool>>(&name)?
-                        .ok_or_else(|| Error::MissingVanillaSetting(name.to_string()))?
-                        .quote();
-                    (
-                        quote!(),
-                        quote!(#name_ident: HashMap<Cow<'static, str>, bool>), //TODO use structs with Option<bool> fields for known lists?
-                        quote!(#name_ident: HashMap::default()),
-                        quote!(#name_ident: #quoted_vanilla),
-                        quote!(#name => Some(T::from_list(&self.#name_ident)?)),
-                        quote!(#name => self.#name_ident = value.into_list()?),
-                        quote!(#name => self.#name_ident = HashMap::default()),
-                    )
-                }
-            })
-        })
-        .try_collect::<_, Vec<_>, _>()?
-        .into_iter()
-        .multiunzip::<(Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>)>();
     Ok(quote! {
         #(#lazy_statics)*
 

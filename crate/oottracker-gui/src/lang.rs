@@ -1,3 +1,5 @@
+#![allow(unused)] //TODO
+
 use {
     std::fmt,
     num_traits::One,

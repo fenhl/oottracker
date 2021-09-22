@@ -1,47 +1,43 @@
+#![allow(unused)] //TODO
+
 use {
     std::fmt,
-    derivative::Derivative,
-    quote_value::QuoteValue,
     crate::{
-        Rando,
         model::{
             Dungeon,
             Medallion,
         },
-        region::Mq,
+        region::Region,
     },
 };
 
-#[derive(Derivative, QuoteValue)]
-#[derivative(Debug(bound = ""), Clone(bound = ""), PartialEq(bound = ""), Eq(bound = ""), Hash(bound = ""))]
-#[quote_value(where(R::RegionName: QuoteValue))]
-pub enum Check<R: Rando> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Check {
     /// Constructed using `at` or `here`.
-    AnonymousEvent(Box<Check<R>>, usize),
+    AnonymousEvent(Box<Check>, usize),
     Event(String),
     /// What's behind an entrance.
-    Exit {
-        from: R::RegionName,
-        from_mq: Option<Mq>,
-        to: R::RegionName,
+    Exit { // don't merge with knowledge checks, as there should only be 1 check per exit, not 1 per possible connected entrance
+        from: Region,
+        to: Region,
     },
     /// These are the things the randomizer itself considers checks.
-    Location(String),
+    Location(String), //TODO use Location enum?
     /// Used as the context for anonymous events in logic helpers.
-    LogicHelper(String),
+    LogicHelper(String), //TODO use LogicHelper enum?
     /// Check whether the given dungeon is MQ or vanilla.
-    Mq(Dungeon),
-    Setting(String), //TODO include the partitions that can be checked
-    TrialActive(Medallion),
-    Trick(String),
+    Mq(Dungeon), //TODO merge with Knowledge check
+    Setting(String), //TODO replace with a more generic Knowledge check that checks whether the current knowledge is consistent (subset → true) with the given one, inconsistent (neither subset nor superset → false), or indeterminate (true superset → None)
+    TrialActive(Medallion), //TODO merge with Knowledge check
+    Trick(String), //TODO merge with Knowledge check
 }
 
-impl<R: Rando> fmt::Display for Check<R> {
+impl fmt::Display for Check {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Check::AnonymousEvent(at_check, id) => write!(f, "requirement {} for {}", id, at_check),
             Check::Event(event) => write!(f, "event: {}", event),
-            Check::Exit { from, from_mq, to } => write!(f, "{} ({}) → {}", from, from_mq.map_or_else(|| format!("overworld"), |mq| mq.to_string()), to),
+            Check::Exit { from, to } => write!(f, "{} → {}", from, to),
             Check::Location(loc) => loc.fmt(f),
             Check::LogicHelper(fn_name) => write!(f, "logic helper {:?}", fn_name),
             Check::Mq(dungeon) => write!(f, "is {} MQ or vanilla", dungeon),

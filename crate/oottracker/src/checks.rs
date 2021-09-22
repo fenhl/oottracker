@@ -1,50 +1,20 @@
-use {
-    std::{
-        collections::{
-            HashMap,
-            HashSet,
-        },
-        fmt,
-        io,
-        sync::Arc,
+use crate::{
+    check::Check,
+    ModelState,
+    /*
+    region::{
+        Entrance,
+        Region,
     },
-    collect_mac::collect,
-    derivative::Derivative,
-    derive_more::From,
-    itertools::{
-        EitherOrBoth,
-        Itertools as _,
-    },
-    ootr::{
-        Rando,
-        access,
-        region::{
-            Mq,
-            Region,
-        },
-    },
-    crate::{
-        Check,
-        ModelState,
-        knowledge::Entrance,
-        region::{
-            RegionExt as _,
-            RegionLookup,
-            RegionLookupError,
-        },
-    },
+    */
 };
 
 pub trait CheckExt {
-    type Rando: Rando;
-
-    fn checked(&self, model: &ModelState<Self::Rando>) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
+    fn checked(&self, model: &ModelState) -> Option<bool>; //TODO change return type to bool once all used checks are implemented
 }
 
-impl<R: Rando> CheckExt for Check<R> {
-    type Rando = R;
-
-    fn checked(&self, model: &ModelState<R>) -> Option<bool> {
+impl CheckExt for Check {
+    fn checked(&self, model: &ModelState) -> Option<bool> {
         // event and location lists from Dev-R as of commit b670183e9aff520c20ac2ee65aa55e3740c5f4b4
         if let Some(checked) = model.ram.save.gold_skulltulas.checked(self) { return Some(checked) }
         if let Some(checked) = model.ram.scene_flags().checked(self) { return Some(checked) }
@@ -52,36 +22,37 @@ impl<R: Rando> CheckExt for Check<R> {
         if let Some(checked) = model.ram.save.item_get_inf.checked(self) { return Some(checked) }
         if let Some(checked) = model.ram.save.inf_table.checked(self) { return Some(checked) }
         match self {
+            /*
             Check::AnonymousEvent(at_check, id) => match (&**at_check, id) {
                 (Check::Event(event), 0) if *event == "Deku Tree Clear" /*vanilla*/ => Some(
                     model.ram.scene_flags().deku_tree.room_clear.contains(
                         crate::scene::DekuTreeRoomClear::SCRUBS_231_PUZZLE
                     )
                 ),
-                (Check::Exit { from_mq: None, from, to }, 0) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
+                (Check::Exit { from: Region::DeathMountain, to: Region::DeathMountainSummit }, 0) => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_FIRST_BOULDER
                         | crate::scene::DeathMountainSwitches::DMT_TO_SUMMIT_SECOND_BOULDER
                     )
                 ),
-                (Check::Exit { from_mq: None, from, to }, 1) if *from == "Death Mountain" && *to == "Death Mountain Summit" => Some(
+                (Check::Exit { from: Region::DeathMountain, to: Region::DeathMountainSummit }, 1) => Some(
                     model.ram.scene_flags().death_mountain.switches.contains(
                         crate::scene::DeathMountainSwitches::BLOW_UP_DC_ENTRANCE
                         | crate::scene::DeathMountainSwitches::PLANT_BEAN
                     )
                 ),
-                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 0) if *from == "Deku Tree Lobby" && *to == "Deku Tree Basement Backroom" => Some(
+                (Check::Exit { from: Region::DekuTreeLobby, to: Region::DekuTreeBasementBackroom }, 0) => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_BURN_FIRST_WEB_TO_BACK_ROOM
                         | crate::scene::DekuTreeSwitches::LIGHT_TORCHES_AFTER_WATER_ROOM
                     )
                 ),
-                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 2) if *from == "Deku Tree Lobby" && *to == "Deku Tree Basement Backroom" => Some(
+                (Check::Exit { from: Region::DekuTreeLobby, to: Region::DekuTreeBasementBackroom }, 2) => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
                 ),
-                (Check::Exit { from_mq: Some(Mq::Vanilla), from, to }, 1) if *from == "Deku Tree Lobby" && *to == "Deku Tree Boss Room" => Some(
+                (Check::Exit { from: Region::DekuTreeLobby, to: Region::DekuTreeBossRoom }, 1) => Some(
                     model.ram.scene_flags().deku_tree.switches.contains(
                         crate::scene::DekuTreeSwitches::BASEMENT_PUSHED_BLOCK
                     )
@@ -316,24 +287,24 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Ice Cavern MQ Map Chest" => None, //TODO
                 "Ice Cavern MQ Freestanding PoH" => None, //TODO
 
-                // Gerudo Training Grounds MQ
-                "Gerudo Training Grounds MQ Lobby Right Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Lobby Left Chest" => None, //TODO
-                "Gerudo Training Grounds MQ First Iron Knuckle Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Before Heavy Block Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Eye Statue Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Flame Circle Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Second Iron Knuckle Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Dinolfos Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Ice Arrows Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Right Central Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Path First Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Right Side Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Path Third Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Path Second Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Hidden Ceiling Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Underwater Silver Rupee Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Heavy Block Chest" => None, //TODO
+                // Gerudo Training Ground MQ
+                "Gerudo Training Ground MQ Lobby Right Chest" => None, //TODO
+                "Gerudo Training Ground MQ Lobby Left Chest" => None, //TODO
+                "Gerudo Training Ground MQ First Iron Knuckle Chest" => None, //TODO
+                "Gerudo Training Ground MQ Before Heavy Block Chest" => None, //TODO
+                "Gerudo Training Ground MQ Eye Statue Chest" => None, //TODO
+                "Gerudo Training Ground MQ Flame Circle Chest" => None, //TODO
+                "Gerudo Training Ground MQ Second Iron Knuckle Chest" => None, //TODO
+                "Gerudo Training Ground MQ Dinolfos Chest" => None, //TODO
+                "Gerudo Training Ground MQ Ice Arrows Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Right Central Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Path First Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Right Side Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Path Third Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Path Second Chest" => None, //TODO
+                "Gerudo Training Ground MQ Hidden Ceiling Chest" => None, //TODO
+                "Gerudo Training Ground MQ Underwater Silver Rupee Chest" => None, //TODO
+                "Gerudo Training Ground MQ Heavy Block Chest" => None, //TODO
 
                 // Ganon's Castle MQ
                 "Ganons Castle MQ Water Trial Chest" => None, //TODO
@@ -745,10 +716,13 @@ impl<R: Rando> CheckExt for Check<R> {
             Check::Setting(_) => panic!("setting checks not implemented"), //TODO check knowledge
             Check::TrialActive(_) => panic!("trial-active checks not implemented"), //TODO check knowledge
             Check::Trick(_) => panic!("trick checks not implemented"), //TODO check knowledge, allow the player to decide their own tricks if unknown
+            */
+            _ => None, //TODO
         }
     }
 }
 
+/*
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CheckStatus {
     Checked,
@@ -756,20 +730,14 @@ pub enum CheckStatus {
     NotYetReachable, //TODO split into definitely/possibly/not reachable later in order to determine ALR setting
 }
 
-#[derive(Derivative, From)]
-#[derivative(Debug(bound = ""), Clone(bound = ""))]
-pub enum CheckStatusError<R: Rando> {
+#[derive(Debug, Clone, From, FromArc)]
+pub enum CheckStatusError {
+    #[from_arc]
     Io(Arc<io::Error>),
-    RegionLookup(RegionLookupError<R>),
+    RegionLookup(RegionLookupError),
 }
 
-impl<R: Rando> From<io::Error> for CheckStatusError<R> { //TODO add support for generics to FromArc derive macro
-    fn from(e: io::Error) -> CheckStatusError<R> {
-        CheckStatusError::Io(Arc::new(e))
-    }
-}
-
-impl<R: Rando> fmt::Display for CheckStatusError<R> {
+impl fmt::Display for CheckStatusError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CheckStatusError::Io(e) => write!(f, "I/O error: {}", e),
@@ -778,50 +746,49 @@ impl<R: Rando> fmt::Display for CheckStatusError<R> {
     }
 }
 
-pub fn status<R: Rando>(rando: &R, model: &ModelState<R>) -> Result<HashMap<Check<R>, CheckStatus>, CheckStatusError<R>> {
+pub fn status(model: &ModelState) -> Result<HashMap<Check, CheckStatus>, CheckStatusError> {
     let mut map = HashMap::default();
-    let all_regions = Region::all(rando)?;
-    let mut reachable_regions = collect![as HashSet<_>: Region::root(rando)?];
+    let all_regions = Region::into_enum_iter();
+    let mut reachable_regions = collect![as HashSet<_>: Region::Root];
     let mut unhandled_reachable_checks = Vec::default();
-    match model.ram.current_region(rando)? {
-        //TODO run separate logic check using knowledge only and not considering current region
-        RegionLookup::Overworld(region)
-        | RegionLookup::Dungeon(EitherOrBoth::Left(region))
-        | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => { reachable_regions.insert(region); }
-        //TODO move checks to appropriate spots
-        RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, _)) => unhandled_reachable_checks.push((Check::Mq(vanilla.dungeon.expect("MQ-ambiguous non-dungeon region").0), access::Expr::True)),
+    let current_region = model.current_region()?;
+    //TODO run separate logic check using knowledge only and not considering current region
+    if let Some(dungeon) = current_region.mq_check() {
+        unhandled_reachable_checks.push((Check::Mq(dungeon), |_| true));
+    } else {
+        reachable_regions.insert(current_region);
     }
     let mut unhandled_reachable_regions = reachable_regions.iter().cloned().collect_vec();
     let mut unhandled_unreachable_regions = all_regions.iter().filter(|region_info| !reachable_regions.contains(*region_info)).collect::<HashSet<_>>();
-    let mut unhandled_unreachable_checks = Vec::<(_, access::Expr<R>)>::default();
+    let mut unhandled_unreachable_checks = Vec::<(_, _ /*access::Expr*/ /*TODO access function type */)>::default();
     loop {
         if let Some(region) = unhandled_reachable_regions.pop() {
-            for (exit, rule) in &region.exits {
-                unhandled_reachable_checks.push((Check::Exit { from_mq: region.dungeon.map(|(_, mq)| mq), from: region.name.clone(), to: exit.clone() }, rule.clone()));
+            for (exit, rule) in &region.exits() {
+                unhandled_reachable_checks.push((Check::Exit { from: region, to: exit }, rule.clone()));
             }
             //TODO events, locations, setting checks
         } else if let Some((check, rule)) = unhandled_reachable_checks.pop() {
             let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
-                if let Check::Exit { ref to, .. } = check {
+                if let Check::Exit { to, .. } = check {
                     let region_behind_exit = to; //TODO entrance rando support (look up exit knowledge)
-                    if !reachable_regions.iter().any(|region| region.name == *region_behind_exit) {
-                        if model.can_access(rando, &rule) == Ok(true) {
+                    if !reachable_regions.iter().any(|region| region == region_behind_exit) {
+                        if model.can_access(&rule) == Ok(true) {
                             // exit is checked (i.e. we know what's behind it) and reachable (i.e. we can actually use it), so the region behind it becomes reachable
-                            let region_info = match Region::new(rando, region_behind_exit)? {
+                            let region_info = match Region::new(region_behind_exit)? {
                                 RegionLookup::Overworld(region)
                                 | RegionLookup::Dungeon(EitherOrBoth::Left(region))
                                 | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => region,
                                 RegionLookup::Dungeon(EitherOrBoth::Both(_, _)) => unimplemented!(), //TODO disambiguate MQ-ness based on knowledge, add MQ-ness check if unknown
                             };
                             unhandled_unreachable_regions.remove(&region_info);
-                            reachable_regions.insert(Arc::clone(&region_info));
+                            reachable_regions.insert(region_info);
                             unhandled_reachable_regions.push(region_info);
                         }
                     }
                 }
                 CheckStatus::Checked
             } else {
-                match model.can_access(rando, &rule) {
+                match model.can_access(&rule) {
                     Ok(true) => CheckStatus::Reachable,
                     Ok(false) => CheckStatus::NotYetReachable,
                     Err(deps) => {
@@ -842,7 +809,7 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState<R>) -> Result<HashMap<Chec
             let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
                 CheckStatus::Checked
             } else {
-                match model.can_access(rando, &rule) {
+                match model.can_access(&rule) {
                     Ok(_) => CheckStatus::NotYetReachable,
                     Err(deps) => {
                         map.extend(deps.into_iter().map(|dep| (dep, CheckStatus::NotYetReachable))); //TODO check reachability of dependency
@@ -858,12 +825,11 @@ pub fn status<R: Rando>(rando: &R, model: &ModelState<R>) -> Result<HashMap<Chec
     Ok(map)
 }
 
-#[cfg(not(test))] use ootr_static as _; // used below
-
 #[test]
 fn default_status() {
-    if let Err(e) = status(&ootr_static::Rando, &ModelState::default()) {
+    if let Err(e) = status(&ModelState::default()) {
         eprintln!("{:?}", e);
         panic!("{}", e) // for better error message
     }
 }
+*/ //TODO

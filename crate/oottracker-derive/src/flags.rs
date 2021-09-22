@@ -1,0 +1,845 @@
+use {
+    std::convert::TryFrom,
+    convert_case::{
+        Case,
+        Casing as _,
+    },
+    itertools::Itertools as _,
+    proc_macro2::{
+        Span,
+        TokenStream,
+    },
+    quote::quote,
+    syn::{
+        Expr,
+        Ident,
+        Index,
+        LitInt,
+        LitStr,
+        Token,
+        Visibility,
+        braced,
+        bracketed,
+        parse::{
+            Parse,
+            ParseStream,
+            Result,
+        },
+        punctuated::Punctuated,
+    },
+};
+
+enum FlagName {
+    Event(LitStr),
+    Ident(Ident),
+    Lit(LitStr),
+    Entrance(Ident, Ident),
+    Prereq(LitInt, Box<FlagName>),
+}
+
+impl FlagName {
+    fn to_ident(&self) -> Ident {
+        match self {
+            FlagName::Event(lit) | FlagName::Lit(lit) => Ident::new(&lit.value().replace('&', "AND").to_case(Case::ScreamingSnake), lit.span()),
+            FlagName::Ident(ident) => ident.clone(),
+            FlagName::Entrance(from, to) => Ident::new(&format!("ENTRANCE_{}_TO_{}", from.to_string().to_case(Case::ScreamingSnake), to.to_string().to_case(Case::ScreamingSnake)), to.span()),
+            FlagName::Prereq(id, at_check) => Ident::new(&format!("REQ_{}_FOR_{}", id, at_check.to_ident()), id.span()),
+        }
+    }
+}
+
+impl Parse for FlagName {
+    fn parse(input: ParseStream<'_>) -> Result<FlagName> {
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Ident) {
+            let ident = input.parse::<Ident>()?;
+            if ident.to_string() == "event" {
+                input.parse().map(FlagName::Event)
+            } else {
+                let lookahead = input.lookahead1();
+                if lookahead.peek(Token![->]) {
+                    input.parse::<Token![->]>()?;
+                    let to = input.parse()?;
+                    Ok(FlagName::Entrance(ident, to))
+                } else if lookahead.peek(Token![=]) {
+                    Ok(FlagName::Ident(ident))
+                } else {
+                    Err(lookahead.error())
+                }
+            }
+        } else if lookahead.peek(LitStr) {
+            input.parse().map(FlagName::Lit)
+        } else if lookahead.peek(LitInt) {
+            let lit = input.parse()?;
+            input.parse::<Token![for]>()?;
+            Ok(FlagName::Prereq(lit, Box::new(input.parse()?)))
+        } else {
+            Err(lookahead.error())
+        }
+    }
+}
+
+struct Flag {
+    name: FlagName,
+    value: LitInt,
+}
+
+impl Parse for Flag {
+    fn parse(input: ParseStream<'_>) -> Result<Flag> {
+        let name = input.parse()?;
+        input.parse::<Token![=]>()?;
+        let value = input.parse()?;
+        Ok(Flag { name, value })
+    }
+}
+
+struct Flags {
+    idx: LitInt,
+    fields: Punctuated<Flag, Token![,]>,
+}
+
+impl Parse for Flags {
+    fn parse(input: ParseStream<'_>) -> Result<Flags> {
+        let idx = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let content;
+        braced!(content in input);
+        let fields = content.parse_terminated(Flag::parse)?;
+        Ok(Flags { idx, fields })
+    }
+}
+
+pub(crate) struct FlagsList {
+    vis: Visibility,
+    struct_token: Token![struct],
+    name: Ident,
+    field_ty: Ident,
+    num_fields: LitInt,
+    fields: Punctuated<Flags, Token![,]>,
+}
+
+impl Parse for FlagsList {
+    fn parse(input: ParseStream<'_>) -> Result<FlagsList> {
+        let vis = input.parse()?;
+        let struct_token = input.parse()?;
+        let name = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let content;
+        bracketed!(content in input);
+        let field_ty = content.parse()?;
+        content.parse::<Token![;]>()?;
+        let num_fields = content.parse()?;
+        let content;
+        braced!(content in input);
+        let fields = content.parse_terminated(Flags::parse)?;
+        Ok(FlagsList { vis, struct_token, name, field_ty, num_fields, fields })
+    }
+}
+
+pub(crate) fn flags_list(input: FlagsList) -> TokenStream {
+    let FlagsList { vis, struct_token, name, field_ty, num_fields, fields } = input;
+    let field_ty_size = match &field_ty.to_string()[..] {
+        "i8" | "u8" => 1,
+        "i16" | "u16" => 2,
+        "i32" | "u32" => 4,
+        "i64" | "u64" => 8,
+        _ => return quote!(compile_error!("unsupported field type: {}", field_ty)).into(),
+    };
+    let num_fields = match num_fields.base10_parse() {
+        Ok(n) => n,
+        Err(e) => return e.to_compile_error().into(),
+    };
+    let mut all_fields = (0..num_fields).map(|_| None).collect_vec();
+    for Flags { idx, fields } in fields {
+        let idx = match idx.base10_parse::<usize>() {
+            Ok(n) => n,
+            Err(e) => return e.to_compile_error().into(),
+        };
+        all_fields[idx] = Some(fields);
+    }
+    let fields_tys = (0..num_fields).map(|i|
+        Ident::new(&format!("{}{}", name, i), Span::call_site())
+    ).collect_vec();
+    let contents = all_fields.iter().zip(&fields_tys).map(|(fields, fields_ty)| {
+        if fields.is_some() { quote!(#vis #fields_ty) } else { quote!(#fields_ty) }
+    }).collect_vec();
+    let tup_idxs = (0..num_fields).map(Index::from).collect_vec();
+    let mut entrance_prereqs = Vec::default();
+    let mut event_checks = Vec::default();
+    let mut location_checks = Vec::default();
+    for ((fields, idx), fields_ty) in all_fields.iter().zip(&tup_idxs).zip(&fields_tys) {
+        if let Some(fields) = fields {
+            for Flag { name, .. } in fields {
+                let name_ident = name.to_ident();
+                match name {
+                    FlagName::Event(event_name_lit) => {
+                        event_checks.push(quote!(#event_name_lit => Some(self.#idx.contains(#fields_ty::#name_ident))));
+                    }
+                    FlagName::Ident(_) => {} // internal use only, don't auto-generate check logic
+                    FlagName::Lit(name_lit) => {
+                        location_checks.push(quote!(#name_lit => Some(self.#idx.contains(#fields_ty::#name_ident))));
+                    }
+                    FlagName::Entrance(_, _) => unreachable!("entrance checks aren't saved in RAM"), //TODO replace with compile error
+                    FlagName::Prereq(id, at_check) => match &**at_check {
+                        FlagName::Entrance(from, to) => entrance_prereqs.push(quote!((#id, (#from, #to)) => Some(self.#idx.contains(#fields_ty::#name_ident)))),
+                        _ => unimplemented!("prereqs for non-entrance checks"),
+                    },
+                }
+            }
+        }
+    }
+    let start_idxs = (0..num_fields).map(|i| i * field_ty_size);
+    let end_idxs = (1..=num_fields).map(|i| i * field_ty_size);
+    let decls = all_fields.iter().zip(&fields_tys).map(|(fields, fields_ty)|
+        if let Some(fields) = fields {
+            let fields = fields.iter().map(|Flag { name, value }| {
+                let name_ident = name.to_ident();
+                quote!(const #name_ident = #value;)
+            });
+            let read_field = if matches!(&field_ty.to_string()[..], "u8" | "i8") {
+                quote!(raw_data[0] as #field_ty)
+            } else {
+                let read_field_ty = Ident::new(&format!("read_{}", field_ty), Span::call_site());
+                quote!(<::byteorder::BigEndian as ::byteorder::ByteOrder>::#read_field_ty(&raw_data))
+            };
+            quote! {
+                ::bitflags::bitflags! {
+                    #[derive(Default)]
+                    #vis struct #fields_ty: #field_ty {
+                        #(#fields)*
+                    }
+                }
+
+                impl<'a> ::std::convert::TryFrom<&'a [u8]> for #fields_ty {
+                    type Error = ();
+
+                    fn try_from(raw_data: &[u8]) -> Result<#fields_ty, ()> {
+                        if raw_data.len() != #field_ty_size { return Err(()) }
+                        Ok(#fields_ty::from_bits_truncate(#read_field))
+                    }
+                }
+
+                impl From<#fields_ty> for Vec<u8> {
+                    fn from(value: #fields_ty) -> Vec<u8> {
+                        value.bits().to_be_bytes().into()
+                    }
+                }
+            }
+        } else {
+            quote! {
+                #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+                struct #fields_ty;
+
+                impl<'a> ::std::convert::TryFrom<&'a [u8]> for #fields_ty {
+                    type Error = ();
+
+                    fn try_from(raw_data: &[u8]) -> Result<#fields_ty, ()> {
+                        if raw_data.len() != #field_ty_size { return Err(()) }
+                        Ok(#fields_ty)
+                    }
+                }
+
+                impl From<#fields_ty> for Vec<u8> {
+                    fn from(_: #fields_ty) -> Vec<u8> {
+                        vec![0; #field_ty_size]
+                    }
+                }
+            }
+        }
+    ).collect_vec();
+    quote! {
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+        #vis #struct_token #name(#(#contents,)*);
+
+        impl #name {
+            pub(crate) fn checked(&self, check: &crate::check::Check) -> Option<bool> {
+                match check {
+                    crate::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
+                        crate::check::Check::Exit { from, to, .. } => match (id, (from, to)) {
+                            #(#entrance_prereqs,)*
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    crate::check::Check::Event(event) => match &event[..] {
+                        #(#event_checks,)*
+                        _ => None,
+                    }
+                    crate::check::Check::Location(loc) => match &loc[..] {
+                        #(#location_checks,)*
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
+        }
+
+        impl ::std::convert::TryFrom<Vec<u8>> for #name {
+            type Error = Vec<u8>;
+
+            fn try_from(raw_data: Vec<u8>) -> Result<#name, Vec<u8>> {
+                if raw_data.len() != #num_fields * #field_ty_size { return Err(raw_data) }
+                Ok(#name(
+                    #(#fields_tys::try_from(&raw_data[#start_idxs..#end_idxs]).map_err(|()| raw_data.clone())?,)*
+                ))
+            }
+        }
+
+        impl<'a> From<&'a #name> for Vec<u8> {
+            fn from(value: &#name) -> Vec<u8> {
+                ::std::iter::empty()
+                    #(.chain(Vec::from(value.#tup_idxs)))*
+                    .collect()
+            }
+        }
+
+        #(#decls)*
+    }
+}
+
+fn scene_name_to_field(ident: &Ident) -> Ident {
+    Ident::new(&ident.to_string().to_case(Case::Snake), ident.span())
+}
+
+#[derive(PartialEq, Eq)]
+enum SceneFieldsKind {
+    Chests,
+    Switches,
+    RoomClear,
+    Collectible,
+    Unused,
+    VisitedRooms,
+    VisitedFloors,
+    GoldSkulltulas,
+}
+
+impl SceneFieldsKind {
+    fn start_idx(&self) -> usize {
+        match self {
+            SceneFieldsKind::Chests => 0x00,
+            SceneFieldsKind::Switches => 0x04,
+            SceneFieldsKind::RoomClear => 0x08,
+            SceneFieldsKind::Collectible => 0x0c,
+            SceneFieldsKind::Unused => 0x10,
+            SceneFieldsKind::VisitedRooms => 0x14,
+            SceneFieldsKind::VisitedFloors => 0x18,
+            SceneFieldsKind::GoldSkulltulas => panic!("tried to get start_idx for GoldSkulltulas"),
+        }
+    }
+
+    fn end_idx(&self) -> usize { self.start_idx() + 4 }
+
+    fn ty(&self, scene_name: &Ident) -> Ident {
+        Ident::new(&format!("{}{}", scene_name, match self {
+            SceneFieldsKind::Chests => "Chests",
+            SceneFieldsKind::Switches => "Switches",
+            SceneFieldsKind::RoomClear => "RoomClear",
+            SceneFieldsKind::Collectible => "Collectible",
+            SceneFieldsKind::Unused => "Unused",
+            SceneFieldsKind::VisitedRooms => "VisitedRooms",
+            SceneFieldsKind::VisitedFloors => "VisitedFloors",
+            SceneFieldsKind::GoldSkulltulas => "GoldSkulltulas",
+        }), Span::call_site())
+    }
+}
+
+impl TryFrom<Ident> for SceneFieldsKind {
+    type Error = syn::Error;
+
+    fn try_from(ident: Ident) -> Result<SceneFieldsKind> {
+        match &ident.to_string()[..] {
+            "chests" => Ok(SceneFieldsKind::Chests),
+            "switches" => Ok(SceneFieldsKind::Switches),
+            "room_clear" => Ok(SceneFieldsKind::RoomClear),
+            "collectible" => Ok(SceneFieldsKind::Collectible),
+            "unused" => Ok(SceneFieldsKind::Unused),
+            "visited_rooms" => Ok(SceneFieldsKind::VisitedRooms),
+            "visited_floors" => Ok(SceneFieldsKind::VisitedFloors),
+            "gold_skulltulas" => Ok(SceneFieldsKind::GoldSkulltulas),
+            _ => Err(syn::Error::new(ident.span(), "expected `chests`, `switches`, `room_clear`, `collectible`, `unused`, `visited_rooms`, `visited_floors`, or `gold_skulltulas`")),
+        }
+    }
+}
+
+impl quote::ToTokens for SceneFieldsKind {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        Ident::new(match self {
+            SceneFieldsKind::Chests => "chests",
+            SceneFieldsKind::Switches => "switches",
+            SceneFieldsKind::RoomClear => "room_clear",
+            SceneFieldsKind::Collectible => "collectible",
+            SceneFieldsKind::Unused => "unused",
+            SceneFieldsKind::VisitedRooms => "visited_rooms",
+            SceneFieldsKind::VisitedFloors => "visited_floors",
+            SceneFieldsKind::GoldSkulltulas => "gold_skulltulas",
+        }, Span::call_site()).to_tokens(tokens)
+    }
+}
+
+enum RegionName {
+    One(Ident),
+    Multiple(Expr),
+}
+
+impl Parse for RegionName {
+    fn parse(input: ParseStream<'_>) -> Result<RegionName> {
+        if input.peek(Ident) {
+            input.parse().map(RegionName::One)
+        } else {
+            input.parse().map(RegionName::Multiple)
+        }
+    }
+}
+
+enum SceneData {
+    RegionName(RegionName),
+    Fields {
+        kind: SceneFieldsKind,
+        fields: Punctuated<Flag, Token![,]>,
+    },
+}
+
+impl Parse for SceneData {
+    fn parse(input: ParseStream<'_>) -> Result<SceneData> {
+        let ident = input.parse::<Ident>()?;
+        Ok(match &*ident.to_string() {
+            "region_name" => {
+                input.parse::<Token![:]>()?;
+                SceneData::RegionName(input.parse()?)
+            }
+            _ => {
+                input.parse::<Token![:]>()?;
+                let content;
+                braced!(content in input);
+                let fields = content.parse_terminated(Flag::parse)?;
+                SceneData::Fields {
+                    kind: SceneFieldsKind::try_from(ident)?,
+                    fields,
+                }
+            }
+        })
+    }
+}
+
+struct Scene {
+    idx: LitInt,
+    name: Ident,
+    data: Punctuated<SceneData, Token![,]>,
+}
+
+impl Scene {
+    fn fields(&self) -> impl Iterator<Item = (&SceneFieldsKind, &Punctuated<Flag, Token![,]>)> {
+        self.data.iter().filter_map(|data| if let SceneData::Fields { kind, fields } = data { Some((kind, fields)) } else { None })
+    }
+}
+
+impl Parse for Scene {
+    fn parse(input: ParseStream<'_>) -> Result<Scene> {
+        let idx = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let name = input.parse()?;
+        let content;
+        braced!(content in input);
+        let data = content.parse_terminated(SceneData::parse)?;
+        Ok(Scene { idx, name, data })
+    }
+}
+
+pub(crate) struct SceneFlags {
+    vis: Visibility,
+    struct_token: Token![struct],
+    name: Ident,
+    scenes: Punctuated<Scene, Token![,]>,
+}
+
+impl Parse for SceneFlags {
+    fn parse(input: ParseStream<'_>) -> Result<SceneFlags> {
+        let vis = input.parse()?;
+        let struct_token = input.parse()?;
+        let name = input.parse()?;
+        let content;
+        braced!(content in input);
+        let scenes = content.parse_terminated(Scene::parse)?;
+        Ok(SceneFlags { vis, struct_token, name, scenes })
+    }
+}
+
+fn converted_scene_skulls_idx(scene_idx: usize) -> usize {
+    (scene_idx + 3) - 2 * (scene_idx % 4)
+}
+
+pub(crate) fn scene_flags(input: SceneFlags) -> TokenStream {
+    let SceneFlags { vis, struct_token, name, scenes } = input;
+    let scene_size = 0x1c;
+    let num_scenes = 0x65usize;
+    let skull_scenes = scenes.iter()
+        .filter(|scene| scene.fields().any(|(kind, _)| *kind == SceneFieldsKind::GoldSkulltulas))
+        .map(|Scene { idx, .. }| idx)
+        .collect_vec();
+    let contents = scenes.iter().map(|Scene { name, .. }| {
+        let scene_field = scene_name_to_field(name);
+        quote!(#vis #scene_field: #name)
+    }).collect_vec();
+    let skull_contents = scenes.iter().filter(|Scene { idx, .. }| skull_scenes.contains(&idx)).map(|Scene { name, .. }| {
+        let scene_field = scene_name_to_field(name);
+        let fields_ty = SceneFieldsKind::GoldSkulltulas.ty(&name);
+        quote!(#vis #scene_field: #fields_ty)
+    });
+    let mut entrance_prereqs = Vec::default();
+    let mut event_checks = Vec::default();
+    let mut location_checks = Vec::default();
+    let mut skull_location_checks = Vec::default();
+    let mut location_prereqs = Vec::default();
+    for scene in &scenes {
+        let scene_field = scene_name_to_field(&scene.name);
+        for (kind, fields) in scene.fields() {
+            let fields_ty = kind.ty(&scene.name);
+            for Flag { name, .. } in fields {
+                let name_ident = name.to_ident();
+                if let SceneFieldsKind::GoldSkulltulas = kind {
+                    match name {
+                        FlagName::Lit(name_lit) => {
+                            skull_location_checks.push(quote!(#name_lit => Some(self.#scene_field.contains(#fields_ty::#name_ident))));
+                        }
+                        _ => unimplemented!("non-location checks on skulls"),
+                    }
+                } else {
+                    match name {
+                        FlagName::Event(event_name_lit) => {
+                            event_checks.push(quote!(#event_name_lit => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident))));
+                        }
+                        FlagName::Ident(_) => {} // internal use only, don't auto-generate check logic
+                        FlagName::Lit(name_lit) => {
+                            location_checks.push(quote!(#name_lit => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident))));
+                        }
+                        FlagName::Entrance(_, _) => unreachable!("entrance checks aren't saved in RAM"), //TODO replace with compile error
+                        FlagName::Prereq(id, at_check) => match &**at_check {
+                            FlagName::Entrance(from, to) => entrance_prereqs.push(quote!((#id, (#from, #to)) => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident)))),
+                            FlagName::Lit(name_lit) => location_prereqs.push(quote!((#id, #name_lit) => Some(self.#scene_field.#kind.contains(#fields_ty::#name_ident)))),
+                            _ => unimplemented!("prereqs for non-entrance checks"),
+                        },
+                    }
+                }
+            }
+        }
+    }
+    let scene_variants = scenes.iter()
+        .map(|Scene { idx, name, .. }| quote!(#name = #idx));
+    let from_id_arms = scenes.iter()
+        .map(|Scene { idx, name, .. }| quote!(#idx => Some(Self::#name)));
+    let get_mut_items = scenes.iter()
+        .map(|Scene { name, .. }| {
+            let scene_field = scene_name_to_field(name);
+            quote!(Scene::#name => Some(&mut self.#scene_field))
+        });
+    let try_from_items = scenes.iter()
+        .map(|Scene { idx, name, .. }| {
+            let scene_field = scene_name_to_field(name);
+            let start_idx = idx.base10_parse::<usize>().expect("failed to parse scene index") * scene_size;
+            let end_idx = start_idx + scene_size;
+            quote!(#scene_field: #name::try_from(&raw_data[#start_idx..#end_idx]).map_err(|()| raw_data.clone())?)
+        });
+    let skull_try_from_items = scenes.iter().filter(|Scene { idx, .. }| skull_scenes.contains(&idx))
+        .map(|Scene { idx, name, .. }| {
+            let scene_field = scene_name_to_field(name);
+            let scene_ty = SceneFieldsKind::GoldSkulltulas.ty(name);
+            let scene_skulls_idx = converted_scene_skulls_idx(idx.base10_parse::<usize>().expect("failed to parse scene index"));
+            quote!(#scene_field: #scene_ty::try_from(raw_data[#scene_skulls_idx]).map_err(|()| raw_data.clone())?)
+        });
+    let into_items = scenes.iter()
+        .map(|Scene { idx, name, .. }| {
+            let scene_field = scene_name_to_field(name);
+            let start_idx = idx.base10_parse::<usize>().expect("failed to parse scene index") * scene_size;
+            let end_idx = start_idx + scene_size;
+            quote!(buf.splice(#start_idx..#end_idx, Vec::from(value.#scene_field));)
+        });
+    let skull_into_items = scenes.iter().filter(|Scene { idx, .. }| skull_scenes.contains(&idx))
+        .map(|Scene { idx, name, .. }| {
+            let scene_field = scene_name_to_field(name);
+            let scene_skulls_idx = converted_scene_skulls_idx(idx.base10_parse::<usize>().expect("failed to parse scene index"));
+            quote!(buf[#scene_skulls_idx] = u8::from(value.#scene_field);)
+        });
+    let decls = scenes.iter().map(|scene| {
+        let scene_ty = &scene.name;
+        let struct_fields = scene.fields().filter(|(kind, _)| **kind != SceneFieldsKind::GoldSkulltulas).map(|(kind, _)| {
+            let fields_ty = kind.ty(&scene.name);
+            quote!(#vis #kind: #fields_ty)
+        }).collect_vec();
+        let try_from_items = scene.fields().filter(|(kind, _)| **kind != SceneFieldsKind::GoldSkulltulas)
+            .map(|(kind, _)| {
+                let fields_ty = kind.ty(&scene.name);
+                let start_idx = kind.start_idx();
+                let end_idx = kind.end_idx();
+                quote!(#kind: #fields_ty::try_from(&raw_data[#start_idx..#end_idx])?)
+            });
+        let into_items = scene.fields().filter(|(kind, _)| **kind != SceneFieldsKind::GoldSkulltulas)
+            .map(|(kind, _)| {
+                let start_idx = kind.start_idx();
+                let end_idx = kind.end_idx();
+                quote!(buf.splice(#start_idx..#end_idx, Vec::from(value.#kind));)
+            });
+        let set_chests = if let Some((kind, _)) = scene.fields().find(|(kind, _)| **kind == SceneFieldsKind::Chests) {
+            let fields_ty = kind.ty(&scene.name);
+            quote!(fn set_chests(&mut self, chests: u32) {
+                self.#kind = #fields_ty::from_bits_truncate(chests);
+            })
+        } else {
+            quote!(fn set_chests(&mut self, _: u32) {})
+        };
+        let set_switches = if let Some((kind, _)) = scene.fields().find(|(kind, _)| **kind == SceneFieldsKind::Switches) {
+            let fields_ty = kind.ty(&scene.name);
+            quote!(fn set_switches(&mut self, switches: u32) {
+                self.#kind = #fields_ty::from_bits_truncate(switches);
+            })
+        } else {
+            quote!(fn set_switches(&mut self, _: u32) {})
+        };
+        let set_room_clear = if let Some((kind, _)) = scene.fields().find(|(kind, _)| **kind == SceneFieldsKind::RoomClear) {
+            let fields_ty = kind.ty(&scene.name);
+            quote!(fn set_room_clear(&mut self, room_clear: u32) {
+                self.#kind = #fields_ty::from_bits_truncate(room_clear);
+            })
+        } else {
+            quote!(fn set_room_clear(&mut self, _: u32) {})
+        };
+        let subdecls = scene.fields().filter(|(kind, _)| **kind != SceneFieldsKind::GoldSkulltulas).map(|(kind, fields)| {
+            let fields_ty = kind.ty(&scene.name);
+            let fields = fields.iter().map(|Flag { name, value }| {
+                let name_ident = name.to_ident();
+                quote!(const #name_ident = #value;)
+            });
+            let field_ty = Ident::new("u32", Span::call_site());
+            let field_ty_size = 4usize;
+            let read_field_ty = Ident::new(&format!("read_{}", field_ty), Span::call_site());
+            quote! {
+                ::bitflags::bitflags! {
+                    #[derive(Default)]
+                    #vis struct #fields_ty: #field_ty {
+                        #(#fields)*
+                    }
+                }
+
+                impl<'a> ::std::convert::TryFrom<&'a [u8]> for #fields_ty {
+                    type Error = ();
+
+                    fn try_from(raw_data: &[u8]) -> Result<#fields_ty, ()> {
+                        if raw_data.len() != #field_ty_size { return Err(()) }
+                        Ok(#fields_ty::from_bits_truncate(<::byteorder::BigEndian as ::byteorder::ByteOrder>::#read_field_ty(&raw_data)))
+                    }
+                }
+
+                impl From<#fields_ty> for Vec<u8> {
+                    fn from(value: #fields_ty) -> Vec<u8> {
+                        value.bits().to_be_bytes().into()
+                    }
+                }
+            }
+        }).collect_vec();
+        quote! {
+            #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+            #vis struct #scene_ty {
+                #(#struct_fields,)*
+            }
+
+            impl<'a> ::std::convert::TryFrom<&'a [u8]> for #scene_ty {
+                type Error = ();
+
+                fn try_from(raw_data: &[u8]) -> Result<#scene_ty, ()> {
+                    if raw_data.len() != #scene_size { return Err(()) }
+                    Ok(#scene_ty {
+                        #(#try_from_items,)*
+                    })
+                }
+            }
+
+            impl From<#scene_ty> for Vec<u8> {
+                fn from(value: #scene_ty) -> Vec<u8> {
+                    let mut buf = vec![0; #scene_size];
+                    #(#into_items)*
+                    buf
+                }
+            }
+
+            impl FlagsScene for #scene_ty {
+                #set_chests
+                #set_switches
+                #set_room_clear
+            }
+
+            #(#subdecls)*
+        }
+    }).collect_vec();
+    let skull_decls = scenes.iter().filter_map(|scene| {
+        scene.fields().find(|(kind, _)| **kind == SceneFieldsKind::GoldSkulltulas).map(|(kind, fields)| {
+            let fields_ty = kind.ty(&scene.name);
+            let fields = fields.iter().map(|Flag { name, value }| {
+                let name_ident = name.to_ident();
+                quote!(const #name_ident = #value;)
+            });
+            quote! {
+                ::bitflags::bitflags! {
+                    #[derive(Default)]
+                    #vis struct #fields_ty: u8 {
+                        #(#fields)*
+                    }
+                }
+
+                impl<'a> ::std::convert::TryFrom<u8> for #fields_ty {
+                    type Error = ();
+
+                    fn try_from(raw_data: u8) -> Result<#fields_ty, ()> {
+                        Ok(#fields_ty::from_bits_truncate(raw_data))
+                    }
+                }
+
+                impl From<#fields_ty> for u8 {
+                    fn from(value: #fields_ty) -> u8 {
+                        value.bits()
+                    }
+                }
+            }
+        })
+    }).collect_vec();
+    /*
+    let region_arms = scenes.iter().filter_map(|Scene { name, data, .. }| data.iter().filter_map(|data| {
+        if let SceneData::RegionName(region_name) = data {
+            let scene_name = name.to_lit();
+            Some(match region_name {
+                RegionName::One(region_name) => quote!(#scene_name => Ok(Region::#region_name?)),
+                RegionName::Multiple(f) => quote! {
+                    #scene_name => {
+                        let f: Box<dyn Fn(&Ram) -> &str + Send + Sync> = Box::new(#f);
+                        Ok(&f(ram))
+                    }
+                },
+            })
+        } else {
+            None
+        }
+    }).next());
+    */
+    quote! {
+        use itertools::Itertools as _;
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[repr(u8)]
+        pub(crate) enum Scene {
+            #(#scene_variants,)*
+        }
+
+        impl Scene {
+            pub(crate) fn from_id(id: u8) -> Option<Self> {
+                match id {
+                    #(#from_id_arms,)*
+                    _ => None,
+                }
+            }
+
+            /*
+            pub(crate) fn region(&self, ram: &Ram) -> Result<Region, RegionLookupError> {
+                match self.0 {
+                    #(#region_arms,)*
+                    _ => RegionLookup::new(self.regions()?),
+                }
+            }
+            */ //TODO
+        }
+
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+        #vis #struct_token #name {
+            #(#contents,)*
+        }
+
+        impl #name {
+            pub(crate) fn checked(&self, check: &crate::check::Check) -> Option<bool> {
+                match check {
+                    crate::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
+                        crate::check::Check::Exit { from, to, .. } => match (id, (from, to)) {
+                            #(#entrance_prereqs,)*
+                            _ => None,
+                        },
+                        crate::check::Check::Location(loc) => match (id, &**loc) {
+                            #(#location_prereqs,)*
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    crate::check::Check::Event(event) => match &event[..] {
+                        #(#event_checks,)*
+                        _ => None,
+                    }
+                    crate::check::Check::Location(loc) => match &loc[..] {
+                        #(#location_checks,)*
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
+
+            pub(crate) fn get_mut(&mut self, scene: Scene) -> Option<&mut dyn FlagsScene> {
+                match scene {
+                    #(#get_mut_items,)*
+                }
+            }
+        }
+
+        impl ::std::convert::TryFrom<Vec<u8>> for #name {
+            type Error = Vec<u8>;
+
+            fn try_from(raw_data: Vec<u8>) -> Result<#name, Vec<u8>> {
+                if raw_data.len() != #num_scenes * #scene_size { return Err(raw_data) }
+                Ok(#name {
+                    #(#try_from_items,)*
+                })
+            }
+        }
+
+        impl<'a> From<&'a #name> for Vec<u8> {
+            fn from(value: &#name) -> Vec<u8> {
+                let mut buf = vec![0; #scene_size * #num_scenes];
+                #(#into_items)*
+                buf
+            }
+        }
+
+        #(#decls)*
+
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+        #vis struct GoldSkulltulas {
+            #(#skull_contents,)*
+        }
+
+        impl GoldSkulltulas {
+            pub(crate) fn checked(&self, check: &crate::check::Check) -> Option<bool> {
+                match check {
+                    crate::check::Check::Location(loc) => match &loc[..] {
+                        #(#skull_location_checks,)*
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
+        }
+
+        impl ::std::convert::TryFrom<Vec<u8>> for GoldSkulltulas {
+            type Error = Vec<u8>;
+
+            fn try_from(raw_data: Vec<u8>) -> Result<GoldSkulltulas, Vec<u8>> {
+                if raw_data.len() != 0x18 { return Err(raw_data) }
+                Ok(GoldSkulltulas {
+                    #(#skull_try_from_items,)*
+                })
+            }
+        }
+
+        impl<'a> From<&'a GoldSkulltulas> for Vec<u8> {
+            fn from(value: &GoldSkulltulas) -> Vec<u8> {
+                let mut buf = vec![0; 0x18];
+                #(#skull_into_items)*
+                buf
+            }
+        }
+
+        #(#skull_decls)*
+    }
+}

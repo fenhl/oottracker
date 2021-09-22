@@ -1,64 +1,76 @@
 use {
     std::{
+        collections::{
+            HashMap,
+            hash_set::{
+                self,
+                HashSet,
+            },
+        },
         fmt,
         io,
+        iter,
+        ops::BitAnd,
         sync::Arc,
     },
-    derivative::Derivative,
-    itertools::{
-        EitherOrBoth,
-        Itertools as _,
-    },
-    ootr::{
-        Rando,
-        region::{
-            Mq,
-            Region,
-        },
-    },
+    async_proto::Protocol,
+    enum_iterator::IntoEnumIterator,
+    wheel::FromArc,
+    crate::item::Item,
 };
 
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""), Clone(bound = ""))]
-pub enum RegionLookupError<R: Rando> {
-    Filename,
-    Io(Arc<io::Error>),
-    MixedOverworldAndDungeon,
-    MultipleFound,
-    NotFound,
-    Rando(R::Err),
-    UnknownScene(u8),
+oottracker_derive::region!();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+pub enum Mq {
+    Vanilla,
+    Mq,
 }
 
-impl<R: Rando> From<io::Error> for RegionLookupError<R> { //TODO add support for generics to FromArc derive macro
-    fn from(e: io::Error) -> RegionLookupError<R> {
-        RegionLookupError::Io(Arc::new(e))
-    }
-}
-
-impl<R: Rando> fmt::Display for RegionLookupError<R> {
+impl fmt::Display for Mq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RegionLookupError::Filename => write!(f, "region file name is not valid UTF-8"),
-            RegionLookupError::Io(e) => write!(f, "I/O error: {}", e),
-            RegionLookupError::MixedOverworldAndDungeon => write!(f, "region found in both the overworld and a dungeon"),
-            RegionLookupError::MultipleFound => write!(f, "found multiple regions with the same name"),
-            RegionLookupError::NotFound => write!(f, "region not found"),
-            RegionLookupError::Rando(e) => e.fmt(f),
-            RegionLookupError::UnknownScene(id) => write!(f, "unknown scene: 0x{:02x}", id),
+            Mq::Vanilla => write!(f, "vanilla"),
+            Mq::Mq => write!(f, "MQ"),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum RegionLookup<R: Rando> {
-    Overworld(Arc<Region<R>>),
-    /// vanilla data on the left, MQ data on the right
-    Dungeon(EitherOrBoth<Arc<Region<R>>, Arc<Region<R>>>),
+#[derive(Debug, Clone, FromArc)]
+pub enum RegionLookupError {
+    Filename,
+    #[from_arc]
+    Io(Arc<io::Error>),
+    MixedOverworldAndDungeon,
+    MultipleFound,
+    NotFound,
+    UnknownScene(u8),
 }
 
-impl<R: Rando> RegionLookup<R> {
-    pub fn new(candidates: impl IntoIterator<Item = Arc<Region<R>>>) -> Result<RegionLookup<R>, RegionLookupError<R>> {
+impl fmt::Display for RegionLookupError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Filename => write!(f, "region file name is not valid UTF-8"),
+            Self::Io(e) => write!(f, "I/O error: {}", e),
+            Self::MixedOverworldAndDungeon => write!(f, "region found in both the overworld and a dungeon"),
+            Self::MultipleFound => write!(f, "found multiple regions with the same name"),
+            Self::NotFound => write!(f, "region not found"),
+            Self::UnknownScene(id) => write!(f, "unknown scene: 0x{:02x}", id),
+        }
+    }
+}
+
+//TODO review whether this is still required — it might make more sense to include MQ-ness in the Region value itself (merging fully ambiguous regions like Dodongos Cavern Beginning)
+/*
+#[derive(Debug, Clone)]
+pub enum RegionLookup {
+    Overworld(Region),
+    /// vanilla data on the left, MQ data on the right
+    Dungeon(EitherOrBoth<Region, Region>),
+}
+
+impl RegionLookup {
+    pub fn new(candidates: impl IntoIterator<Item = Region>) -> Result<RegionLookup, RegionLookupError> {
         let mut candidates = candidates.into_iter().collect_vec();
         Ok(if candidates.len() == 0 {
             return Err(RegionLookupError::NotFound)
@@ -86,13 +98,12 @@ impl<R: Rando> RegionLookup<R> {
         })
     }
 
-    pub fn by_name<N: ?Sized>(rando: &R, name: &N) -> Result<RegionLookup<R>, RegionLookupError<R>>
-    where R::RegionName: PartialEq<N> {
-        let all_regions = rando.regions().map_err(RegionLookupError::Rando)?;
-        let candidates = all_regions.iter().filter(|region| region.name == *name).cloned().collect_vec();
+    pub fn by_name<N: ?Sized + PartialEq<Region>>(name: &N) -> Result<RegionLookup, RegionLookupError> {
+        let candidates = Region::into_enum_iter().iter().filter(|region| region.name == *name).cloned().collect_vec();
         RegionLookup::new(candidates)
     }
 }
+*/
 
 #[derive(Debug, Clone)]
 struct MissingRegionError(pub String);
@@ -105,28 +116,71 @@ impl fmt::Display for MissingRegionError {
 
 impl std::error::Error for MissingRegionError {}
 
-pub trait RegionExt {
-    type R: Rando;
-
-    fn new<'a, N: ?Sized>(rando: &'a Self::R, name: &N) -> Result<RegionLookup<Self::R>, RegionLookupError<Self::R>> where <Self::R as Rando>::RegionName: PartialEq<N>;
-    /// A thin wrapper around [`Rando::regions`] with this module's error type.
-    fn all<'a>(rando: &'a Self::R) -> Result<Arc<Vec<Arc<Region<Self::R>>>>, RegionLookupError<Self::R>>;
-    fn root(rando: &Self::R) -> Result<Arc<Region<Self::R>>, RegionLookupError<Self::R>>; //TODO glitched param
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
+pub struct Entrance {
+    pub from: Region,
+    pub to: Region,
 }
 
-impl<R: Rando> RegionExt for Region<R> {
-    type R = R;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
+pub struct EntranceKnowledge(/*TODO*/);
 
-    fn new<'a, N: ?Sized>(rando: &'a R, name: &N) -> Result<RegionLookup<R>, RegionLookupError<R>>
-    where R::RegionName: PartialEq<N> {
-        RegionLookup::by_name(rando, name)
+impl BitAnd for EntranceKnowledge {
+    type Output = Result<Self, ()>;
+
+    fn bitand(self, _: Self) -> Result<Self, ()> {
+        Ok(Self(/*TODO*/))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Protocol)]
+pub struct LocationKnowledge(HashSet<Item>);
+
+impl LocationKnowledge {
+    /// Returns location knowledge with no possible items (a contradiction).
+    pub fn empty() -> Self {
+        Self(HashSet::default())
     }
 
-    fn all<'a>(rando: &'a R) -> Result<Arc<Vec<Arc<Region<R>>>>, RegionLookupError<R>> {
-        rando.regions().map_err(RegionLookupError::Rando)
+    pub fn contains(&self, item: Item) -> bool {
+        self.0.contains(&item)
     }
 
-    fn root(rando: &R) -> Result<Arc<Region<R>>, RegionLookupError<R>> {
-        Ok(Arc::clone(Region::all(rando)?.iter().find(|region| region.name == "Root").ok_or(RegionLookupError::NotFound)?))
+    pub fn insert(&mut self, item: Item) {
+        self.0.insert(item);
     }
+
+    pub fn remove(&mut self, item: Item) -> bool {
+        self.0.remove(&item)
+    }
+}
+
+impl BitAnd for LocationKnowledge {
+    type Output = Result<Self, ()>;
+
+    fn bitand(self, rhs: Self) -> Result<Self, ()> {
+        let intersection = self.0.intersection(&rhs.0).copied().collect::<HashSet<_>>();
+        if intersection.is_empty() {
+            Err(())
+        } else {
+            Ok(Self(intersection))
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a LocationKnowledge {
+    type IntoIter = iter::Copied<hash_set::Iter<'a, Item>>;
+    type Item = Item;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter().copied()
+    }
+}
+
+pub fn vanilla_entrances() -> HashMap<Entrance, EntranceKnowledge> {
+    HashMap::default() //TODO
+}
+
+pub fn vanilla_locations() -> HashMap<String, LocationKnowledge> { //TODO Location enum?
+    HashMap::default() //TODO
 }

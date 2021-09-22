@@ -9,23 +9,9 @@ proc-macro = true
 
 [dependencies]
 convert_case = "0.4"
-directories = "3"
-graphql_client = "0.10"
-#itertools = "0.10" #TODO update once itertools commit fa3fffb0741c59785dcbf9ed168e3def122621c9 is released
 proc-macro2 = "1"
 quote = "1"
-serde = "1"
 syn = "1"
-zip = "0.5"
-
-[dependencies.derive_more]
-version = "0.99"
-default-features = false
-features = ["from"]
-
-[dependencies.itertools]
-git = "https://github.com/rust-itertools/itertools"
-rev = "fa3fffb0741c59785dcbf9ed168e3def122621c9"
 
 [dependencies.ootr]
 path = "../ootr"
@@ -33,15 +19,6 @@ path = "../ootr"
 [dependencies.ootr-dynamic]
 path = "../ootr-dynamic"
 
-[dependencies.pyo3]
-version = "0.14"
-features = ["auto-initialize"]
-
 [dependencies.quote-value]
 git = "https://github.com/fenhl/quote-value" #TODO publish
 branch = "main"
-
-[dependencies.reqwest]
-version = "0.11"
-default-features = false
-features = ["blocking", "json", "rustls-tls", "trust-dns"]

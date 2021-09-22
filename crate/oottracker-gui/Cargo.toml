@@ -8,7 +8,7 @@ edition = "2018"
 winres = "0.1"
 
 [dependencies]
-async-proto = "0.8"
+#async-proto = "0.8" #TODO publish changes
 derivative = "2"
 futures = "0.3"
 iced_futures = "0.3"
@@ -18,6 +18,9 @@ itertools = "0.10"
 num-traits = "0.2"
 semver = "1"
 url = "2"
+
+[dependencies.async-proto]
+path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto" #TODO publish changes
 
 [dependencies.derive_more]
 version = "0.99"
@@ -31,12 +34,6 @@ branch = "fields"
 [dependencies.iced]
 version = "0.3"
 features = ["image", "tokio"]
-
-[dependencies.ootr]
-path = "../ootr"
-
-[dependencies.ootr-static]
-path = "../ootr-static"
 
 [dependencies.oottracker]
 path = "../oottracker"

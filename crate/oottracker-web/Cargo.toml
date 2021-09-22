@@ -12,7 +12,8 @@ rocket = "0.5.0-rc.1"
 warp = "0.3"
 
 [dependencies.async-proto]
-version = "0.8"
+#version = "0.8"
+path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto" #TODO publish changes
 features = ["warp"]
 
 [dependencies.derive_more]
@@ -24,9 +25,6 @@ features = ["from"]
 git = "https://github.com/fenhl/horrorshow-rs"
 branch = "rocket"
 features = ["rocket"]
-
-[dependencies.ootr]
-path = "../ootr"
 
 [dependencies.oottracker]
 path = "../oottracker"

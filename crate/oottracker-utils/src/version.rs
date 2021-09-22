@@ -32,9 +32,6 @@ pub(crate) async fn check_cli_version(package: &str, version: &Version) {
 pub(crate) async fn version() -> Version {
     let version = Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version");
     assert_eq!(version, plist::from_file::<_, Plist>(INFO_PLIST_PATH).expect("failed to read plist for version check").bundle_short_version_string);
-    assert_eq!(version, ootr::version());
-    assert_eq!(version, ootr_dynamic::version());
-    assert_eq!(version, ootr_static::version()); // also checks ootr-static-derive
     assert_eq!(version, oottracker::version()); // also checks oottracker-derive
     assert_eq!(version, oottracker_bizhawk::version());
     //assert_eq!(version, oottracker_csharp::version()); //TODO

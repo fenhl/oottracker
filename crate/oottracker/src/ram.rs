@@ -19,25 +19,17 @@ use {
         ByteOrder as _,
     },
     derive_more::From,
-    itertools::{
-        EitherOrBoth,
-        Itertools as _,
-    },
+    itertools::Itertools as _,
     tokio::io::{
         AsyncRead,
         AsyncReadExt as _,
         AsyncWrite,
         AsyncWriteExt as _,
     },
-    ootr::Rando,
     crate::{
         save::{
             self,
             Save,
-        },
-        region::{
-            RegionLookup,
-            RegionLookupError,
         },
         scene::{
             Scene,
@@ -173,13 +165,14 @@ impl Ram {
         ]
     }
 
-    pub(crate) fn current_region<R: Rando>(&self, rando: &R) -> Result<RegionLookup<R>, RegionLookupError<R>> { //TODO disambiguate MQ-ness
-        Ok(match Scene::current(self).map_err(RegionLookupError::UnknownScene)?.region(rando, self)? {
+    /*
+    pub(crate) fn current_region(&self) -> Result<Region, RegionLookupError> {
+        Ok(match Scene::current(self).map_err(RegionLookupError::UnknownScene)?.region(self)? {
             RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, mq)) => {
                 //TODO auto-disambiguate
                 // visibility of MQ-ness per dungeon
                 // immediately upon entering: Deku Tree (torch next to web), Jabu Jabus Belly (boulder and 2 cows), Forest Temple (extra skulltulas and no wolfos), Fire Temple (extra small torches and no hammer blocks), Ganons Castle (extra green bubbles), Spirit Temple (extra boulders)
-                // not immediately but without checks: Ice Cavern (boulder takes a couple seconds to be visible), Gerudo Training Grounds (the different torches in the first room only become visible after approx. 1 roll forward), Bottom of the Well (the first skulltula being replaced with a ReDead is audible from the entrance)
+                // not immediately but without checks: Ice Cavern (boulder takes a couple seconds to be visible), Gerudo Training Ground (the different torches in the first room only become visible after approx. 1 roll forward), Bottom of the Well (the first skulltula being replaced with a ReDead is audible from the entrance)
                 // requires checks (exits/locations): Dodongos Cavern (must blow up the first mud block to see that the lobby has an additional boulder)
                 // unsure: Water Temple (not sure if the tektite on the ledge of the central pillar is still there in MQ, if not that's the first difference), Shadow Temple (the extra boxes are only visible after going through the first fake wall, not sure if that counts as a check)
                 RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, mq))
@@ -187,6 +180,7 @@ impl Ram {
             lookup => lookup,
         })
     }
+    */ //TODO move to ModelState and disambiguate MQ-ness
 
     /// Returns the scene flags, with flags for the current scene updated properly.
     pub(crate) fn scene_flags(&self) -> SceneFlags {

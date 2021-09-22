@@ -24,17 +24,17 @@ use {
 };
 
 pub const TCP_PORT: u16 = 24801;
-pub const VERSION: u8 = 5;
+pub const VERSION: u8 = 5; //TODO account for changes in the randomizer
 
 #[derive(Debug, Clone, Protocol)]
 pub enum Packet {
     Goodbye,
     SaveDelta(save::Delta),
     SaveInit(save::Save),
-    KnowledgeInit(knowledge::Knowledge<ootr_static::Rando>), //TODO support other Rando impls?
+    KnowledgeInit(knowledge::Knowledge),
     RamInit(Ram),
     UpdateCell(TrackerCellId, Json),
-    ModelInit(ModelState<ootr_static::Rando>), //TODO support other Rando impls?
+    ModelInit(ModelState),
     ModelDelta(ModelDelta),
 }
 

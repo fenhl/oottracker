@@ -3,7 +3,6 @@ use {
         any::TypeId,
         collections::{
             BTreeMap,
-            HashSet,
             hash_map::DefaultHasher,
         },
         convert::{
@@ -15,7 +14,6 @@ use {
             Hash,
             Hasher,
         },
-        iter,
         pin::Pin,
         sync::Arc,
     },
@@ -38,20 +36,17 @@ use {
     },
     tokio::sync::Mutex,
     wheel::FromArc,
-    ootr::{
-        Rando,
+    crate::{
+        ModelState,
         check::Check,
+        checks::CheckExt as _,
         model::{
             DungeonReward,
             DungeonRewardLocation,
             MainDungeon,
         },
         region::Mq,
-        settings::Knowledge as _,
-    },
-    crate::{
-        ModelState,
-        checks::CheckExt as _,
+        settings::GerudoFortressKnowledge,
         ui::{
             TrackerCellId,
             TrackerCellKind::{
@@ -76,7 +71,7 @@ macro_rules! cells {
             }
         }
 
-        fn serialize_state(&self, state: &ModelState<R>) -> serde_json::Result<BTreeMap<&'static str, Json>> {
+        fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> {
             let mut map = BTreeMap::default();
             $(
                 map.insert($cell_name, serde_json::to_value(render_cell(TrackerCellId::$id.kind(), state))?);
@@ -127,16 +122,16 @@ impl fmt::Display for Error {
     }
 }
 
-pub trait App<R: Rando>: fmt::Debug + Send + Sync + 'static {
+pub trait App: fmt::Debug + Send + Sync + 'static {
     fn base_url(&self) -> &'static str;
     fn api_key(&self) -> &'static str;
     fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId>;
-    fn serialize_state(&self, state: &ModelState<R>) -> serde_json::Result<BTreeMap<&'static str, Json>>;
+    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>>;
 
-    fn set_cell(&self, state: &mut ModelState<R>, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
+    fn set_cell(&self, state: &mut ModelState, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
         match cell_id.kind() {
-            BossKey { active, toggle } => if active(&state.ram.save.boss_keys) != value.as_bool().ok_or_else(|| value.clone())? {
-                toggle(&mut state.ram.save.boss_keys);
+            BossKey { active, toggle } => if active(&state.ram.save.dungeon_items) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle(&mut state.ram.save.dungeon_items);
             },
             Composite { active, toggle_left, toggle_right, .. } => {
                 let (active_left, active_right) = active(state);
@@ -159,11 +154,11 @@ pub trait App<R: Rando>: fmt::Debug + Send + Sync + 'static {
                 }
             }
             FortressMq => if value.as_bool().ok_or_else(|| value.clone())? {
-                state.knowledge.settings.update("gerudo_fortress", "normal").expect("failed to update Gerudo Fortress setting");
+                state.knowledge.settings.gerudo_fortress = GerudoFortressKnowledge::normal();
             } else {
                 // don't override local state that's consistent with the value received
-                if state.knowledge.settings.get::<HashSet<&'static str>>("gerudo_fortress").expect("failed to get Gerudo Fortress setting").map_or(false, |fort| fort.iter().copied().eq(iter::once("normal"))) {
-                    state.knowledge.settings.remove("gerudo_fortress");
+                if state.knowledge.settings.gerudo_fortress == GerudoFortressKnowledge::normal() {
+                    state.knowledge.settings.gerudo_fortress = GerudoFortressKnowledge::default();
                 }
             },
             Medallion(med) => if value.as_bool().ok_or_else(|| value.clone())? {
@@ -212,7 +207,7 @@ pub trait App<R: Rando>: fmt::Debug + Send + Sync + 'static {
             } else {
                 state.ram.save.quest_items.remove(song);
             },
-            SongCheck { check, toggle_overlay } => if Check::<R>::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? {
+            SongCheck { check, toggle_overlay } => if Check::Location(check.to_string()).checked(state).unwrap_or(false) != value.as_bool().ok_or_else(|| value.clone())? {
                 toggle_overlay(&mut state.ram.save.event_chk_inf);
             },
             Spells => {
@@ -252,17 +247,17 @@ pub trait App<R: Rando>: fmt::Debug + Send + Sync + 'static {
     }
 }
 
-impl<R: Rando> App<R> for Box<dyn App<R>> {
+impl App for Box<dyn App> {
     fn base_url(&self) -> &'static str { (**self).base_url() }
     fn api_key(&self) -> &'static str { (**self).api_key() }
     fn cell_id(&self, cell_id: &str) -> Option<TrackerCellId> { (**self).cell_id(cell_id) }
-    fn serialize_state(&self, state: &ModelState<R>) -> serde_json::Result<BTreeMap<&'static str, Json>> { (**self).serialize_state(state) }
+    fn serialize_state(&self, state: &ModelState) -> serde_json::Result<BTreeMap<&'static str, Json>> { (**self).serialize_state(state) }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OldRestreamTracker;
 
-impl<R: Rando> App<R> for OldRestreamTracker {
+impl App for OldRestreamTracker {
     fn base_url(&self) -> &'static str { "https://oot-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { OLD_RESTREAM_API_KEY }
 
@@ -323,7 +318,7 @@ impl<R: Rando> App<R> for OldRestreamTracker {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RestreamTracker;
 
-impl<R: Rando> App<R> for RestreamTracker {
+impl App for RestreamTracker {
     fn base_url(&self) -> &'static str { "https://ootr-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RESTREAM_API_KEY }
 
@@ -392,7 +387,7 @@ impl<R: Rando> App<R> for RestreamTracker {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RslItemTracker;
 
-impl<R: Rando> App<R> for RslItemTracker {
+impl App for RslItemTracker {
     fn base_url(&self) -> &'static str { "https://ootr-random-settings-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RSL_API_KEY }
 
@@ -529,21 +524,21 @@ struct PatchData {
 }
 
 #[derive(Clone)]
-pub struct Session<R: Rando, A: App<R>> {
+pub struct Session<A: App> {
     client: reqwest::Client,
     local_id: String,
     id_token: String,
     app: A,
 }
 
-impl<R: Rando, A: App<R>> Session<R, A> {
-    pub async fn new(app: A) -> reqwest::Result<Session<R, A>> {
+impl<A: App> Session<A> {
+    pub async fn new(app: A) -> reqwest::Result<Self> {
         let client = reqwest::Client::builder()
             .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
             .use_rustls_tls()
             .https_only(true)
             .build()?;
-        let mut session = Session {
+        let mut session = Self {
             client, app,
             local_id: String::default(),
             id_token: String::default(),
@@ -609,7 +604,7 @@ impl<R: Rando, A: App<R>> Session<R, A> {
         Ok(())
     }
 
-    fn to_dyn(&self) -> Session<R, Box<dyn App<R>>>
+    fn to_dyn(&self) -> Session<Box<dyn App>>
     where A: Clone {
         Session {
             client: self.client.clone(),
@@ -621,14 +616,14 @@ impl<R: Rando, A: App<R>> Session<R, A> {
 }
 
 #[derive(Clone)]
-pub struct Room<R: Rando, A: App<R>> {
-    pub session: Session<R, A>,
+pub struct Room<A: App> {
+    pub session: Session<A>,
     pub name: String,
     pub passcode: String,
 }
 
-impl<R: Rando, A: App<R>> Room<R, A> {
-    pub fn to_dyn(&self) -> DynRoom<R>
+impl<A: App> Room<A> {
+    pub fn to_dyn(&self) -> DynRoom
     where A: Clone + Send {
         let mut hasher = DefaultHasher::default();
         TypeId::of::<A>().hash(&mut hasher);
@@ -642,15 +637,15 @@ impl<R: Rando, A: App<R>> Room<R, A> {
 }
 
 #[derive(Clone)]
-pub struct DynRoom<R: Rando> {
+pub struct DynRoom {
     app_hash: u64,
-    session: Arc<Mutex<Session<R, Box<dyn App<R>>>>>,
+    session: Arc<Mutex<Session<Box<dyn App>>>>,
     name: String,
     passcode: String,
 }
 
-impl<R: Rando> DynRoom<R> {
-    pub async fn set_state(&self, new_state: &ModelState<R>) -> Result<(), Error> {
+impl DynRoom {
+    pub async fn set_state(&self, new_state: &ModelState) -> Result<(), Error> {
         let mut session = self.session.lock().await;
         let url = format!("{}/games/{}/items.json", session.app.base_url(), self.name);
         let state = session.app.serialize_state(new_state)?;
@@ -711,13 +706,13 @@ impl<R: Rando> DynRoom<R> {
     }
 }
 
-impl<R: Rando> fmt::Debug for DynRoom<R> {
+impl fmt::Debug for DynRoom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "DynRoom {{ name: {:?}, session: _ }}", self.name) //TODO use debug_struct with finish_non_exhaustive
     }
 }
 
-impl<R: Rando> Hash for DynRoom<R> {
+impl Hash for DynRoom {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.app_hash.hash(state);
         self.name.hash(state);
@@ -725,9 +720,9 @@ impl<R: Rando> Hash for DynRoom<R> {
     }
 }
 
-fn render_cell<R: Rando>(cell_kind: TrackerCellKind, state: &ModelState<R>) -> Json {
+fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
     match cell_kind {
-        BossKey { active, .. } => json!(active(&state.ram.save.boss_keys)),
+        BossKey { active, .. } => json!(active(&state.ram.save.dungeon_items)),
         Composite { active, .. } => json!(match active(state) {
             (false, false) => 0,
             (true, false) => 1,
@@ -735,7 +730,7 @@ fn render_cell<R: Rando>(cell_kind: TrackerCellKind, state: &ModelState<R>) -> J
             (true, true) => 3,
         }),
         Count { get, max, step, .. } => json!(get(state).min(max) / step),
-        FortressMq => json!(state.knowledge.settings.get::<HashSet<&'static str>>("gerudo_fortress").expect("failed to get Gerudo Fortress setting").map_or(false, |fort| fort.iter().copied().eq(iter::once("normal")))),
+        FortressMq => json!(state.knowledge.settings.gerudo_fortress == GerudoFortressKnowledge::normal()),
         Medallion(med) => json!(state.ram.save.quest_items.has(med)),
         MedallionLocation(med) => json!(match state.knowledge.get_dungeon_reward_location(DungeonReward::Medallion(med)) {
             None => 0,
@@ -755,7 +750,7 @@ fn render_cell<R: Rando>(cell_kind: TrackerCellKind, state: &ModelState<R>) -> J
         Simple { active, .. } => json!(active(state)),
         SmallKeys { get, .. } => json!(get(&state.ram.save.small_keys)),
         Song { song, .. } => json!(state.ram.save.quest_items.contains(song)),
-        SongCheck { check, .. } => json!(Check::<R>::Location(check.to_string()).checked(state).unwrap_or(false)),
+        SongCheck { check, .. } => json!(Check::Location(check.to_string()).checked(state).unwrap_or(false)),
         Spells => json!(match (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind) {
             (false, false) => 0,
             (true, false) => 1,

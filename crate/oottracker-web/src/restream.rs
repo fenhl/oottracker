@@ -4,14 +4,14 @@ use {
         collections::HashMap,
     },
     tokio::sync::watch::*,
-    ootr::model::{
-        DungeonReward,
-        DungeonRewardLocation,
-        MainDungeon,
-        Stone,
-    },
     oottracker::{
         ModelState,
+        model::{
+            DungeonReward,
+            DungeonRewardLocation,
+            MainDungeon,
+            Stone,
+        },
         ui::{
             CellOverlay,
             CellRender,
@@ -63,7 +63,7 @@ pub(crate) fn render_double_cell(runner1: &ModelState, runner2: &ModelState, rew
         (true, false) => CellStyle::RightDimmed,
         (true, true) => CellStyle::Normal,
     };
-    let location = (runner1.knowledge.clone() & runner2.knowledge.clone()).map(|knowledge| knowledge.dungeon_reward_locations.get(&reward).copied()).unwrap_or_default(); //TODO display contradiction errors differently?
+    let location = (runner1.knowledge.clone() & runner2.knowledge.clone()).map(|knowledge| knowledge.get_dungeon_reward_location(reward)).unwrap_or_default(); //TODO display contradiction errors differently?
     let loc_img_filename = match location {
         None => "unknown_text",
         Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",

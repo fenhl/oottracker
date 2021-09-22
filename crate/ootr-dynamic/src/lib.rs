@@ -79,13 +79,6 @@ impl<'p> Rando<'p> {
             setting_infos: RefCell::default(),
         }
     }
-
-    /// Imports and returns the given Python module from the randomizer codebase.
-    fn import(&self, module: &str) -> PyResult<&'p PyModule> {
-        let sys = self.py.import("sys")?;
-        sys.getattr("path")?.call_method1("append", (self.path.display().to_string(),))?;
-        self.py.import(module)
-    }
 }
 
 impl<'p> fmt::Debug for Rando<'p> {
@@ -250,38 +243,6 @@ impl<'p> ootr::Rando for Rando<'p> {
         Ok(Arc::clone(self.logic_tricks.borrow().as_ref().expect("just inserted")))
     }
 
-    fn regions(&self) -> Result<Arc<Vec<Arc<Region<Self>>>>, RandoErr> {
-        if self.regions.borrow().is_none() {
-            let world_path = self.path.join("data").join("World"); //TODO glitched support
-            let mut regions = Vec::default();
-            for region_path in fs::read_dir(world_path)? {
-                let region_path = region_path?;
-                let filename = region_path.file_name();
-                let filename = filename.to_str().ok_or(RandoErr::NonUnicodeRegionFilename)?;
-                let dungeon = parse_dungeon_info(filename.strip_suffix(".json").ok_or_else(|| RandoErr::NonJsonRegionFile(filename.to_owned()))?)?;
-                let region_file = File::open(region_path.path())?;
-                for raw_region in read_json_lenient_sync::<_, Vec<RawRegion>>(BufReader::new(region_file))? {
-                    let name = raw_region.region_name.clone();
-                    //assert_eq!(dungeon.map(|(dungeon, _)| dungeon.to_string().replace('\'', "")), raw_region.dungeon);
-                    regions.push(Arc::new(Region {
-                        dungeon,
-                        scene: raw_region.scene,
-                        hint: raw_region.hint,
-                        time_passes: raw_region.time_passes,
-                        events: raw_region.events.into_iter().map(|(event_name, rule_str)| Ok::<_, RandoErr>((event_name.clone(), ootr::access::Expr::parse(self, &Check::Event(event_name), rule_str.trim())?))).try_collect()?,
-                        locations: raw_region.locations.into_iter().map(|(loc_name, rule_str)| Ok::<_, RandoErr>((loc_name.clone(), ootr::access::Expr::parse(self, &Check::Location(loc_name), rule_str.trim())?))).try_collect()?,
-                        exits: raw_region.exits.into_iter().map(|(to, rule_str)| Ok::<_, RandoErr>((to.clone(), ootr::access::Expr::parse(self, &Check::Exit { to, from: name.clone(), from_mq: dungeon.map(|(_, mq)| mq) }, rule_str.trim())?))).try_collect()?,
-                        name,
-                    }));
-                }
-            }
-            *self.regions.borrow_mut() = Some(Arc::new(regions));
-        }
-        Ok(Arc::clone(self.regions.borrow().as_ref().expect("just inserted")))
-    }
-
-    fn root() -> String { format!("Root") }
-
     fn setting_names(&self) -> Result<Arc<HashMap<String, String>>, RandoErr> {
         if self.setting_names.borrow().is_none() {
             let mut settings = HashMap::default();
@@ -295,21 +256,6 @@ impl<'p> ootr::Rando for Rando<'p> {
         }
         Ok(Arc::clone(self.setting_names.borrow().as_ref().expect("just inserted")))
     }
-}
-
-fn read_json_lenient_sync<R: BufRead, T: DeserializeOwned>(mut reader: R) -> io::Result<T> {
-    let mut buf = String::default();
-    let mut line_buf = String::default();
-    while reader.read_line(&mut line_buf)? > 0 {
-        buf.push_str(
-            &line_buf.split('#')
-                .next().expect("split always yields at least one element")
-                .replace("\r", "")
-                .replace('\n', " ")
-        );
-        line_buf.clear();
-    }
-    Ok(serde_json::from_str(&buf)?)
 }
 
 pub fn version() -> Version {

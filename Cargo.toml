@@ -1,5 +1,6 @@
 [workspace]
-members = ["crate/*"]
+#members = ["crate/*"] #TODO reenable after remove-dynamic-rando refactor
+members = ["crate/oottracker", "crate/oottracker-bizhawk", "crate/oottracker-csharp", "crate/oottracker-derive", "crate/oottracker-gui", "crate/oottracker-updater", "crate/oottracker-utils", "crate/oottracker-web"]
 default-members = ["crate/oottracker"] #TODO change to CLI?
 
 [patch.crates-io.darwin-libproc] # see https://github.com/heim-rs/darwin-libproc/pull/3 for details

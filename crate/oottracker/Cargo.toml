@@ -23,7 +23,8 @@ semver = "1"
 serde_json = "1"
 
 [dependencies.async-proto]
-version = "0.8"
+#version = "0.8.5"
+path = "C:\\Users\\fenhl\\git\\github.com\\fenhl\\async-proto\\stage\\crate\\async-proto" #TODO publish changes
 features = ["serde_json", "tokio-tungstenite", "write-sync"]
 
 [dependencies.derive_more]
@@ -39,12 +40,6 @@ branch = "fields"
 git = "https://github.com/fenhl/horrorshow-rs"
 branch = "rocket"
 features = ["rocket"]
-
-[dependencies.ootr]
-path = "../ootr"
-
-[dependencies.ootr-static] # used in tests
-path = "../ootr-static"
 
 [dependencies.oottracker-derive]
 path = "../oottracker-derive"

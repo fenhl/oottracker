@@ -9,7 +9,36 @@ proc-macro = true
 
 [dependencies]
 convert_case = "0.4"
-itertools = "0.10"
+directories = "3"
+graphql_client = "0.10"
+#itertools = "0.10" #TODO update once itertools commit fa3fffb0741c59785dcbf9ed168e3def122621c9 is released
+once_cell = "1"
 proc-macro2 = "1"
 quote = "1"
-syn = "1"
+serde_json = "1"
+zip = "0.5"
+
+[dependencies.itertools]
+git = "https://github.com/rust-itertools/itertools"
+rev = "fa3fffb0741c59785dcbf9ed168e3def122621c9"
+
+[dependencies.pyo3]
+version = "0.14"
+features = ["auto-initialize"]
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["blocking", "json", "rustls-tls", "trust-dns"]
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
+[dependencies.syn]
+version = "1"
+features = ["extra-traits"]
+
+[dependencies.wheel]
+git = "https://github.com/fenhl/wheel"
+branch = "main"

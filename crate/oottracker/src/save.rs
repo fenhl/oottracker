@@ -1,3 +1,5 @@
+#![allow(unused)] //TODO
+
 use {
     std::{
         convert::{
@@ -31,15 +33,6 @@ use {
         AsyncWrite,
         AsyncWriteExt as _,
     },
-    ootr::{
-        item::Item,
-        model::{
-            DungeonReward,
-            Medallion,
-            Stone,
-            TimeRange,
-        },
-    },
     crate::{
         info_tables::{
             EventChkInf,
@@ -47,7 +40,14 @@ use {
             InfTable,
             ItemGetInf,
         },
+        item::Item,
         item_ids,
+        model::{
+            DungeonReward,
+            Medallion,
+            Stone,
+            TimeRange,
+        },
         scene::{
             GoldSkulltulas,
             SceneFlags,
@@ -122,6 +122,12 @@ impl<'a> From<&'a MagicCapacity> for u8 {
             MagicCapacity::Small => 1,
             MagicCapacity::Large => 2,
         }
+    }
+}
+
+impl From<MagicCapacity> for u8 {
+    fn from(magic: MagicCapacity) -> u8 {
+        Self::from(&magic)
     }
 }
 
@@ -228,7 +234,7 @@ impl From<Bottle> for u8 {
     }
 }
 
-#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derivative(Default)]
 pub enum AdultTradeItem {
     #[derivative(Default)]
@@ -249,20 +255,20 @@ pub enum AdultTradeItem {
 impl TryFrom<u8> for AdultTradeItem {
     type Error = u8;
 
-    fn try_from(raw_data: u8) -> Result<AdultTradeItem, u8> {
+    fn try_from(raw_data: u8) -> Result<Self, u8> {
         match raw_data {
-            item_ids::NONE => Ok(AdultTradeItem::None),
-            item_ids::POCKET_EGG => Ok(AdultTradeItem::PocketEgg),
-            item_ids::POCKET_CUCCO => Ok(AdultTradeItem::PocketCucco),
-            item_ids::COJIRO => Ok(AdultTradeItem::Cojiro),
-            item_ids::ODD_POTION => Ok(AdultTradeItem::OddPotion),
-            item_ids::ODD_MUSHROOM => Ok(AdultTradeItem::OddMushroom),
-            item_ids::POACHERS_SAW => Ok(AdultTradeItem::PoachersSaw),
-            item_ids::GORONS_SWORD_BROKEN => Ok(AdultTradeItem::BrokenSword),
-            item_ids::PRESCRIPTION => Ok(AdultTradeItem::Prescription),
-            item_ids::EYEBALL_FROG => Ok(AdultTradeItem::EyeballFrog),
-            item_ids::EYEDROPS => Ok(AdultTradeItem::Eyedrops),
-            item_ids::CLAIM_CHECK => Ok(AdultTradeItem::ClaimCheck),
+            item_ids::NONE => Ok(Self::None),
+            item_ids::POCKET_EGG => Ok(Self::PocketEgg),
+            item_ids::POCKET_CUCCO => Ok(Self::PocketCucco),
+            item_ids::COJIRO => Ok(Self::Cojiro),
+            item_ids::ODD_POTION => Ok(Self::OddPotion),
+            item_ids::ODD_MUSHROOM => Ok(Self::OddMushroom),
+            item_ids::POACHERS_SAW => Ok(Self::PoachersSaw),
+            item_ids::GORONS_SWORD_BROKEN => Ok(Self::BrokenSword),
+            item_ids::PRESCRIPTION => Ok(Self::Prescription),
+            item_ids::EYEBALL_FROG => Ok(Self::EyeballFrog),
+            item_ids::EYEDROPS => Ok(Self::Eyedrops),
+            item_ids::CLAIM_CHECK => Ok(Self::ClaimCheck),
             _ => Err(raw_data),
         }
     }
@@ -509,6 +515,7 @@ pub struct InvAmounts {
     pub deku_sticks: u8,
     pub deku_nuts: u8,
     pub bombchus: u8,
+    pub beans: u8,
 }
 
 impl TryFrom<Vec<u8>> for InvAmounts {
@@ -520,6 +527,7 @@ impl TryFrom<Vec<u8>> for InvAmounts {
             deku_sticks: *raw_data.get(0x00).ok_or_else(|| raw_data.clone())?,
             deku_nuts: *raw_data.get(0x01).ok_or_else(|| raw_data.clone())?,
             bombchus: *raw_data.get(0x08).ok_or_else(|| raw_data.clone())?,
+            beans: *raw_data.get(0x0e).ok_or_else(|| raw_data.clone())?,
         })
     }
 }
@@ -529,7 +537,7 @@ impl<'a> From<&'a InvAmounts> for [u8; 0xf] {
         [
             inv_amounts.deku_sticks, inv_amounts.deku_nuts, 0, 0, 0, 0,
             0, 0, inv_amounts.bombchus, 0, 0, 0,
-            0, 0, 0,
+            0, 0, inv_amounts.beans,
         ]
     }
 }
@@ -581,14 +589,22 @@ impl<'a> From<&'a Equipment> for Vec<u8> {
 bitflags! {
     #[derive(Default)]
     pub struct Upgrades: u32 {
+        const DEKU_NUT_CAPACITY_MASK = 0x0070_0000;
+        //TODO or does it start at 1?
+        const DEKU_NUT_CAPACITY_40 = 0x0020_0000;
+        const DEKU_NUT_CAPACITY_30 = 0x0010_0000;
+        const DEKU_STICK_CAPACITY_MASK = 0x000e_0000;
+        //TODO or does it start at 1?
+        const DEKU_STICK_CAPACITY_30 = 0x0004_0000;
+        const DEKU_STICK_CAPACITY_20 = 0x0002_0000;
         const BULLET_BAG_MASK = 0x0001_c000;
         const BULLET_BAG_50 = 0x0001_8000;
         const BULLET_BAG_40 = 0x0001_0000;
         const BULLET_BAG_30 = 0x0000_8000; //TODO check for parity with slingshot
         const WALLET_MASK = 0x0000_3000;
-        const ADULTS_WALLET = 0x0000_1000;
-        const GIANTS_WALLET = 0x0000_2000;
         const TYCOONS_WALLET = 0x0000_3000;
+        const GIANTS_WALLET = 0x0000_2000;
+        const ADULTS_WALLET = 0x0000_1000;
         const SCALE_MASK = 0x0000_0e00;
         const GOLD_SCALE = 0x0000_0400;
         const SILVER_SCALE = 0x0000_0200;
@@ -609,6 +625,19 @@ bitflags! {
 }
 
 impl Upgrades {
+    pub fn deku_nut_capacity(&self) -> Upgrades { *self & Upgrades::DEKU_NUT_CAPACITY_MASK }
+
+    pub fn set_deku_nut_capacity(&mut self, deku_nut_capacity: Upgrades) {
+        self.remove(Upgrades::DEKU_NUT_CAPACITY_MASK);
+        self.insert(deku_nut_capacity & Upgrades::DEKU_NUT_CAPACITY_MASK);
+    }
+    pub fn deku_stick_capacity(&self) -> Upgrades { *self & Upgrades::DEKU_STICK_CAPACITY_MASK }
+
+    pub fn set_deku_stick_capacity(&mut self, deku_stick_capacity: Upgrades) {
+        self.remove(Upgrades::DEKU_STICK_CAPACITY_MASK);
+        self.insert(deku_stick_capacity & Upgrades::DEKU_STICK_CAPACITY_MASK);
+    }
+
     pub fn bullet_bag(&self) -> Upgrades { *self & Upgrades::BULLET_BAG_MASK }
 
     pub fn set_bullet_bag(&mut self, bullet_bag: Upgrades) {
@@ -703,42 +732,42 @@ bitflags! {
 }
 
 impl QuestItems {
-    pub fn has(&self, items: impl Into<QuestItems>) -> bool {
+    pub fn has(&self, items: impl Into<Self>) -> bool {
         self.contains(items.into())
     }
 
     pub fn num_stones(&self) -> u8 {
-        (if self.contains(QuestItems::KOKIRI_EMERALD) { 1 } else { 0 })
-        + if self.contains(QuestItems::GORON_RUBY) { 1 } else { 0 }
-        + if self.contains(QuestItems::ZORA_SAPPHIRE) { 1 } else { 0 }
+        (if self.contains(Self::KOKIRI_EMERALD) { 1 } else { 0 })
+        + if self.contains(Self::GORON_RUBY) { 1 } else { 0 }
+        + if self.contains(Self::ZORA_SAPPHIRE) { 1 } else { 0 }
     }
 }
 
 impl From<Medallion> for QuestItems {
-    fn from(med: Medallion) -> QuestItems {
+    fn from(med: Medallion) -> Self {
         match med {
-            Medallion::Light => QuestItems::LIGHT_MEDALLION,
-            Medallion::Forest => QuestItems::FOREST_MEDALLION,
-            Medallion::Fire => QuestItems::FIRE_MEDALLION,
-            Medallion::Water => QuestItems::WATER_MEDALLION,
-            Medallion::Shadow => QuestItems::SHADOW_MEDALLION,
-            Medallion::Spirit => QuestItems::SPIRIT_MEDALLION,
+            Medallion::Light => Self::LIGHT_MEDALLION,
+            Medallion::Forest => Self::FOREST_MEDALLION,
+            Medallion::Fire => Self::FIRE_MEDALLION,
+            Medallion::Water => Self::WATER_MEDALLION,
+            Medallion::Shadow => Self::SHADOW_MEDALLION,
+            Medallion::Spirit => Self::SPIRIT_MEDALLION,
         }
     }
 }
 
 impl From<Stone> for QuestItems {
-    fn from(stone: Stone) -> QuestItems {
+    fn from(stone: Stone) -> Self {
         match stone {
-            Stone::KokiriEmerald => QuestItems::KOKIRI_EMERALD,
-            Stone::GoronRuby => QuestItems::GORON_RUBY,
-            Stone::ZoraSapphire => QuestItems::ZORA_SAPPHIRE,
+            Stone::KokiriEmerald => Self::KOKIRI_EMERALD,
+            Stone::GoronRuby => Self::GORON_RUBY,
+            Stone::ZoraSapphire => Self::ZORA_SAPPHIRE,
         }
     }
 }
 
 impl From<DungeonReward> for QuestItems {
-    fn from(reward: DungeonReward) -> QuestItems {
+    fn from(reward: DungeonReward) -> Self {
         match reward {
             DungeonReward::Medallion(med) => med.into(),
             DungeonReward::Stone(stone) => stone.into(),
@@ -747,77 +776,127 @@ impl From<DungeonReward> for QuestItems {
 }
 
 impl<'a, T: Into<QuestItems> + Clone> From<&'a T> for QuestItems {
-    fn from(x: &T) -> QuestItems { x.clone().into() }
+    fn from(x: &T) -> Self { x.clone().into() }
 }
 
 impl TryFrom<Vec<u8>> for QuestItems {
     type Error = Vec<u8>;
 
-    fn try_from(raw_data: Vec<u8>) -> Result<QuestItems, Vec<u8>> {
+    fn try_from(raw_data: Vec<u8>) -> Result<Self, Vec<u8>> {
         if raw_data.len() != 4 { return Err(raw_data) }
         Ok(QuestItems::from_bits_truncate(BigEndian::read_u32(&raw_data)))
     }
 }
 
 impl<'a> From<&'a QuestItems> for [u8; 4] {
-    fn from(quest_items: &QuestItems) -> [u8; 4] {
+    fn from(quest_items: &QuestItems) -> Self {
         quest_items.bits().to_be_bytes()
     }
 }
 
 impl<'a> From<&'a QuestItems> for Vec<u8> {
-    fn from(quest_items: &QuestItems) -> Vec<u8> {
+    fn from(quest_items: &QuestItems) -> Self {
         <[u8; 4]>::from(quest_items).into()
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct BossKeys {
-    pub forest_temple: bool,
-    pub fire_temple: bool,
-    pub water_temple: bool,
-    pub spirit_temple: bool,
-    pub shadow_temple: bool,
-    pub ganons_castle: bool,
+pub struct SingleDungeonItems {
+    pub boss_key: bool,
+    pub compass: bool,
+    pub map: bool,
 }
 
-impl TryFrom<Vec<u8>> for BossKeys {
+impl From<u8> for SingleDungeonItems {
+    fn from(raw_data: u8) -> Self {
+        Self {
+            boss_key: raw_data & 0x01 == 0x01,
+            compass: raw_data & 0x02 == 0x02,
+            map: raw_data & 0x04 == 0x04,
+        }
+    }
+}
+
+impl From<SingleDungeonItems> for u8 {
+    fn from(items: SingleDungeonItems) -> Self {
+        (if items.boss_key { 0x01 } else { 0 })
+        | if items.compass { 0x02 } else { 0 }
+        | if items.map { 0x04 } else { 0 }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct DungeonItems {
+    pub deku_tree: SingleDungeonItems,
+    pub dodongos_cavern: SingleDungeonItems,
+    pub jabu_jabu: SingleDungeonItems,
+    pub forest_temple: SingleDungeonItems,
+    pub fire_temple: SingleDungeonItems,
+    pub water_temple: SingleDungeonItems,
+    pub spirit_temple: SingleDungeonItems,
+    pub shadow_temple: SingleDungeonItems,
+    pub bottom_of_the_well: SingleDungeonItems,
+    pub ice_cavern: SingleDungeonItems,
+    pub ganons_castle: SingleDungeonItems,
+}
+
+impl TryFrom<Vec<u8>> for DungeonItems {
     type Error = Vec<u8>;
 
-    fn try_from(raw_data: Vec<u8>) -> Result<BossKeys, Vec<u8>> {
-        macro_rules! get {
-            ($idx:expr) => {{
-                raw_data[$idx] & 0x01 == 0x01
-            }};
-        }
-
+    fn try_from(raw_data: Vec<u8>) -> Result<Self, Vec<u8>> {
         if raw_data.len() != 0x14 { return Err(raw_data) }
-        Ok(BossKeys {
-            forest_temple: get!(0x03),
-            fire_temple: get!(0x04),
-            water_temple: get!(0x05),
-            spirit_temple: get!(0x06),
-            shadow_temple: get!(0x07),
-            ganons_castle: get!(0x0a),
+        Ok(Self {
+            deku_tree: SingleDungeonItems::from(raw_data[0x00]),
+            dodongos_cavern: SingleDungeonItems::from(raw_data[0x01]),
+            jabu_jabu: SingleDungeonItems::from(raw_data[0x02]),
+            forest_temple: SingleDungeonItems::from(raw_data[0x03]),
+            fire_temple: SingleDungeonItems::from(raw_data[0x04]),
+            water_temple: SingleDungeonItems::from(raw_data[0x05]),
+            spirit_temple: SingleDungeonItems::from(raw_data[0x06]),
+            shadow_temple: SingleDungeonItems::from(raw_data[0x07]),
+            bottom_of_the_well: SingleDungeonItems::from(raw_data[0x08]),
+            ice_cavern: SingleDungeonItems::from(raw_data[0x09]),
+            ganons_castle: SingleDungeonItems::from(raw_data[0x0a]), // Ganon boss key stored in the “Ganon's Tower” scene, not “Inside Ganon's Castle”
         })
     }
 }
 
-impl<'a> From<&'a BossKeys> for [u8; 0x14] {
-    fn from(boss_keys: &BossKeys) -> [u8; 0x14] {
+impl IntoIterator for DungeonItems {
+    type IntoIter = <[SingleDungeonItems; 11] as IntoIterator>::IntoIter;
+    type Item = SingleDungeonItems;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::array::IntoIter::new([
+            self.deku_tree,
+            self.dodongos_cavern,
+            self.jabu_jabu,
+            self.forest_temple,
+            self.fire_temple,
+            self.water_temple,
+            self.spirit_temple,
+            self.shadow_temple,
+            self.bottom_of_the_well,
+            self.ice_cavern,
+            self.ganons_castle,
+        ]) //TODO (Rust 2021) use into_iter method
+    }
+}
+
+impl<'a> From<&'a DungeonItems> for [u8; 0x14] {
+    fn from(items: &DungeonItems) -> [u8; 0x14] {
         [
-            0, 0, 0, if boss_keys.forest_temple { 1 } else { 0 },
-            if boss_keys.fire_temple { 1 } else { 0 }, if boss_keys.water_temple { 1 } else { 0 }, if boss_keys.spirit_temple { 1 } else { 0 }, if boss_keys.shadow_temple { 1 } else { 0 },
-            0, 0, if boss_keys.ganons_castle { 1 } else { 0 }, 0,
+            items.deku_tree.into(), items.dodongos_cavern.into(), items.jabu_jabu.into(), items.forest_temple.into(),
+            items.fire_temple.into(), items.water_temple.into(), items.spirit_temple.into(), items.shadow_temple.into(),
+            items.bottom_of_the_well.into(), items.ice_cavern.into(), items.ganons_castle.into(), 0,
             0, 0, 0, 0,
             0, 0, 0, 0,
         ]
     }
 }
 
-impl<'a> From<&'a BossKeys> for Vec<u8> {
-    fn from(boss_keys: &BossKeys) -> Vec<u8> {
-        <[u8; 0x14]>::from(boss_keys).into()
+impl<'a> From<&'a DungeonItems> for Vec<u8> {
+    fn from(items: &DungeonItems) -> Vec<u8> {
+        <[u8; 0x14]>::from(items).into()
     }
 }
 
@@ -829,9 +908,16 @@ pub struct SmallKeys {
     pub spirit_temple: u8,
     pub shadow_temple: u8,
     pub bottom_of_the_well: u8,
-    pub gerudo_training_grounds: u8,
+    pub gerudo_training_ground: u8,
     pub thieves_hideout: u8,
     pub ganons_castle: u8,
+}
+
+impl SmallKeys {
+    fn total(&self) -> u8 {
+        let Self { forest_temple, fire_temple, water_temple, spirit_temple, shadow_temple, bottom_of_the_well, gerudo_training_ground, thieves_hideout, ganons_castle } = *self;
+        forest_temple + fire_temple + water_temple + spirit_temple + shadow_temple + bottom_of_the_well + gerudo_training_ground + thieves_hideout + ganons_castle
+    }
 }
 
 impl TryFrom<Vec<u8>> for SmallKeys {
@@ -852,7 +938,7 @@ impl TryFrom<Vec<u8>> for SmallKeys {
             spirit_temple: get!(0x06),
             shadow_temple: get!(0x07),
             bottom_of_the_well: get!(0x08),
-            gerudo_training_grounds: get!(0x0b),
+            gerudo_training_ground: get!(0x0b),
             thieves_hideout: get!(0x0c),
             ganons_castle: get!(0x0d),
         })
@@ -864,7 +950,7 @@ impl<'a> From<&'a SmallKeys> for [u8; 0x13] {
         [
             0, 0, 0, small_keys.forest_temple,
             small_keys.fire_temple, small_keys.water_temple, small_keys.spirit_temple, small_keys.shadow_temple,
-            small_keys.bottom_of_the_well, 0, 0, small_keys.gerudo_training_grounds,
+            small_keys.bottom_of_the_well, 0, 0, small_keys.gerudo_training_ground,
             small_keys.thieves_hideout, small_keys.ganons_castle, 0, 0,
             0, 0, 0,
         ]
@@ -991,7 +1077,7 @@ pub struct Save {
     pub equipment: Equipment,
     pub upgrades: Upgrades,
     pub quest_items: QuestItems,
-    pub boss_keys: BossKeys,
+    pub dungeon_items: DungeonItems,
     pub small_keys: SmallKeys,
     pub skull_tokens: u8,
     pub scene_flags: SceneFlags,
@@ -1094,7 +1180,7 @@ impl Save {
             equipment: try_get_offset!("equipment", 0x009c, 0x2),
             upgrades: try_get_offset!("upgrades", 0x00a0, 0x4),
             quest_items: try_get_offset!("quest_items", 0x00a4, 0x4),
-            boss_keys: try_get_offset!("boss_keys", 0x00a8, 0x14),
+            dungeon_items: try_get_offset!("dungeon_items", 0x00a8, 0x14),
             small_keys: try_get_offset!("small_keys", 0x00bc, 0x13),
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
@@ -1112,7 +1198,7 @@ impl Save {
         let mut buf = vec![0; SIZE];
         let Save {
             is_adult, time_of_day, magic, biggoron_sword, dmt_biggoron_checked, inv, inv_amounts,
-            equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags,
+            equipment, upgrades, quest_items, dungeon_items, small_keys, skull_tokens, scene_flags,
             gold_skulltulas, big_poes, fishing_context, event_chk_inf, item_get_inf, inf_table,
             game_mode,
         } = self;
@@ -1135,7 +1221,7 @@ impl Save {
         buf.splice(0x009c..0x009e, Vec::from(equipment));
         buf.splice(0x00a0..0x00a4, Vec::from(upgrades));
         buf.splice(0x00a4..0x00a8, Vec::from(quest_items));
-        buf.splice(0x00a8..0x00bc, Vec::from(boss_keys));
+        buf.splice(0x00a8..0x00bc, Vec::from(dungeon_items));
         buf.splice(0x00bc..0x00cf, Vec::from(small_keys));
         buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
@@ -1157,60 +1243,183 @@ impl Save {
         self.scene_flags.windmill_and_dampes_grave.unused = crate::scene::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
     }
 
-    pub(crate) fn amount_of_item(&self, item: &Item) -> u8 {
-        match item.name() {
-            "Blue Fire" | "Buy Blue Fire" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),
-            "Bomb Bag" => match self.upgrades.bomb_bag() {
+    pub(crate) fn amount_of_item(&self, item: Item) -> u8 {
+        match item {
+            Item::BigPoe | Item::BottleWithBigPoe => self.big_poes + u8::try_from(self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BigPoe).count()).expect("more than u8::MAX bottles"),
+            Item::BiggoronSword => (self.equipment.contains(Equipment::GIANTS_KNIFE) && self.biggoron_sword).into(),
+            Item::BlueFire | Item::BottleWithBlueFire | Item::BuyBlueFire => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),
+            Item::BottleWithBluePotion | Item::BuyBluePotion => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BluePotion).count().try_into().expect("more than u8::MAX bottles"),
+            Item::BoleroOfFire => self.quest_items.contains(QuestItems::BOLERO_OF_FIRE).into(),
+            Item::BombBag | Item::Bombs | Item::Bombs5 | Item::Bombs10 | Item::Bombs20 | Item::BuyBombs525 | Item::BuyBombs535 | Item::BuyBombs10 | Item::BuyBombs20 | Item::BuyBombs30 => match self.upgrades.bomb_bag() {
                 Upgrades::BOMB_BAG_40 => 3,
                 Upgrades::BOMB_BAG_30 => 2,
                 Upgrades::BOMB_BAG_20 => 1,
                 _ => 0,
             },
-            "Bombchus" | "Bombchu Drop" | "Bombchus (5)" | "Bombchus (10)" | "Bombchus (20)" | "Buy Bombchu (5)" | "Buy Bombchu (10)" | "Buy Bombchu (20)" => self.inv_amounts.bombchus,
-            "Boomerang" => self.inv.boomerang.into(),
-            "Bow" => self.inv.bow.into(),
-            "Deku Nut Drop" | "Buy Deku Nut (5)" | "Buy Deku Nut (10)" => self.inv_amounts.deku_nuts,
-            "Buy Deku Shield" => self.equipment.contains(Equipment::DEKU_SHIELD).into(),
-            "Deku Stick Drop" | "Buy Deku Stick (1)" => self.inv_amounts.deku_sticks,
-            "Deliver Letter" => self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER).into(), //TODO only consider when known by settings knowledge or visual confirmation
-            "Dins Fire" => self.inv.dins_fire.into(),
-            "Fish" | "Buy Fish" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Fish).count().try_into().expect("more than u8::MAX bottles"),
-            "Gerudo Membership Card" => self.quest_items.contains(QuestItems::GERUDO_CARD).into(),
-            "Hover Boots" => self.equipment.contains(Equipment::HOVER_BOOTS).into(),
-            "Buy Hylian Shield" => self.equipment.contains(Equipment::HYLIAN_SHIELD).into(),
-            "Kokiri Sword" => self.equipment.contains(Equipment::KOKIRI_SWORD).into(),
-            "Lens of Truth" => self.inv.lens.into(),
-            "Megaton Hammer" => self.inv.hammer.into(),
-            "Mirror Shield" => self.equipment.contains(Equipment::MIRROR_SHIELD).into(),
-            "Nayrus Love" => self.inv.nayrus_love.into(),
-            "Ocarina" => self.inv.ocarina.into(), //TODO return 2 with Ocarina of Time? (currently unused)
-            "Progressive Hookshot" => match self.inv.hookshot {
+            Item::Bombchus | Item::BombchuDrop | Item::Bombchus5 | Item::Bombchus10 | Item::Bombchus20 | Item::BuyBombchu5 | Item::BuyBombchu10 | Item::BuyBombchu20 => self.inv_amounts.bombchus,
+            Item::Boomerang => self.inv.boomerang.into(),
+            //TODO add already opened doors (if Keysy is known or off)
+            Item::BossKey => self.dungeon_items.into_iter().filter(|dungeon_items| dungeon_items.boss_key).count().try_into().expect("more than u8::MAX boss keys"),
+            Item::BossKeyForestTemple => self.dungeon_items.forest_temple.boss_key.into(),
+            Item::BossKeyFireTemple => self.dungeon_items.fire_temple.boss_key.into(),
+            Item::BossKeyWaterTemple => self.dungeon_items.water_temple.boss_key.into(),
+            Item::BossKeyShadowTemple => self.dungeon_items.shadow_temple.boss_key.into(),
+            Item::BossKeySpiritTemple => self.dungeon_items.spirit_temple.boss_key.into(),
+            Item::BossKeyGanonsCastle => self.dungeon_items.ganons_castle.boss_key.into(),
+            Item::Bottle => self.inv.emptiable_bottles(),
+            Item::Bow | Item::Arrows | Item::Arrows5 | Item::Arrows10 | Item::Arrows30 | Item::BuyArrows10 | Item::BuyArrows30 | Item::BuyArrows50 => self.inv.bow.into(),
+            Item::BrokenSword => (self.inv.adult_trade_item >= AdultTradeItem::BrokenSword).into(),
+            Item::Bugs | Item::BottleWithBugs | Item::BuyBottleBug => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Bug).count().try_into().expect("more than u8::MAX bottles"),
+            Item::BunnyHood => matches!(self.inv.child_trade_item, ChildTradeItem::BunnyHood | ChildTradeItem::MaskOfTruth).into(), //TODO check trade quest progress instead
+            Item::ClaimCheck => (self.inv.adult_trade_item >= AdultTradeItem::ClaimCheck).into(),
+            Item::Cojiro => (self.inv.adult_trade_item >= AdultTradeItem::Cojiro).into(),
+            //TODO only count compasses if start with compasses is known or off
+            Item::Compass => self.dungeon_items.into_iter().filter(|dungeon_items| dungeon_items.compass).count().try_into().expect("more than u8::MAX compasses"),
+            Item::CompassDekuTree => self.dungeon_items.deku_tree.compass.into(),
+            Item::CompassDodongosCavern => self.dungeon_items.dodongos_cavern.compass.into(),
+            Item::CompassJabuJabusBelly => self.dungeon_items.jabu_jabu.compass.into(),
+            Item::CompassForestTemple => self.dungeon_items.forest_temple.compass.into(),
+            Item::CompassFireTemple => self.dungeon_items.fire_temple.compass.into(),
+            Item::CompassWaterTemple => self.dungeon_items.water_temple.compass.into(),
+            Item::CompassShadowTemple => self.dungeon_items.shadow_temple.compass.into(),
+            Item::CompassSpiritTemple => self.dungeon_items.spirit_temple.compass.into(),
+            Item::CompassIceCavern => self.dungeon_items.ice_cavern.compass.into(),
+            Item::CompassBottomOfTheWell => self.dungeon_items.bottom_of_the_well.compass.into(),
+            Item::DekuNuts | Item::DekuNutDrop | Item::DekuNuts5 | Item::DekuNuts10 | Item::BuyDekuNut5 | Item::BuyDekuNut10 => self.inv_amounts.deku_nuts,
+            Item::DekuNutCapacity => match self.upgrades.deku_nut_capacity() {
+                Upgrades::DEKU_NUT_CAPACITY_40 => 2,
+                Upgrades::DEKU_NUT_CAPACITY_30 => 1,
+                _ => 0,
+            },
+            Item::DekuShield | Item::BuyDekuShield => self.equipment.contains(Equipment::DEKU_SHIELD).into(),
+            Item::DekuSticks | Item::DekuStick1 | Item::DekuStickDrop | Item::BuyDekuStick1 => self.inv_amounts.deku_sticks,
+            Item::DekuStickCapacity => match self.upgrades.deku_stick_capacity() {
+                Upgrades::DEKU_STICK_CAPACITY_30 => 2,
+                Upgrades::DEKU_STICK_CAPACITY_20 => 1,
+                _ => 0,
+            },
+            Item::DeliverLetter => self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER).into(), //TODO only consider when known by settings knowledge or visual confirmation
+            Item::DinsFire => self.inv.dins_fire.into(),
+            Item::EponasSong => self.quest_items.contains(QuestItems::EPONAS_SONG).into(),
+            Item::EyeballFrog => (self.inv.adult_trade_item >= AdultTradeItem::EyeballFrog).into(),
+            Item::Eyedrops => (self.inv.adult_trade_item >= AdultTradeItem::Eyedrops).into(),
+            Item::Fairy | Item::BottleWithFairy | Item::BuyFairysSpirit => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Fairy).count().try_into().expect("more than u8::MAX bottles"),
+            Item::FaroresWind => self.inv.farores_wind.into(),
+            Item::FireArrows => self.inv.fire_arrows.into(),
+            Item::FireMedallion => self.quest_items.contains(QuestItems::FIRE_MEDALLION).into(),
+            Item::Fish | Item::BottleWithFish | Item::BuyFish => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Fish).count().try_into().expect("more than u8::MAX bottles"),
+            Item::ForestMedallion => self.quest_items.contains(QuestItems::FOREST_MEDALLION).into(),
+            Item::GerudoMembershipCard => self.quest_items.contains(QuestItems::GERUDO_CARD).into(),
+            Item::GiantsKnife => self.equipment.contains(Equipment::GIANTS_KNIFE).into(),
+            Item::GoldSkulltulaToken => self.skull_tokens,
+            Item::GoronRuby => self.quest_items.contains(QuestItems::GORON_RUBY).into(),
+            Item::GoronTunic | Item::BuyGoronTunic => self.equipment.contains(Equipment::GORON_TUNIC).into(),
+            Item::BottleWithGreenPotion | Item::BuyGreenPotion => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::GreenPotion).count().try_into().expect("more than u8::MAX bottles"),
+            Item::HoverBoots => self.equipment.contains(Equipment::HOVER_BOOTS).into(),
+            Item::HylianShield | Item::BuyHylianShield => self.equipment.contains(Equipment::HYLIAN_SHIELD).into(),
+            Item::IceArrows => self.inv.ice_arrows.into(),
+            Item::IronBoots => self.equipment.contains(Equipment::IRON_BOOTS).into(),
+            Item::KeatonMask => matches!(self.inv.child_trade_item, ChildTradeItem::KeatonMask | ChildTradeItem::SkullMask | ChildTradeItem::SpookyMask | ChildTradeItem::BunnyHood | ChildTradeItem::MaskOfTruth).into(), //TODO check trade quest progress instead
+            Item::KokiriEmerald => self.quest_items.contains(QuestItems::KOKIRI_EMERALD).into(),
+            Item::KokiriSword => self.equipment.contains(Equipment::KOKIRI_SWORD).into(),
+            Item::LensOfTruth => self.inv.lens.into(),
+            Item::LightArrows => self.inv.light_arrows.into(),
+            Item::LightMedallion => self.quest_items.contains(QuestItems::LIGHT_MEDALLION).into(),
+            Item::MagicBean | Item::MagicBeanPack => self.inv_amounts.beans, //TODO include already planted beans
+            Item::MagicMeter => self.magic.into(),
+            //TODO only count compasses if start with maps is known or off
+            Item::Map => self.dungeon_items.into_iter().filter(|dungeon_items| dungeon_items.map).count().try_into().expect("more than u8::MAX maps"),
+            Item::MapDekuTree => self.dungeon_items.deku_tree.map.into(),
+            Item::MapDodongosCavern => self.dungeon_items.dodongos_cavern.map.into(),
+            Item::MapJabuJabusBelly => self.dungeon_items.jabu_jabu.map.into(),
+            Item::MapForestTemple => self.dungeon_items.forest_temple.map.into(),
+            Item::MapFireTemple => self.dungeon_items.fire_temple.map.into(),
+            Item::MapWaterTemple => self.dungeon_items.water_temple.map.into(),
+            Item::MapShadowTemple => self.dungeon_items.shadow_temple.map.into(),
+            Item::MapSpiritTemple => self.dungeon_items.spirit_temple.map.into(),
+            Item::MapIceCavern => self.dungeon_items.ice_cavern.map.into(),
+            Item::MapBottomOfTheWell => self.dungeon_items.bottom_of_the_well.map.into(),
+            Item::MaskOfTruth => (self.inv.child_trade_item == ChildTradeItem::MaskOfTruth).into(), //TODO check trade quest progress instead
+            Item::MegatonHammer => self.inv.hammer.into(),
+            Item::Milk | Item::BottleWithMilk => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::MilkFull).count().try_into().expect("more than u8::MAX bottles"),
+            Item::MinuetOfForest => self.quest_items.contains(QuestItems::MINUET_OF_FOREST).into(),
+            Item::MirrorShield => self.equipment.contains(Equipment::MIRROR_SHIELD).into(),
+            Item::NayrusLove => self.inv.nayrus_love.into(),
+            Item::NocturneOfShadow => self.quest_items.contains(QuestItems::NOCTURNE_OF_SHADOW).into(),
+            Item::Ocarina => self.inv.ocarina.into(), //TODO return 2 with Ocarina of Time? (currently unused)
+            Item::OddMushroom => (self.inv.adult_trade_item >= AdultTradeItem::OddMushroom).into(),
+            Item::OddPotion => (self.inv.adult_trade_item >= AdultTradeItem::OddPotion).into(),
+            Item::PoachersSaw => (self.inv.adult_trade_item >= AdultTradeItem::PoachersSaw).into(),
+            Item::PocketCucco => (self.inv.adult_trade_item >= AdultTradeItem::PocketCucco).into(),
+            Item::PocketEgg => (self.inv.adult_trade_item >= AdultTradeItem::PocketEgg).into(),
+            Item::BottleWithPoe | Item::BuyPoe => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Poe).count().try_into().expect("more than u8::MAX bottles"),
+            Item::PreludeOfLight => self.quest_items.contains(QuestItems::PRELUDE_OF_LIGHT).into(),
+            Item::Prescription => (self.inv.adult_trade_item >= AdultTradeItem::Prescription).into(),
+            Item::ProgressiveHookshot => match self.inv.hookshot {
                 Hookshot::None => 0,
                 Hookshot::Hookshot => 1,
                 Hookshot::Longshot => 2,
             },
-            "Progressive Scale" => match self.upgrades.scale() {
+            Item::ProgressiveScale => match self.upgrades.scale() {
                 Upgrades::GOLD_SCALE => 2,
                 Upgrades::SILVER_SCALE => 1,
                 _ => 0,
             },
-            "Progressive Strength Upgrade" => match self.upgrades.strength() {
+            Item::ProgressiveStrengthUpgrade => match self.upgrades.strength() {
                 Upgrades::GOLD_GAUNTLETS => 3,
                 Upgrades::SILVER_GAUNTLETS => 2,
                 Upgrades::GORON_BRACELET => 1,
                 _ => 0,
             },
-            "Serenade of Water" => self.quest_items.contains(QuestItems::SERENADE_OF_WATER).into(),
-            "Shadow Medallion" => self.quest_items.contains(QuestItems::SHADOW_MEDALLION).into(),
-            "Slingshot" => self.inv.slingshot.into(),
+            Item::ProgressiveWallet => match self.upgrades.wallet() {
+                Upgrades::TYCOONS_WALLET => 3,
+                Upgrades::GIANTS_WALLET => 2,
+                Upgrades::ADULTS_WALLET => 1,
+                _ => 0,
+            },
+            Item::BottleWithRedPotion | Item::BuyRedPotion30 | Item::BuyRedPotion40 | Item::BuyRedPotion50 => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::RedPotion).count().try_into().expect("more than u8::MAX bottles"),
+            Item::RequiemOfSpirit => self.quest_items.contains(QuestItems::REQUIEM_OF_SPIRIT).into(),
+            Item::RutosLetter => self.inv.has_rutos_letter().into(), //TODO also show Ruto's letter as active if it has been delivered
+            Item::SariasSong => self.quest_items.contains(QuestItems::SARIAS_SONG).into(),
+            Item::ScarecrowSong => unimplemented!(), //TODO free scarecrow setting knowledge + event_chk_inf
+            Item::SellBigPoe => self.big_poes,
+            Item::SerenadeOfWater => self.quest_items.contains(QuestItems::SERENADE_OF_WATER).into(),
+            Item::ShadowMedallion => self.quest_items.contains(QuestItems::SHADOW_MEDALLION).into(),
+            Item::SkullMask => matches!(self.inv.child_trade_item, ChildTradeItem::SkullMask | ChildTradeItem::SpookyMask | ChildTradeItem::BunnyHood | ChildTradeItem::MaskOfTruth).into(), //TODO check trade quest progress instead
+            Item::Slingshot | Item::DekuSeeds | Item::DekuSeeds30 | Item::BuyDekuSeeds30 => self.inv.slingshot.into(),
             //TODO add already opened doors (if Keysy is known or off)
-            "Small Key (Fire Temple)" => self.small_keys.fire_temple,
-            "Small Key (Forest Temple)" => self.small_keys.forest_temple,
-            "Small Key (Gerudo Training Grounds)" => self.small_keys.gerudo_training_grounds,
-            "Small Key (Spirit Temple)" => self.small_keys.spirit_temple,
-            "Small Key (Water Temple)" => self.small_keys.water_temple,
-            "Weird Egg" => (self.inv.child_trade_item != ChildTradeItem::None).into(),
-            name => unimplemented!("check for item {}", name), //TODO (make a list of all items)
+            Item::SmallKey => self.small_keys.total(),
+            Item::SmallKeyForestTemple => self.small_keys.forest_temple,
+            Item::SmallKeyFireTemple => self.small_keys.fire_temple,
+            Item::SmallKeyWaterTemple => self.small_keys.water_temple,
+            Item::SmallKeyShadowTemple => self.small_keys.shadow_temple,
+            Item::SmallKeySpiritTemple => self.small_keys.spirit_temple, //TODO only count starting keys if known
+            Item::SmallKeyBottomOfTheWell => self.small_keys.bottom_of_the_well,
+            Item::SmallKeyGerudoTrainingGround => self.small_keys.gerudo_training_ground,
+            Item::SmallKeyThievesHideout => self.small_keys.thieves_hideout,
+            Item::SmallKeyGanonsCastle => self.small_keys.ganons_castle,
+            Item::SongOfStorms => self.quest_items.contains(QuestItems::SONG_OF_STORMS).into(),
+            Item::SongOfTime => self.quest_items.contains(QuestItems::SONG_OF_TIME).into(),
+            Item::SpiritMedallion => self.quest_items.contains(QuestItems::SPIRIT_MEDALLION).into(),
+            Item::SpookyMask => matches!(self.inv.child_trade_item, ChildTradeItem::SpookyMask | ChildTradeItem::BunnyHood | ChildTradeItem::MaskOfTruth).into(), //TODO check trade quest progress instead
+            Item::StoneOfAgony => self.quest_items.contains(QuestItems::STONE_OF_AGONY).into(),
+            Item::SunsSong => self.quest_items.contains(QuestItems::SUNS_SONG).into(),
+            Item::TriforcePiece => self.triforce_pieces(),
+            Item::WaterMedallion => self.quest_items.contains(QuestItems::WATER_MEDALLION).into(),
+            Item::WeirdEgg => (self.inv.child_trade_item != ChildTradeItem::None).into(),
+            Item::ZeldasLetter => (!matches!(self.inv.child_trade_item, ChildTradeItem::None | ChildTradeItem::WeirdEgg | ChildTradeItem::Chicken)).into(), //TODO check trade quest progress instead
+            Item::ZeldasLullaby => self.quest_items.contains(QuestItems::ZELDAS_LULLABY).into(),
+            Item::ZoraSapphire => self.quest_items.contains(QuestItems::ZORA_SAPPHIRE).into(),
+            Item::ZoraTunic | Item::BuyZoraTunic => self.equipment.contains(Equipment::ZORA_TUNIC).into(),
+
+            // the following are most likely unused
+            Item::DoubleDefense => unimplemented!(),
+            Item::GoronMask | Item::ZoraMask | Item::GerudoMask => unimplemented!(),
+            Item::HeartContainer | Item::HeartContainerBoss | Item::PieceOfHeart | Item::PieceOfHeartTreasureChestGame => unimplemented!(),
+            Item::IceTrap => unimplemented!(),
+            Item::RecoveryHeart | Item::BuyHeart => unimplemented!(),
+            Item::Rupees | Item::Rupee1 | Item::Rupees5 | Item::Rupees20 | Item::Rupees50 | Item::Rupees200 | Item::RupeeTreasureChestGame => unimplemented!(),
+            Item::SoldOut => unimplemented!(),
         }
     }
 }
