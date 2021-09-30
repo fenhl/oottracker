@@ -65,6 +65,19 @@ fn ignore_setting(name: &str) -> bool {
     }
 }
 
+pub(crate) fn value_to_ident(value: &str) -> Ident {
+    Ident::new(match value {
+        "0" => "zero",
+        "1" => "one",
+        "2" => "two",
+        "3" => "three",
+        "4" => "four",
+        "default" => "forenoon", //TODO make sure this is only on starting time of day
+        "witching-hour" => "witching_hour",
+        _ => value,
+    }, Span::call_site())
+}
+
 pub(crate) fn settings(settings_list: &PyModule) -> Result<TokenStream, Error> {
     let mut knowledge_types = Vec::default();
     let mut knowledge_fields = Vec::default();
@@ -80,18 +93,7 @@ pub(crate) fn settings(settings_list: &PyModule) -> Result<TokenStream, Error> {
         if settings_list.getattr("Combobox")?.downcast::<PyType>()?.is_instance(setting)? {
             let ty = Ident::new(&format!("{}Knowledge", name.to_case(Case::Pascal)), Span::call_site());
             let choices = setting.getattr("choice_list")?.iter()?
-                .map(|choice_res| choice_res.and_then(|choice| Ok(
-                    Ident::new(match choice.extract()? {
-                        "0" => "zero",
-                        "1" => "one",
-                        "2" => "two",
-                        "3" => "three",
-                        "4" => "four",
-                        "default" => "forenoon", //TODO make sure this is only on starting time of day
-                        "witching-hour" => "witching_hour",
-                        choice => choice,
-                    }, Span::call_site())
-                )))
+                .map(|choice_res| choice_res.and_then(|choice| Ok(value_to_ident(choice.extract()?))))
                 .try_collect::<_, Vec<_>, _>()?;
             knowledge_types.push(quote! {
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
@@ -114,6 +116,10 @@ pub(crate) fn settings(settings_list: &PyModule) -> Result<TokenStream, Error> {
                             }
                         }
                     )*
+
+                    pub fn is_known(&self) -> bool {
+                        0 #(+ u8::from(self.#choices))* == 1
+                    }
                 }
 
                 impl Default for #ty {

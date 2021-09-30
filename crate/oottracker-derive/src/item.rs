@@ -13,6 +13,10 @@ use {
     syn::Ident,
 };
 
+pub(crate) fn to_ident(name: &str) -> Ident {
+    Ident::new(&name.replace(&['\'', '(', ')', '[', ']'][..], "").to_case(Case::Pascal), Span::call_site())
+}
+
 pub(crate) fn item(item_list: &PyModule) -> Result<TokenStream, crate::Error> {
     let items = item_list.getattr("item_table")?
         .call_method0("items")?
@@ -24,7 +28,7 @@ pub(crate) fn item(item_list: &PyModule) -> Result<TokenStream, crate::Error> {
         .try_collect::<_, Vec<_>, _>()?
         .into_iter()
         .filter_map(|(name, kind)| if kind != "Event" || name == "Scarecrow Song" { //HACK treat Scarecrow Song as not an event since it's not defined as one in any region
-            Some(Ident::new(&name.replace(&['\'', '(', ')', '[', ']'][..], "").to_case(Case::Pascal), Span::call_site()))
+            Some(to_ident(&name))
         } else {
             None
         })

@@ -22,6 +22,7 @@ use {
         Case,
         Casing as _,
     },
+    derive_more::From,
     directories::ProjectDirs,
     graphql_client::{
         GraphQLQuery,
@@ -48,6 +49,8 @@ use {
     },
 };
 
+mod access;
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "../../assets/graphql/github-schema.graphql",
@@ -56,9 +59,13 @@ use {
 )]
 struct DevRVersionQuery;
 
-#[derive(Debug, FromArc, Clone)]
+#[derive(Debug, From, FromArc, Clone)]
 enum Error {
+    #[from]
+    AccessParse(access::ParseError),
     EmptyResponse,
+    ExitToUnknownRegion,
+    InvalidLogicHelper,
     #[from_arc]
     Io(Arc<io::Error>),
     MissingHomeDir,
@@ -72,6 +79,7 @@ enum Error {
     Py(Arc<PyErr>),
     #[from_arc]
     Reqwest(Arc<reqwest::Error>),
+    UnknownDungeon(String),
     UnknownSettingType(String),
     UnknownStringSetting(String),
     #[from_arc]
@@ -154,7 +162,7 @@ pub fn version(_: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn embed_image(input: TokenStream) -> TokenStream {
     let img_path = parse_macro_input!(input as LitStr).value();
-    let img_path = Path::new(&img_path);
+    let img_path = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("crate has no parent").parent().expect("crates dir has no parent").join(img_path);
     let name = Ident::new(&img_path.file_name().expect("empty filename").to_string_lossy().split('.').next().expect("empty filename").to_case(Case::Snake), Span::call_site());
     let mut buf = Vec::default();
     File::open(img_path).expect("failed to open image to embed").read_to_end(&mut buf).expect("failed to read image to embed");
@@ -169,7 +177,7 @@ pub fn embed_image(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn embed_images(input: TokenStream) -> TokenStream {
     let dir_path = parse_macro_input!(input as LitStr).value();
-    let dir_path = Path::new(&dir_path);
+    let dir_path = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("crate has no parent").parent().expect("crates dir has no parent").join(dir_path);
     let name = Ident::new(&dir_path.file_name().expect("empty filename").to_string_lossy().to_case(Case::Snake), Span::call_site());
     let name_all = Ident::new(&format!("{}_all", name), Span::call_site());
     let img_consts = fs::read_dir(dir_path).expect("failed to open images dir") //TODO compile error instead of panic
@@ -241,7 +249,7 @@ mod region;
 #[proc_macro]
 pub fn region(input: TokenStream) -> TokenStream {
     if input.is_empty() {
-        match RANDO_PATH.clone().and_then(|rando_path| region::region(&rando_path)) {
+        match RANDO_PATH.clone().and_then(|rando_path| Python::with_gil(|py| region::region(py, &rando_path))) {
             Ok(output) => output,
             Err(e) => e.to_compile_error(),
         }

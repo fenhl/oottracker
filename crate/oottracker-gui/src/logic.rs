@@ -178,12 +178,13 @@ impl State {
             ))
             .push(Button::new(&mut self.save_btn, Text::new("Save Game"))) //TODO on_press
             .push(Button::new(&mut self.reset_btn, Text::new("Reset N64"))) //TODO on_press
+            //TODO menu with advanced file ops (swap to file n/copy 1 to 2/copy 2 to 1/delete file 1/delete file 2)
             .spacing(16)
         );
         match self.current_region.as_ref() {
             "Root" => col = col
                 .push(Text::new("External knowledge:"))
-                //TODO randomizer version (support latest release, latest Dev, latest Dev-R, and any version currently used in a major tournament or the RSL)
+                //TODO randomizer version? (support latest release, latest Dev, latest Dev-R, and any version currently used in a major tournament or the RSL)
                 .push(Row::new()
                     .push(Text::new("Settings:").height(Length::Units(30)).vertical_alignment(VerticalAlignment::Center))
                     .push(PickList::new(&mut self.settings_pick, SettingsInfoKind::into_enum_iter().collect_vec(), Some(self.settings_info.kind()), Message::PickSettingsInfo))

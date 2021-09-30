@@ -391,6 +391,7 @@ impl App for RslItemTracker {
     fn base_url(&self) -> &'static str { "https://ootr-random-settings-tracker.firebaseio.com" }
     fn api_key(&self) -> &'static str { RSL_API_KEY }
 
+    //TODO update for changes since https://github.com/matthewkirby/ootrr-web-tracker/commit/dfc3f0bb0a5ffeb7f87af41659528bb62f8a2f67
     cells! {
         "forestmed": ForestMedallion,
         "forest_med_text": ForestMedallionLocation,

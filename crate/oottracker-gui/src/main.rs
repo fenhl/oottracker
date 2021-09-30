@@ -5,7 +5,7 @@
 
 use {
     std::{
-        //collections::HashMap,
+        collections::HashMap,
         convert::Infallible as Never,
         env,
         fmt,
@@ -64,6 +64,11 @@ use {
     wheel::FromArc,
     oottracker::{
         ModelState,
+        check::Check,
+        checks::{
+            self,
+            CheckStatus,
+        },
         firebase,
         github::Repo,
         net::{
@@ -192,7 +197,7 @@ enum Message {
     SetPort(String),
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
-    //UpdateAvailableChecks(HashMap<Check, CheckStatus>),
+    UpdateAvailableChecks(HashMap<Check, CheckStatus>),
     UpdateCheck,
     UpdateCheckComplete(Option<Version>),
     UpdateCheckError(UpdateCheckError),
@@ -312,7 +317,7 @@ struct State {
     disable_update_checks_button: button::State,
     cell_buttons: [button::State; 52],
     model: ModelState,
-    //checks: HashMap<Check, CheckStatus>, //TODO
+    checks: HashMap<Check, CheckStatus>,
     //logic: logic::State,
     notification: Option<(bool, Message)>,
     dismiss_notification_button: button::State,
@@ -386,7 +391,7 @@ impl Default for State {
                 button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(), button::State::default(),
             ],
             model: ModelState::default(),
-            //checks: HashMap::default(),
+            checks: HashMap::default(),
             //logic: logic::State::default(),
             notification: None,
             dismiss_notification_button: button::State::default(),
@@ -520,18 +525,13 @@ impl Application for State {
                         self.model.update_knowledge();
                     }
                 }
-                /*
                 if self.flags.show_available_checks {
-                    let rando = self.rando.clone();
                     let model = self.model.clone();
                     return async move {
-                        tokio::task::spawn_blocking(move || match checks::status(&*rando, &model) {
-                            Ok(status) => Message::UpdateAvailableChecks(status),
-                            Err(e) => Message::CheckStatusErrorStatic(e),
-                        }).await.expect("status checks task panicked")
+                        let statuses = checks::status(&model).into_iter().map(|(check, reachable)| (check, if reachable { CheckStatus::Reachable } else { CheckStatus::NotYetReachable })).collect(); //TODO differentiate checked/unchecked
+                        tokio::task::spawn_blocking(move || Message::UpdateAvailableChecks(statuses)).await.expect("status checks task panicked")
                     }.into()
                 }
-                */ //TODO
             }
             Message::ResetUpdateState => self.update_check = UpdateCheckState::Unknown(button::State::default()),
             Message::RightClick => {
@@ -580,7 +580,7 @@ impl Application for State {
                 self.config.as_mut().expect("config not yet loaded").warp_song_order = warp_song_order;
                 return self.save_config()
             }
-            //Message::UpdateAvailableChecks(checks) => self.checks = checks,
+            Message::UpdateAvailableChecks(checks) => self.checks = checks,
             Message::UpdateCheck => {
                 self.update_check = UpdateCheckState::Checking;
                 let client = self.http_client.clone();
@@ -750,7 +750,7 @@ impl Application for State {
             .width(if self.flags.show_logic_tracker { Length::Units(WIDTH as u16 + 2) } else { Length::Fill })
             .height(if self.flags.show_available_checks { Length::Units(HEIGHT as u16 + 2) } else { Length::Fill })
             .into();
-        let left_column = /*if self.flags.show_available_checks {
+        let left_column = if self.flags.show_available_checks {
             let check_status_map = self.checks.iter().map(|(check, status)| (status, check)).into_group_map();
             let mut col = Column::new()
                 .push(Text::new(format!("{} checked", lang::plural(check_status_map.get(&CheckStatus::Checked).map_or(0, Vec::len), "location"))))
@@ -765,7 +765,7 @@ impl Application for State {
                 .into()
         } else {
             items_container
-        }*/ items_container; //TODO
+        };
         /*
         if self.flags.show_logic_tracker {
             Row::new()

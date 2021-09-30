@@ -16,10 +16,19 @@ use {
     async_proto::Protocol,
     enum_iterator::IntoEnumIterator,
     wheel::FromArc,
-    crate::item::Item,
+    crate::{
+        ModelState,
+        item::Item,
+        model::{
+            Dungeon,
+            MainDungeon,
+        },
+    },
 };
 
 oottracker_derive::region!();
+
+pub type Access = fn(&ModelState) -> bool;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
 pub enum Mq {

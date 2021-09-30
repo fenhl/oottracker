@@ -24,7 +24,7 @@ pub use crate::{
     save::Save,
 };
 
-mod check;
+pub mod check;
 pub mod checks;
 pub mod firebase;
 pub mod github;
@@ -52,6 +52,9 @@ pub struct ModelState {
 impl ModelState {
     pub fn update_knowledge(&mut self) {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
+        if !self.knowledge.settings.starting_age.is_known() {
+            self.knowledge.settings.starting_age = if self.ram.save.is_adult { settings::StartingAgeKnowledge::adult() } else { settings::StartingAgeKnowledge::child() }
+        } //TODO handle random starting age with unknown randomized_settings similarly
         if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
             self.knowledge.set_dungeon_reward_location(reward, DungeonRewardLocation::LinksPocket);
         }

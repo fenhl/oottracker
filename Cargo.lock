@@ -3153,9 +3153,13 @@ name = "oottracker-derive"
 version = "0.6.1"
 dependencies = [
  "convert_case",
+ "derivative",
+ "derive_more",
  "directories",
+ "enum-iterator",
  "graphql_client",
  "itertools 0.10.1 (git+https://github.com/rust-itertools/itertools?rev=fa3fffb0741c59785dcbf9ed168e3def122621c9)",
+ "lazy-regex",
  "once_cell",
  "proc-macro2",
  "pyo3",
