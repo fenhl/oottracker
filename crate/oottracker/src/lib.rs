@@ -47,6 +47,7 @@ pub mod ram;
 pub mod region;
 pub mod save;
 mod scene;
+mod text;
 pub mod ui;
 pub mod websocket;
 
@@ -61,6 +62,13 @@ impl ModelState {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
         if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
             self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::LinksPocket);
+        }
+        if self.ram.current_text_box_id != 0 {
+            if let Ok(new_knowledge) = self.knowledge.clone() & text::read_knowledge(&self.ram.text_box_contents[..]) {
+                self.knowledge = new_knowledge;
+            } else {
+                //TODO report/log error?
+            }
         }
     }
 
