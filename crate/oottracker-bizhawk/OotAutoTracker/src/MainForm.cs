@@ -11,226 +11,152 @@ using System.Windows.Forms;
 using BizHawk.Client.Common;
 using BizHawk.Client.EmuHawk;
 
-namespace Net.Fenhl.OotAutoTracker
-{
-    internal class Native
-    {
-        [DllImport("oottracker")]
-        internal static extern StringHandle version_string();
-        [DllImport("oottracker")]
-        internal static extern TrackerLayoutHandle layout_default();
-        [DllImport("oottracker")]
-        internal static extern void layout_free(IntPtr layout);
-        [DllImport("oottracker")]
-        internal static extern TrackerCellHandle layout_cell(TrackerLayoutHandle layout, byte idx);
-        [DllImport("oottracker")]
-        internal static extern void cell_free(IntPtr layout);
-        [DllImport("oottracker")]
-        internal static extern StringHandle cell_image(ModelStateHandle model, TrackerCellHandle cell);
-        [DllImport("oottracker")]
-        internal static extern TcpStreamResultHandle connect_ipv4(byte[] addr);
-        [DllImport("oottracker")]
-        internal static extern TcpStreamResultHandle connect_ipv6(byte[] addr);
-        [DllImport("oottracker")]
-        internal static extern void tcp_stream_result_free(IntPtr tcp_stream_res);
-        [DllImport("oottracker")]
-        internal static extern bool tcp_stream_result_is_ok(TcpStreamResultHandle tcp_stream_res);
-        [DllImport("oottracker")]
-        internal static extern TcpStreamHandle tcp_stream_result_unwrap(IntPtr tcp_stream_res);
-        [DllImport("oottracker")]
-        internal static extern void tcp_stream_free(IntPtr tcp_stream);
-        [DllImport("oottracker")]
-        internal static extern StringHandle tcp_stream_result_debug_err(IntPtr tcp_stream_res);
-        [DllImport("oottracker")]
-        internal static extern void string_free(IntPtr s);
-        [DllImport("oottracker")]
-        internal static extern UnitResultHandle tcp_stream_disconnect(IntPtr tcp_stream);
-        [DllImport("oottracker")]
-        internal static extern void unit_result_free(IntPtr unit_res);
-        [DllImport("oottracker")]
-        internal static extern bool unit_result_is_ok(UnitResultHandle unit_res);
-        [DllImport("oottracker")]
-        internal static extern StringHandle unit_result_debug_err(IntPtr unit_res);
-        [DllImport("oottracker")]
-        internal static extern SaveResultHandle save_from_save_data(byte[] start);
-        [DllImport("oottracker")]
-        internal static extern void save_result_free(IntPtr save_res);
-        [DllImport("oottracker")]
-        internal static extern bool save_result_is_ok(SaveResultHandle save_res);
-        [DllImport("oottracker")]
-        internal static extern SaveHandle save_result_unwrap(IntPtr save_res);
-        [DllImport("oottracker")]
-        internal static extern SaveHandle save_default();
-        [DllImport("oottracker")]
-        internal static extern void save_free(IntPtr save);
-        [DllImport("oottracker")]
-        internal static extern StringHandle save_debug(SaveHandle save);
-        [DllImport("oottracker")]
-        internal static extern StringHandle save_result_debug_err(IntPtr save_res);
-        [DllImport("oottracker")]
-        internal static extern UnitResultHandle save_send(TcpStreamHandle tcp_stream, SaveHandle save);
-        [DllImport("oottracker")]
-        internal static extern bool saves_equal(SaveHandle save1, SaveHandle save2);
-        [DllImport("oottracker")]
-        internal static extern SavesDiffHandle saves_diff(SaveHandle old_save, SaveHandle new_save);
-        [DllImport("oottracker")]
-        internal static extern void saves_diff_free(IntPtr diff);
-        [DllImport("oottracker")]
-        internal static extern UnitResultHandle saves_diff_send(TcpStreamHandle tcp_stream, IntPtr diff);
-        [DllImport("oottracker")]
-        internal static extern KnowledgeHandle knowledge_none();
-        [DllImport("oottracker")]
-        internal static extern KnowledgeHandle knowledge_vanilla();
-        [DllImport("oottracker")]
-        internal static extern void knowledge_free(IntPtr knowledge);
-        [DllImport("oottracker")]
-        internal static extern UnitResultHandle knowledge_send(TcpStreamHandle tcp_stream, KnowledgeHandle knowledge);
-        [DllImport("oottracker")]
-        internal static extern ModelStateHandle model_new(IntPtr save, IntPtr knowledge);
-        [DllImport("oottracker")]
-        internal static extern void model_free(IntPtr model);
-        [DllImport("oottracker")]
-        internal static extern byte ram_num_ranges();
-        [DllImport("oottracker")]
-        internal static extern IntPtr ram_ranges();
-        [DllImport("oottracker")]
-        internal static extern RamResultHandle ram_from_ranges(IntPtr[] ranges);
-        [DllImport("oottracker")]
-        internal static extern void ram_result_free(IntPtr ram_res);
-        [DllImport("oottracker")]
-        internal static extern bool ram_result_is_ok(RamResultHandle ram_res);
-        [DllImport("oottracker")]
-        internal static extern RamHandle ram_result_unwrap(IntPtr ram_res);
-        [DllImport("oottracker")]
-        internal static extern StringHandle ram_result_debug_err(IntPtr ram_res);
-        [DllImport("oottracker")]
-        internal static extern void ram_free(IntPtr ram);
-        [DllImport("oottracker")]
-        internal static extern bool ram_equal(RamHandle ram1, RamHandle ram2);
-        [DllImport("oottracker")]
-        internal static extern void model_set_ram(ModelStateHandle model, RamHandle ram);
-        [DllImport("oottracker")]
-        internal static extern SaveHandle ram_clone_save(RamHandle ram);
+namespace Net.Fenhl.OotAutoTracker {
+    internal class Native {
+        [DllImport("oottracker")] internal static extern StringHandle version_string();
+        [DllImport("oottracker")] internal static extern TrackerLayoutHandle layout_default();
+        [DllImport("oottracker")] internal static extern void layout_free(IntPtr layout);
+        [DllImport("oottracker")] internal static extern TrackerCellHandle layout_cell(TrackerLayoutHandle layout, byte idx);
+        [DllImport("oottracker")] internal static extern void cell_free(IntPtr layout);
+        [DllImport("oottracker")] internal static extern StringHandle cell_image(ModelStateHandle model, TrackerCellHandle cell);
+        [DllImport("oottracker")] internal static extern TcpStreamResultHandle connect_ipv4(byte[] addr);
+        [DllImport("oottracker")] internal static extern TcpStreamResultHandle connect_ipv6(byte[] addr);
+        [DllImport("oottracker")] internal static extern void tcp_stream_result_free(IntPtr tcp_stream_res);
+        [DllImport("oottracker")] internal static extern bool tcp_stream_result_is_ok(TcpStreamResultHandle tcp_stream_res);
+        [DllImport("oottracker")] internal static extern TcpStreamHandle tcp_stream_result_unwrap(IntPtr tcp_stream_res);
+        [DllImport("oottracker")] internal static extern void tcp_stream_free(IntPtr tcp_stream);
+        [DllImport("oottracker")] internal static extern StringHandle tcp_stream_result_debug_err(IntPtr tcp_stream_res);
+        [DllImport("oottracker")] internal static extern void string_free(IntPtr s);
+        [DllImport("oottracker")] internal static extern UnitResultHandle tcp_stream_disconnect(IntPtr tcp_stream);
+        [DllImport("oottracker")] internal static extern void unit_result_free(IntPtr unit_res);
+        [DllImport("oottracker")] internal static extern bool unit_result_is_ok(UnitResultHandle unit_res);
+        [DllImport("oottracker")] internal static extern StringHandle unit_result_debug_err(IntPtr unit_res);
+        [DllImport("oottracker")] internal static extern SaveResultHandle save_from_save_data(byte[] start);
+        [DllImport("oottracker")] internal static extern void save_result_free(IntPtr save_res);
+        [DllImport("oottracker")] internal static extern bool save_result_is_ok(SaveResultHandle save_res);
+        [DllImport("oottracker")] internal static extern SaveHandle save_result_unwrap(IntPtr save_res);
+        [DllImport("oottracker")] internal static extern SaveHandle save_default();
+        [DllImport("oottracker")] internal static extern void save_free(IntPtr save);
+        [DllImport("oottracker")] internal static extern StringHandle save_debug(SaveHandle save);
+        [DllImport("oottracker")] internal static extern StringHandle save_result_debug_err(IntPtr save_res);
+        [DllImport("oottracker")] internal static extern UnitResultHandle save_send(TcpStreamHandle tcp_stream, SaveHandle save);
+        [DllImport("oottracker")] internal static extern bool saves_equal(SaveHandle save1, SaveHandle save2);
+        [DllImport("oottracker")] internal static extern SavesDiffHandle saves_diff(SaveHandle old_save, SaveHandle new_save);
+        [DllImport("oottracker")] internal static extern void saves_diff_free(IntPtr diff);
+        [DllImport("oottracker")] internal static extern UnitResultHandle saves_diff_send(TcpStreamHandle tcp_stream, IntPtr diff);
+        [DllImport("oottracker")] internal static extern KnowledgeHandle knowledge_none();
+        [DllImport("oottracker")] internal static extern KnowledgeHandle knowledge_vanilla();
+        [DllImport("oottracker")] internal static extern void knowledge_free(IntPtr knowledge);
+        [DllImport("oottracker")] internal static extern UnitResultHandle knowledge_send(TcpStreamHandle tcp_stream, KnowledgeHandle knowledge);
+        [DllImport("oottracker")] internal static extern ModelStateHandle model_new(IntPtr save, IntPtr knowledge);
+        [DllImport("oottracker")] internal static extern void model_free(IntPtr model);
+        [DllImport("oottracker")] internal static extern byte ram_num_ranges();
+        [DllImport("oottracker")] internal static extern IntPtr ram_ranges();
+        [DllImport("oottracker")] internal static extern RamResultHandle ram_from_ranges(IntPtr[] ranges);
+        [DllImport("oottracker")] internal static extern void ram_result_free(IntPtr ram_res);
+        [DllImport("oottracker")] internal static extern bool ram_result_is_ok(RamResultHandle ram_res);
+        [DllImport("oottracker")] internal static extern RamHandle ram_result_unwrap(IntPtr ram_res);
+        [DllImport("oottracker")] internal static extern StringHandle ram_result_debug_err(IntPtr ram_res);
+        [DllImport("oottracker")] internal static extern void ram_free(IntPtr ram);
+        [DllImport("oottracker")] internal static extern bool ram_equal(RamHandle ram1, RamHandle ram2);
+        [DllImport("oottracker")] internal static extern void model_set_ram(ModelStateHandle model, RamHandle ram);
+        [DllImport("oottracker")] internal static extern SaveHandle ram_clone_save(RamHandle ram);
     }
 
-    internal class TrackerLayoutHandle : SafeHandle
-    {
+    internal class TrackerLayoutHandle : SafeHandle {
         internal TrackerLayoutHandle() : base(IntPtr.Zero, true) { }
 
-        public override bool IsInvalid
-        {
+        public override bool IsInvalid {
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.layout_free(handle);
             }
             return true;
         }
     }
 
-    class TrackerLayout : IDisposable
-    {
+    class TrackerLayout : IDisposable {
         internal TrackerLayoutHandle layout;
 
-        internal TrackerLayout()
-        {
+        internal TrackerLayout() {
             layout = Native.layout_default();
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             layout.Dispose();
         }
     }
 
-    internal class TrackerCellHandle : SafeHandle
-    {
+    internal class TrackerCellHandle : SafeHandle {
         internal TrackerCellHandle() : base(IntPtr.Zero, true) { }
 
-        public override bool IsInvalid
-        {
+        public override bool IsInvalid {
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.cell_free(handle);
             }
             return true;
         }
     }
 
-    class TrackerCell : IDisposable
-    {
+    class TrackerCell : IDisposable {
         internal TrackerCellHandle cell;
 
-        internal TrackerCell(TrackerLayout layout, byte idx)
-        {
+        internal TrackerCell(TrackerLayout layout, byte idx) {
             cell = Native.layout_cell(layout.layout, idx);
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             cell.Dispose();
         }
 
         public StringHandle Image(ModelState model) => Native.cell_image(model.model, cell);
     }
 
-    internal class TcpStreamResultHandle : SafeHandle
-    {
+    internal class TcpStreamResultHandle : SafeHandle {
         internal TcpStreamResultHandle() : base(IntPtr.Zero, true) { }
 
-        public override bool IsInvalid
-        {
+        public override bool IsInvalid {
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.tcp_stream_result_free(handle);
             }
             return true;
         }
 
-        internal TcpStreamHandle Unwrap()
-        {
+        internal TcpStreamHandle Unwrap() {
             var tcp_stream = Native.tcp_stream_result_unwrap(handle);
             this.handle = IntPtr.Zero; // tcp_stream_result_unwrap takes ownership
             return tcp_stream;
         }
 
-        internal StringHandle DebugErr()
-        {
+        internal StringHandle DebugErr() {
             var err = Native.tcp_stream_result_debug_err(handle);
             this.handle = IntPtr.Zero; // tcp_stream_result_debug_err takes ownership
             return err;
         }
     }
 
-    internal class TcpStreamResult : IDisposable
-    {
+    internal class TcpStreamResult : IDisposable {
         internal TcpStreamResultHandle tcp_stream_res;
 
-        internal TcpStreamResult(IPAddress addr)
-        {
-            tcp_stream_res = addr.AddressFamily switch
-            {
+        internal TcpStreamResult(IPAddress addr) {
+            tcp_stream_res = addr.AddressFamily switch {
                 AddressFamily.InterNetwork => Native.connect_ipv4(addr.GetAddressBytes().ToArray()),
                 AddressFamily.InterNetworkV6 => Native.connect_ipv6(addr.GetAddressBytes().ToArray()),
             };
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             tcp_stream_res.Dispose();
         }
 
@@ -239,72 +165,58 @@ namespace Net.Fenhl.OotAutoTracker
         internal StringHandle DebugErr() => tcp_stream_res.DebugErr();
     }
 
-    internal class TcpStreamHandle : SafeHandle
-    {
+    internal class TcpStreamHandle : SafeHandle {
         internal TcpStreamHandle() : base(IntPtr.Zero, true) { }
 
-        public override bool IsInvalid
-        {
+        public override bool IsInvalid {
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.tcp_stream_free(handle);
             }
             return true;
         }
 
-        internal UnitResultHandle Disconnect()
-        {
+        internal UnitResultHandle Disconnect() {
             var unit_res = Native.tcp_stream_disconnect(handle);
             this.handle = IntPtr.Zero; // tcp_stream_disconnect takes ownership
             return unit_res;
         }
     }
 
-    class TcpStream : IDisposable
-    {
+    class TcpStream : IDisposable {
         internal TcpStreamHandle tcp_stream;
 
-        internal TcpStream(TcpStreamResult tcp_stream_res)
-        {
+        internal TcpStream(TcpStreamResult tcp_stream_res) {
             tcp_stream = tcp_stream_res.Unwrap();
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             tcp_stream.Dispose();
         }
 
-        internal UnitResult Disconnect()
-        {
+        internal UnitResult Disconnect() {
             return new UnitResult(tcp_stream.Disconnect());
         }
     }
 
-    internal class UnitResultHandle : SafeHandle
-    {
+    internal class UnitResultHandle : SafeHandle {
         internal UnitResultHandle() : base(IntPtr.Zero, true) { }
 
-        public override bool IsInvalid
-        {
+        public override bool IsInvalid {
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.unit_result_free(handle);
             }
             return true;
         }
 
-        internal StringHandle DebugErr()
-        {
+        internal StringHandle DebugErr() {
             var err = Native.unit_result_debug_err(handle);
             this.handle = IntPtr.Zero; // unit_result_debug_err takes ownership
             return err;
@@ -315,13 +227,11 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal UnitResultHandle unit_res;
 
-        internal UnitResult(UnitResultHandle unit_res)
-        {
+        internal UnitResult(UnitResultHandle unit_res) {
             this.unit_res = unit_res;
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             unit_res.Dispose();
         }
 
@@ -338,24 +248,20 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.save_result_free(handle);
             }
             return true;
         }
 
-        internal SaveHandle Unwrap()
-        {
+        internal SaveHandle Unwrap() {
             var save = Native.save_result_unwrap(handle);
             this.handle = IntPtr.Zero; // save_result_unwrap takes ownership
             return save;
         }
 
-        internal StringHandle DebugErr()
-        {
+        internal StringHandle DebugErr() {
             var err = Native.save_result_debug_err(handle);
             this.handle = IntPtr.Zero; // save_result_debug_err takes ownership
             return err;
@@ -365,13 +271,11 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal SaveResultHandle save_res;
 
-        internal SaveResult(List<byte> save_data)
-        {
+        internal SaveResult(List<byte> save_data) {
             save_res = Native.save_from_save_data(save_data.ToArray());
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             save_res.Dispose();
         }
 
@@ -389,8 +293,7 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        public string AsString()
-        {
+        public string AsString() {
             int len = 0;
             while (Marshal.ReadByte(handle, len) != 0) { ++len; }
             byte[] buffer = new byte[len];
@@ -398,10 +301,8 @@ namespace Net.Fenhl.OotAutoTracker
             return Encoding.UTF8.GetString(buffer);
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.string_free(handle);
             }
             return true;
@@ -417,17 +318,14 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.save_free(handle);
             }
             return true;
         }
 
-        public IntPtr Move()
-        {
+        public IntPtr Move() {
             var ptr = this.handle;
             this.handle = IntPtr.Zero;
             return ptr;
@@ -438,43 +336,35 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal SaveHandle save;
 
-        internal Save()
-        {
+        internal Save() {
             save = Native.save_default();
         }
 
-        internal Save(SaveResult save_res)
-        {
+        internal Save(SaveResult save_res) {
             save = save_res.Unwrap();
         }
 
-        internal Save(Ram ram)
-        {
+        internal Save(Ram ram) {
             save = Native.ram_clone_save(ram.ram);
         }
 
-        internal bool Equals(Save other)
-        {
+        internal bool Equals(Save other) {
             return Native.saves_equal(save, other.save);
         }
 
-        internal SavesDiff Diff(Save other)
-        {
+        internal SavesDiff Diff(Save other) {
             return new SavesDiff(save, other.save);
         }
 
-        internal UnitResult Send(TcpStream tcp_stream)
-        {
+        internal UnitResult Send(TcpStream tcp_stream) {
             return new UnitResult(Native.save_send(tcp_stream.tcp_stream, save));
         }
 
-        internal StringHandle Debug()
-        {
+        internal StringHandle Debug() {
             return Native.save_debug(save);
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             save.Dispose();
         }
     }
@@ -488,17 +378,14 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.saves_diff_free(handle);
             }
             return true;
         }
 
-        internal UnitResultHandle Send(TcpStreamHandle tcp_stream)
-        {
+        internal UnitResultHandle Send(TcpStreamHandle tcp_stream) {
             var unit_res = Native.saves_diff_send(tcp_stream, handle);
             this.handle = IntPtr.Zero; // saves_diff_send takes ownership
             return unit_res;
@@ -509,18 +396,15 @@ namespace Net.Fenhl.OotAutoTracker
     {
         private SavesDiffHandle diff;
 
-        internal SavesDiff(SaveHandle old_save, SaveHandle new_save)
-        {
+        internal SavesDiff(SaveHandle old_save, SaveHandle new_save) {
             diff = Native.saves_diff(old_save, new_save);
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             diff.Dispose();
         }
 
-        internal UnitResult Send(TcpStream tcp_stream)
-        {
+        internal UnitResult Send(TcpStream tcp_stream) {
             return new UnitResult(diff.Send(tcp_stream.tcp_stream));
         }
     }
@@ -534,17 +418,14 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.knowledge_free(handle);
             }
             return true;
         }
 
-        public IntPtr Move()
-        {
+        public IntPtr Move() {
             var ptr = this.handle;
             this.handle = IntPtr.Zero;
             return ptr;
@@ -555,25 +436,19 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal KnowledgeHandle knowledge;
 
-        internal Knowledge(bool isVanilla)
-        {
-            if (isVanilla)
-            {
+        internal Knowledge(bool isVanilla) {
+            if (isVanilla) {
                 knowledge = Native.knowledge_vanilla();
-            }
-            else
-            {
+            } else {
                 knowledge = Native.knowledge_none();
             }
         }
 
-        internal UnitResult Send(TcpStream tcp_stream)
-        {
+        internal UnitResult Send(TcpStream tcp_stream) {
             return new UnitResult(Native.knowledge_send(tcp_stream.tcp_stream, knowledge));
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             knowledge.Dispose();
         }
     }
@@ -587,10 +462,8 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.model_free(handle);
             }
             return true;
@@ -601,20 +474,17 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal ModelStateHandle model;
 
-        internal ModelState(Save save, Knowledge knowledge)
-        {
+        internal ModelState(Save save, Knowledge knowledge) {
             var save_ptr = save.save.Move();
             var knowledge_ptr = knowledge.knowledge.Move();
             model = Native.model_new(save_ptr, knowledge_ptr);
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             model.Dispose();
         }
 
-        public void SetRam(Ram ram)
-        {
+        public void SetRam(Ram ram) {
             Native.model_set_ram(model, ram.ram);
         }
     }
@@ -628,24 +498,20 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.ram_result_free(handle);
             }
             return true;
         }
 
-        internal RamHandle Unwrap()
-        {
+        internal RamHandle Unwrap() {
             var ram = Native.ram_result_unwrap(handle);
             this.handle = IntPtr.Zero; // ram_result_unwrap takes ownership
             return ram;
         }
 
-        internal StringHandle DebugErr()
-        {
+        internal StringHandle DebugErr() {
             var err = Native.ram_result_debug_err(handle);
             this.handle = IntPtr.Zero; // ram_result_debug_err takes ownership
             return err;
@@ -655,23 +521,19 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal RamResultHandle ram_res;
 
-        internal RamResult(RawRam rawRam)
-        {
+        internal RamResult(RawRam rawRam) {
             IntPtr[] range_data = new IntPtr[rawRam.num_ranges];
-            for (byte i = 0; i < rawRam.num_ranges; i++)
-            {
+            for (byte i = 0; i < rawRam.num_ranges; i++) {
                 range_data[i] = Marshal.AllocHGlobal(rawRam.ranges[2 * i + 1]);
                 Marshal.Copy(rawRam.range_data[i], 0, range_data[i], rawRam.ranges[2 * i + 1]);
             }
             ram_res = Native.ram_from_ranges(range_data);
-            for (byte i = 0; i < rawRam.num_ranges; i++)
-            {
+            for (byte i = 0; i < rawRam.num_ranges; i++) {
                 Marshal.FreeHGlobal(range_data[i]);
             }
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             ram_res.Dispose();
         }
 
@@ -689,17 +551,14 @@ namespace Net.Fenhl.OotAutoTracker
             get { return this.handle == IntPtr.Zero; }
         }
 
-        protected override bool ReleaseHandle()
-        {
-            if (!this.IsInvalid)
-            {
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
                 Native.ram_free(handle);
             }
             return true;
         }
 
-        public IntPtr Move()
-        {
+        public IntPtr Move() {
             var ptr = this.handle;
             this.handle = IntPtr.Zero;
             return ptr;
@@ -710,18 +569,15 @@ namespace Net.Fenhl.OotAutoTracker
     {
         internal RamHandle ram;
 
-        internal Ram(RamResult ram_res)
-        {
+        internal Ram(RamResult ram_res) {
             ram = ram_res.Unwrap();
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             ram.Dispose();
         }
 
-        internal bool Equals(Ram other)
-        {
+        internal bool Equals(Ram other) {
             return Native.ram_equal(ram, other.ram);
         }
     }
@@ -733,28 +589,23 @@ namespace Net.Fenhl.OotAutoTracker
         private string[] range_hashes;
         internal byte[][] range_data;
 
-        internal RawRam(IMemoryApi memoryApi)
-        {
+        internal RawRam(IMemoryApi memoryApi) {
             this.num_ranges = Native.ram_num_ranges();
             this.ranges = new int[2 * num_ranges];
             Marshal.Copy(Native.ram_ranges(), this.ranges, 0, 2 * this.num_ranges);
             this.range_hashes = new string[this.num_ranges];
             this.range_data = new byte[this.num_ranges][];
-            for (byte i = 0; i < this.num_ranges; i++)
-            {
+            for (byte i = 0; i < this.num_ranges; i++) {
                 this.range_hashes[i] = memoryApi.HashRegion(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM");
                 this.range_data[i] = memoryApi.ReadByteRange(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM").ToArray();
             }
         }
 
-        internal bool Update(IMemoryApi memoryApi)
-        {
+        internal bool Update(IMemoryApi memoryApi) {
             bool changed = false;
-            for (byte i = 0; i < this.num_ranges; i++)
-            {
+            for (byte i = 0; i < this.num_ranges; i++) {
                 var new_hash = memoryApi.HashRegion(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM");
-                if (new_hash != this.range_hashes[i])
-                {
+                if (new_hash != this.range_hashes[i]) {
                     changed = true;
                     this.range_hashes[i] = new_hash;
                     this.range_data[i] = memoryApi.ReadByteRange(this.ranges[2 * i], this.ranges[2 * i + 1], "RDRAM").ToArray();
@@ -794,8 +645,7 @@ namespace Net.Fenhl.OotAutoTracker
         private bool connectionOk = false;
         private bool saveOk = false;
 
-        public MainForm()
-        {
+        public MainForm() {
             InitializeComponent();
             ClientSize = new Size(720, 896);
             Icon = new Icon(typeof(MainForm).Assembly.GetManifestResourceStream("Net.Fenhl.OotAutoTracker.Resources.icon.ico"));
@@ -810,51 +660,41 @@ namespace Net.Fenhl.OotAutoTracker
 
         public void Restart() {
             this.model.Dispose();
-            if (this.stream != null) this.stream.Disconnect().Dispose();
+            if (this.stream != null) { this.stream.Disconnect().Dispose(); }
             this.stream = null;
             UpdateConnection(false, "Connection: waiting for game");
-            if (this.prevSave != null) this.prevSave.Dispose();
+            if (this.prevSave != null) { this.prevSave.Dispose(); }
             this.prevSave = null;
             UpdateSave(false, "Save: waiting for game");
-            if (APIs.GameInfo.GetRomName() == "Null")
-            {
+            if (APIs.GameInfo.GetRomName() == "Null") {
                 this.model = new ModelState(new Save(), new Knowledge(false));
                 UpdateGame(false, "Not playing anything");
-            }
-            else
-            {
+            } else {
                 var rom_ident = APIs.Memory.ReadByteRange(0x20, 0x18, "ROM");
-                if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0"))))
-                {
+                if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0")))) {
                     this.model = new ModelState(new Save(), new Knowledge(false));
                     UpdateGame(false, $"Game: Expected OoT or OoTR, found {APIs.GameInfo.GetRomName()} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})");
-                }
-                else
-                {
+                } else {
                     var version = rom_ident.GetRange(0x15, 3);
                     this.isVanilla = Enumerable.SequenceEqual(version, new List<byte>(new byte[] { 0, 0, 0 }));
                     this.model = new ModelState(new Save(), new Knowledge(this.isVanilla));
-                    if (this.isVanilla) UpdateGame(true, "Playing OoT (vanilla)");
-                    else UpdateGame(true, $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}");
-                    using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback)) //TODO only connect manually
-                    {
-                        if (stream_res.IsOk())
-                        {
-                            if (this.stream != null) this.stream.Disconnect().Dispose();
+                    if (this.isVanilla) {
+                        UpdateGame(true, "Playing OoT (vanilla)");
+                    } else {
+                        UpdateGame(true, $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}");
+                    }
+                    using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback)) { //TODO only connect manually
+                        if (stream_res.IsOk()) {
+                            if (this.stream != null) { this.stream.Disconnect().Dispose(); }
                             this.stream = new TcpStream(stream_res);
                             UpdateConnection(true, "Connected");
-                            if (this.isVanilla)
-                            {
-                                using (var knowledge = new Knowledge(true)) //TODO pull knowledge back out of this.model
-                                {
+                            if (this.isVanilla) {
+                                using (var knowledge = new Knowledge(true)) { //TODO pull knowledge back out of this.model
                                     knowledge.Send(this.stream);
                                 }
                             }
-                        }
-                        else
-                        {
-                            using (StringHandle err = stream_res.DebugErr())
-                            {
+                        } else {
+                            using (StringHandle err = stream_res.DebugErr()) {
                                 UpdateConnection(false, $"Failed to connect: {err.AsString()}");
                             }
                         }
@@ -864,25 +704,23 @@ namespace Net.Fenhl.OotAutoTracker
             UpdateCells();
         }
 
-        public void UpdateValues(ToolFormUpdateType type)
-        {
-            if (type != ToolFormUpdateType.PreFrame) return; //TODO setting to also enable auto-tracking during turbo (ToolFormUpdateType.FastPreFrame)?
-            if (APIs.GameInfo.GetRomName() == "Null") return;
+        public void UpdateValues(ToolFormUpdateType type) {
+            if (type != ToolFormUpdateType.PreFrame) { return; } //TODO setting to also enable auto-tracking during turbo (ToolFormUpdateType.FastPreFrame)?
+            if (APIs.GameInfo.GetRomName() == "Null") { return; }
             bool changed = true;
-            if (this.rawRam == null) this.rawRam = new RawRam(APIs.Memory);
-            else changed = this.rawRam.Update(APIs.Memory);
-            if (!changed) return;
-            using (var ram_res = new RamResult(this.rawRam))
-            {
-                if (ram_res.IsOk())
-                {
+            if (this.rawRam == null) {
+                this.rawRam = new RawRam(APIs.Memory);
+            } else {
+                changed = this.rawRam.Update(APIs.Memory);
+            }
+            if (!changed) { return; }
+            using (var ram_res = new RamResult(this.rawRam)) {
+                if (ram_res.IsOk()) {
                     var ram = new Ram(ram_res);
-                    if (prevRam != null && ram.Equals(prevRam)) return;
-                    if (prevRam != null) prevRam.Dispose();
+                    if (prevRam != null && ram.Equals(prevRam)) { return; }
+                    if (prevRam != null) { prevRam.Dispose(); }
                     prevRam = ram;
-                }
-                else
-                {
+                } else {
                     UpdateSave(false, $"Failed to read game RAM: {ram_res.DebugErr().AsString()}");
                     return;
                 }
@@ -891,108 +729,85 @@ namespace Net.Fenhl.OotAutoTracker
             this.model.SetRam(prevRam);
             UpdateCells();
             var save = new Save(prevRam);
-            if (prevSave != null && save.Equals(prevSave)) return;
-            if (prevSave == null)
-            {
-                if (this.stream != null)
-                {
-                    using (UnitResult unit_res = save.Send(this.stream))
-                    {
-                        if (!unit_res.IsOk())
-                        {
-                            if (this.stream != null) this.stream.Dispose();
+            if (prevSave != null && save.Equals(prevSave)) { return; }
+            if (prevSave == null) {
+                if (this.stream != null) {
+                    using (UnitResult unit_res = save.Send(this.stream)) {
+                        if (!unit_res.IsOk()) {
+                            if (this.stream != null) { this.stream.Dispose(); }
                             this.stream = null;
-                            using (StringHandle err = unit_res.DebugErr())
-                            {
+                            using (StringHandle err = unit_res.DebugErr()) {
                                 UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                             }
+                        } else {
+                            UpdateConnection(true, $"Connected, initial save data sent {DateTime.Now}");
                         }
-                        else UpdateConnection(true, $"Connected, initial save data sent {DateTime.Now}");
                     }
                 }
                 prevSave = save;
-            }
-            else if (!save.Equals(prevSave))
-            {
-                if (this.stream != null)
-                {
-                    using (SavesDiff diff = prevSave.Diff(save))
-                    {
-                        using (UnitResult unit_res = diff.Send(this.stream))
-                        {
-                            if (!unit_res.IsOk())
-                            {
-                                if (this.stream != null) this.stream.Dispose();
+            } else if (!save.Equals(prevSave)) {
+                if (this.stream != null) {
+                    using (SavesDiff diff = prevSave.Diff(save)) {
+                        using (UnitResult unit_res = diff.Send(this.stream)) {
+                            if (!unit_res.IsOk()) {
+                                if (this.stream != null) { this.stream.Dispose(); }
                                 this.stream = null;
-                                using (StringHandle err = unit_res.DebugErr())
-                                {
+                                using (StringHandle err = unit_res.DebugErr()) {
                                     UpdateConnection(false, $"Failed to send save data: {err.AsString()}");
                                 }
+                            } else {
+                                UpdateConnection(true, $"Connected, save data last sent {DateTime.Now}");
                             }
-                            else UpdateConnection(true, $"Connected, save data last sent {DateTime.Now}");
                         }
                     }
                 }
                 prevSave.Dispose();
                 prevSave = save;
-            }
-            else
-            {
+            } else {
                 save.Dispose();
             }
         }
 
-        private void UpdateCells()
-        {
-            for (byte i = 0; i < 52; i++)
-            {
-                using (TrackerCell cell = new TrackerCell(this.layout, i))
-                {
+        private void UpdateCells() {
+            for (byte i = 0; i < 52; i++) {
+                using (TrackerCell cell = new TrackerCell(this.layout, i)) {
                     string new_img = cell.Image(this.model).AsString();
-                    if (new_img == this.cellImages[i]) continue;
+                    if (new_img == this.cellImages[i]) { continue; }
                     this.cellImages[i] = new_img;
                     var stream = typeof(MainForm).Assembly.GetManifestResourceStream($"Net.Fenhl.OotAutoTracker.Resources.{new_img}.png");
-                    if (stream == null) throw new Exception($"image stream for cell {i} ({new_img}) is null");
+                    if (stream == null) { throw new Exception($"image stream for cell {i} ({new_img}) is null"); }
                     this.cells[i].Image = Image.FromStream(stream);
                 }
             }
         }
 
-        private void UpdateGame(bool ok, String msg)
-        {
+        private void UpdateGame(bool ok, String msg) {
             label_Game.Text = msg;
             this.gameOk = ok;
             UpdateHelpLabel();
         }
 
-        private void UpdateConnection(bool ok, String msg)
-        {
+        private void UpdateConnection(bool ok, String msg) {
             label_Connection.Text = msg;
             this.connectionOk = ok;
             UpdateHelpLabel();
         }
 
-        private void UpdateSave(bool ok, String msg)
-        {
+        private void UpdateSave(bool ok, String msg) {
             label_Save.Text = msg;
             this.saveOk = ok;
             UpdateHelpLabel();
         }
 
-        private void UpdateHelpLabel()
-        {
-            if (this.gameOk && this.connectionOk && this.saveOk)
-            {
+        private void UpdateHelpLabel() {
+            if (this.gameOk && this.connectionOk && this.saveOk) {
                 label_Help.Text = "You can now minimize this window. To stop auto-tracking, close this window.";
-            }
-            else
-            {
+            } else {
                 label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
             }
         }
 
-        private void InitializeComponent()
-        {
+        private void InitializeComponent() {
             this.label_Version = new Label();
             this.label_Game = new Label();
             this.label_Connection = new Label();
@@ -1003,12 +818,10 @@ namespace Net.Fenhl.OotAutoTracker
             //
             // cells
             //
-            for (int i = 0; i < 52; i++)
-            {
+            for (int i = 0; i < 52; i++) {
                 PictureBox cell = new PictureBox();
                 this.cells[i] = cell;
-                cell.Location = i switch
-                {
+                cell.Location = i switch {
                     _ when i < 6 => new Point(120 * i + 10, 10),
                     _ when i < 14 => new Point(120 * (i % 6) + 10, 120 * (i / 6) - 54),
                     _ when i < 17 => new Point(80 * (i - 14) + 250, 186),
@@ -1016,8 +829,7 @@ namespace Net.Fenhl.OotAutoTracker
                     _ when i < 22 => new Point(80 * (i - 19) + 250, 226),
                     _ => new Point(120 * ((i - 4) % 6) + 10, 120 * ((i - 4) / 6) - 54),
                 };
-                cell.Size = i switch
-                {
+                cell.Size = i switch {
                     _ when i < 6 => new Size(100, 36),
                     14 or 15 or 16 => new Size(60, 20),
                     19 or 20 or 21 => new Size(60, 60),
@@ -1025,20 +837,17 @@ namespace Net.Fenhl.OotAutoTracker
                 };
                 cell.SizeMode = PictureBoxSizeMode.StretchImage;
                 //TODO accessibility metadata?
-                if (i >= 6 && i < 12)
-                {
+                if (i >= 6 && i < 12) {
                     cell.Click += new EventHandler((object sender, EventArgs e) => {
                         MouseEventArgs me = (MouseEventArgs) e;
-                        if (me.Button == MouseButtons.Right)
-                        {
+                        if (me.Button == MouseButtons.Right) {
                             this.label_Version.Visible = true;
                             this.label_Game.Visible = true;
                             this.label_Connection.Visible = true;
                             this.label_Save.Visible = true;
                             this.label_Help.Visible = true;
                             this.button_Close_Menu.Visible = true;
-                            foreach (PictureBox cell in this.cells)
-                            {
+                            foreach (PictureBox cell in this.cells) {
                                 cell.Visible = false;
                             }
                         }
@@ -1121,8 +930,7 @@ namespace Net.Fenhl.OotAutoTracker
                 this.label_Save.Visible = false;
                 this.label_Help.Visible = false;
                 this.button_Close_Menu.Visible = false;
-                foreach (PictureBox cell in this.cells)
-                {
+                foreach (PictureBox cell in this.cells) {
                     cell.Visible = true;
                 }
             });
