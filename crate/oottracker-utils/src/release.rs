@@ -210,7 +210,7 @@ async fn build_gui(client: &reqwest::Client, repo: &Repo, mut release_rx: broadc
 #[cfg(windows)]
 async fn build_macos(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool) -> Result<(), Error> {
     eprintln!("updating repo on Mac");
-    Command::new("ssh").arg(MACOS_ADDR).arg("zsh").arg("-c").arg("'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'").check("ssh", verbose).await?;
+    Command::new("ssh").arg(MACOS_ADDR).arg("cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only").check("ssh", verbose).await?;
     eprintln!("connecting to Mac");
     Command::new("ssh").arg(MACOS_ADDR).arg("/opt/git/github.com/fenhl/oottracker/master/assets/release.sh").arg(if verbose { "--verbose" } else { "" }).check("ssh", true).await?; //TODO convert newlines ro \r\n
     eprintln!("downloading oottracker-mac.dmg from Mac");
@@ -252,7 +252,12 @@ async fn build_pj64(client: &reqwest::Client, repo: &Repo, mut release_rx: broad
 
 #[cfg(windows)]
 async fn build_web(verbose: bool) -> Result<(), Error> {
-    Command::new("ssh").arg("mercredi").arg("sudo").arg("systemctl").arg("restart").arg("oottracker-web").check("ssh", verbose).await?;
+    eprintln!("updating repo on mercredi");
+    Command::new("ssh").arg("mercredi").arg("cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only").check("ssh", verbose).await?;
+    eprintln!("building oottracker.fenhl.net");
+    Command::new("ssh").arg("mercredi").arg("cd /opt/git/github.com/fenhl/oottracker/master && cargo build --release --package=oottracker-web").check("ssh", verbose).await?;
+    eprintln!("restarting oottracker.fenhl.net");
+    Command::new("ssh").arg("mercredi").arg("sudo systemctl restart oottracker-web").check("ssh", verbose).await?;
     Ok(())
 }
 
