@@ -622,7 +622,7 @@ namespace Net.Fenhl.OotAutoTracker {
         private PictureBox[] cells = new PictureBox[52];
         private Label label_Version;
         private Label label_Game;
-        private Label label_Connection;
+        //private Label label_Connection;
         private Label label_Save;
         private Label label_Help;
         private Button button_Close_Menu;
@@ -632,7 +632,7 @@ namespace Net.Fenhl.OotAutoTracker {
         private ApiContainer APIs => _apiContainer ?? throw new NullReferenceException();
 
         private bool isVanilla;
-        private TcpStream? stream;
+        //private TcpStream? stream;
         private RawRam? rawRam;
         private Ram? prevRam;
         private List<byte> prevSaveData = new List<byte>();
@@ -660,9 +660,11 @@ namespace Net.Fenhl.OotAutoTracker {
 
         public void Restart() {
             this.model.Dispose();
+            /*
             if (this.stream != null) { this.stream.Disconnect().Dispose(); }
             this.stream = null;
             UpdateConnection(false, "Connection: waiting for game");
+            */
             if (this.prevSave != null) { this.prevSave.Dispose(); }
             this.prevSave = null;
             UpdateSave(false, "Save: waiting for game");
@@ -683,6 +685,7 @@ namespace Net.Fenhl.OotAutoTracker {
                     } else {
                         UpdateGame(true, $"Playing OoTR version {version[0]}.{version[1]}.{version[2]}");
                     }
+                    /*
                     using (var stream_res = new TcpStreamResult(IPAddress.IPv6Loopback)) { //TODO only connect manually
                         if (stream_res.IsOk()) {
                             if (this.stream != null) { this.stream.Disconnect().Dispose(); }
@@ -699,6 +702,7 @@ namespace Net.Fenhl.OotAutoTracker {
                             }
                         }
                     }
+                    */
                 }
             }
             UpdateCells();
@@ -731,6 +735,7 @@ namespace Net.Fenhl.OotAutoTracker {
             var save = new Save(prevRam);
             if (prevSave != null && save.Equals(prevSave)) { return; }
             if (prevSave == null) {
+                /*
                 if (this.stream != null) {
                     using (UnitResult unit_res = save.Send(this.stream)) {
                         if (!unit_res.IsOk()) {
@@ -744,8 +749,10 @@ namespace Net.Fenhl.OotAutoTracker {
                         }
                     }
                 }
+                */
                 prevSave = save;
             } else if (!save.Equals(prevSave)) {
+                /*
                 if (this.stream != null) {
                     using (SavesDiff diff = prevSave.Diff(save)) {
                         using (UnitResult unit_res = diff.Send(this.stream)) {
@@ -761,6 +768,7 @@ namespace Net.Fenhl.OotAutoTracker {
                         }
                     }
                 }
+                */
                 prevSave.Dispose();
                 prevSave = save;
             } else {
@@ -787,11 +795,13 @@ namespace Net.Fenhl.OotAutoTracker {
             UpdateHelpLabel();
         }
 
+        /*
         private void UpdateConnection(bool ok, String msg) {
             label_Connection.Text = msg;
             this.connectionOk = ok;
             UpdateHelpLabel();
         }
+        */
 
         private void UpdateSave(bool ok, String msg) {
             label_Save.Text = msg;
@@ -800,8 +810,8 @@ namespace Net.Fenhl.OotAutoTracker {
         }
 
         private void UpdateHelpLabel() {
-            if (this.gameOk && this.connectionOk && this.saveOk) {
-                label_Help.Text = "You can now minimize this window. To stop auto-tracking, close this window.";
+            if (this.gameOk /*&& this.connectionOk*/ && this.saveOk) {
+                label_Help.Text = "";
             } else {
                 label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
             }
@@ -810,7 +820,7 @@ namespace Net.Fenhl.OotAutoTracker {
         private void InitializeComponent() {
             this.label_Version = new Label();
             this.label_Game = new Label();
-            this.label_Connection = new Label();
+            //this.label_Connection = new Label();
             this.label_Save = new Label();
             this.label_Help = new Label();
             this.button_Close_Menu = new Button();
@@ -843,7 +853,7 @@ namespace Net.Fenhl.OotAutoTracker {
                         if (me.Button == MouseButtons.Right) {
                             this.label_Version.Visible = true;
                             this.label_Game.Visible = true;
-                            this.label_Connection.Visible = true;
+                            //this.label_Connection.Visible = true;
                             this.label_Save.Visible = true;
                             this.label_Help.Visible = true;
                             this.button_Close_Menu.Visible = true;
@@ -878,6 +888,7 @@ namespace Net.Fenhl.OotAutoTracker {
             this.label_Game.TabIndex = 1;
             this.label_Game.Text = "Game: loading";
             this.label_Game.Visible = false;
+            /*
             //
             // label_Connection
             //
@@ -889,12 +900,13 @@ namespace Net.Fenhl.OotAutoTracker {
             this.label_Connection.TabIndex = 2;
             this.label_Connection.Text = "Connection: waiting for game";
             this.label_Connection.Visible = false;
+            */
             //
             // label_Save
             //
             this.label_Save.ForeColor = Color.White;
             this.label_Save.AutoSize = true;
-            this.label_Save.Location = new Point(12, 84);
+            this.label_Save.Location = new Point(12, /*84*/ 59);
             this.label_Save.Name = "label_Save";
             this.label_Save.Size = new Size(96, 25);
             this.label_Save.TabIndex = 3;
@@ -905,7 +917,7 @@ namespace Net.Fenhl.OotAutoTracker {
             //
             this.label_Help.ForeColor = Color.White;
             this.label_Help.AutoSize = true;
-            this.label_Help.Location = new Point(12, 109);
+            this.label_Help.Location = new Point(12, /*109*/ 84);
             this.label_Help.Name = "label_Help";
             this.label_Help.Size = new Size(96, 25);
             this.label_Help.TabIndex = 4;
@@ -916,7 +928,7 @@ namespace Net.Fenhl.OotAutoTracker {
             //
             this.button_Close_Menu.ForeColor = Color.White;
             this.button_Close_Menu.AutoSize = true;
-            this.button_Close_Menu.Location = new Point(12, 134);
+            this.button_Close_Menu.Location = new Point(12, /*134*/ 109);
             this.button_Close_Menu.Name = "button_Close_Menu";
             this.button_Close_Menu.Size = new Size(96, 25);
             this.button_Close_Menu.TabIndex = 5;
@@ -926,7 +938,7 @@ namespace Net.Fenhl.OotAutoTracker {
                 this.ClientSize = new Size(720, 896);
                 this.label_Version.Visible = false;
                 this.label_Game.Visible = false;
-                this.label_Connection.Visible = false;
+                //this.label_Connection.Visible = false;
                 this.label_Save.Visible = false;
                 this.label_Help.Visible = false;
                 this.button_Close_Menu.Visible = false;
@@ -941,7 +953,7 @@ namespace Net.Fenhl.OotAutoTracker {
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.Controls.Add(this.label_Version);
             this.Controls.Add(this.label_Game);
-            this.Controls.Add(this.label_Connection);
+            //this.Controls.Add(this.label_Connection);
             this.Controls.Add(this.label_Save);
             this.Controls.Add(this.label_Help);
             this.Controls.Add(this.button_Close_Menu);
