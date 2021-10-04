@@ -22,6 +22,7 @@ use {
         model::{
             DungeonReward,
             DungeonRewardLocation,
+            MainDungeon,
         },
     },
     crate::{
@@ -60,6 +61,7 @@ pub struct ModelState {
 impl ModelState {
     pub fn update_knowledge(&mut self) {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
+        // immediate knowledge
         if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
             self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::LinksPocket);
         }
@@ -69,6 +71,11 @@ impl ModelState {
             } else {
                 //TODO report/log error?
             }
+        }
+        // derived knowledge
+        if let Some((reward,)) = DungeonReward::into_enum_iter().filter(|reward| !self.knowledge.dungeon_reward_locations.contains_key(reward)).collect_tuple() {
+            let (dungeon,) = MainDungeon::into_enum_iter().filter(|dungeon| !self.knowledge.dungeon_reward_locations.values().any(|&loc| loc == DungeonRewardLocation::Dungeon(*dungeon))).collect_tuple().expect("exactly one reward left but not exactly one reward location left");
+            self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::Dungeon(dungeon));
         }
     }
 

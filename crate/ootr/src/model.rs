@@ -55,7 +55,7 @@ pub enum DungeonRewardLocation {
     Dungeon(MainDungeon),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
 pub enum MainDungeon {
     DekuTree,
     DodongosCavern,
