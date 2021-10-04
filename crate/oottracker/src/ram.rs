@@ -57,7 +57,7 @@ pub static RANGES: [u32; NUM_RANGES * 2] = [
     0x1ca1c8, 4, // current scene's switch flags
     0x1ca1d8, 8, // current scene's chest and room clear flags
     0x1d8870, 2, // current text box ID
-    0x1d8328, TEXT_LEN as u32, // current/most recent text box contents
+    0x1d887e, TEXT_LEN as u32, // current/most recent text box contents
 ];
 
 #[derive(Debug, From, Clone)]
