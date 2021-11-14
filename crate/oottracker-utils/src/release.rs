@@ -25,13 +25,20 @@ use {
             SeekFrom,
             Write as _,
         },
+        iter,
         num::ParseIntError,
         path::Path,
+        str::FromStr as _,
         time::Duration,
     },
     dir_lock::DirLock,
+    graphql_client::{
+        GraphQLQuery,
+        Response,
+    },
     itertools::Itertools as _,
     lazy_regex::regex_captures,
+    semver::Version,
     tokio::{
         fs::File,
         io::{
@@ -59,36 +66,28 @@ use {
 
 #[derive(Debug, From)]
 enum Error {
-    #[cfg(windows)]
-    BroadcastRecv(broadcast::error::RecvError),
+    #[cfg(windows)] BizHawkOutdated,
+    #[cfg(windows)] BizHawkVersionRegression,
+    #[cfg(windows)] BroadcastRecv(broadcast::error::RecvError),
     CommandExit(&'static str, ExitStatus),
-    #[cfg(windows)]
-    DirLock(dir_lock::Error),
-    #[cfg(windows)]
-    EmptyReleaseNotes,
-    #[cfg(windows)]
-    InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
+    #[cfg(windows)] DirLock(dir_lock::Error),
+    #[cfg(windows)] EmptyReleaseNotes,
+    #[cfg(windows)] EmptyResponse,
+    #[cfg(windows)] InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
     Io(io::Error),
-    #[cfg(windows)]
-    MissingEnvar(&'static str),
-    #[cfg(windows)]
-    ParseInt(ParseIntError),
-    #[cfg(windows)]
-    ProtocolVersionMismatch,
-    #[cfg(windows)]
-    ReleaseSend(broadcast::error::SendError<Release>),
-    #[cfg(windows)]
-    Reqwest(reqwest::Error),
-    #[cfg(windows)]
-    SameVersion,
-    #[cfg(windows)]
-    SemVer(semver::Error),
-    #[cfg(windows)]
-    Task(tokio::task::JoinError),
-    #[cfg(windows)]
-    VersionRegression,
-    #[cfg(windows)]
-    Zip(ZipError),
+    #[cfg(windows)] MissingBizHawkRepo,
+    #[cfg(windows)] MissingEnvar(&'static str),
+    #[cfg(windows)] NoBizHawkReleases,
+    #[cfg(windows)] ParseInt(ParseIntError),
+    #[cfg(windows)] ProtocolVersionMismatch,
+    #[cfg(windows)] ReleaseSend(broadcast::error::SendError<Release>),
+    #[cfg(windows)] Reqwest(reqwest::Error),
+    #[cfg(windows)] SameVersion,
+    #[cfg(windows)] SemVer(semver::Error),
+    #[cfg(windows)] Task(tokio::task::JoinError),
+    #[cfg(windows)] UnnamedRelease,
+    #[cfg(windows)] VersionRegression,
+    #[cfg(windows)] Zip(ZipError),
 }
 
 impl fmt::Display for Error {
@@ -172,6 +171,13 @@ async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
     Ok((client, repo))
 }
 
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "../../assets/graphql/github-schema.graphql",
+    query_path = "../../assets/graphql/github-bizhawk-version.graphql",
+)]
+struct BizHawkVersionQuery;
+
 #[cfg(windows)]
 async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool) -> Result<(), Error> {
     eprintln!("building oottracker-csharp");
@@ -184,8 +190,25 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: br
         let mut zip = ZipWriter::new(&mut buf); //TODO replace with an async zip writer
         zip.start_file("README.txt", FileOptions::default())?;
         let [major, minor, patch, _] = oottracker_bizhawk::bizhawk_version();
-        //TODO check to make sure BizHawk is up to date
-        write!(&mut zip, include_str!("../../../assets/bizhawk-readme.txt"), major, minor, patch)?;
+        let local_version = Version::new(major.into(), minor.into(), patch.into());
+        let remote_version_string = client.post("https://api.github.com/graphql")
+            .bearer_auth(include_str!("../../../assets/release-token"))
+            .json(&BizHawkVersionQuery::build_query(biz_hawk_version_query::Variables {}))
+            .send().await?
+            .error_for_status()?
+            .json::<Response<biz_hawk_version_query::ResponseData>>().await?
+            .data.ok_or(Error::EmptyResponse)?
+            .repository.ok_or(Error::MissingBizHawkRepo)?
+            .latest_release.ok_or(Error::NoBizHawkReleases)?
+            .name.ok_or(Error::UnnamedRelease)?;
+        let (major, minor, patch) = remote_version_string.split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_tuple().expect("iter::repeat produces an infinite iterator");
+        let remote_version = Version::new(major?, minor?, patch?);
+        match local_version.cmp(&remote_version) {
+            Less => return Err(Error::BizHawkOutdated),
+            Equal => {}
+            Greater => return Err(Error::BizHawkVersionRegression),
+        }
+        write!(&mut zip, include_str!("../../../assets/bizhawk-readme.txt"), local_version)?;
         zip.start_file("OotAutoTracker.dll", FileOptions::default())?;
         std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/OotAutoTracker.dll")?, &mut zip)?;
         zip.start_file("oottracker.dll", FileOptions::default())?;

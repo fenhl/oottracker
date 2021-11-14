@@ -3384,6 +3384,7 @@ dependencies = [
  "async-trait",
  "derive_more",
  "dir-lock",
+ "graphql_client",
  "itertools 0.10.1",
  "lazy-regex",
  "ootr",
