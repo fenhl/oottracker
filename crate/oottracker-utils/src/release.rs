@@ -171,6 +171,7 @@ async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
     Ok((client, repo))
 }
 
+#[cfg(windows)]
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "../../assets/graphql/github-schema.graphql",
