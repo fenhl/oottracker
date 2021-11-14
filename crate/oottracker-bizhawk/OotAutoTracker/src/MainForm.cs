@@ -127,6 +127,7 @@ namespace Net.Fenhl.OotAutoTracker {
             return addr.AddressFamily switch {
                 AddressFamily.InterNetwork => Native.connect_ipv4(addr.GetAddressBytes().ToArray()),
                 AddressFamily.InterNetworkV6 => Native.connect_ipv6(addr.GetAddressBytes().ToArray()),
+                _ => throw new NotImplementedException("can only connect to an IPv4 or IPv6 address"),
             };
         }
 
@@ -450,7 +451,7 @@ namespace Net.Fenhl.OotAutoTracker {
         private string[] cellImages = new string[52];
 
         private bool gameOk = false;
-        private bool connectionOk = false;
+        //private bool connectionOk = false;
         private bool saveOk = false;
 
         public MainForm() {
@@ -593,14 +594,14 @@ namespace Net.Fenhl.OotAutoTracker {
             if (this.prevSave != null) { this.prevSave.Dispose(); }
             this.prevSave = null;
             UpdateSave(false, "Save: waiting for game");
-            if (APIs.GameInfo.GetRomName() == "Null") {
+            if ((APIs.GameInfo.GetGameInfo()?.Name ?? "Null") == "Null") {
                 this.model = ModelState.FromSaveAndKnowledge(Native.save_default(), Native.knowledge_none());
                 UpdateGame(false, "Not playing anything");
             } else {
                 var rom_ident = APIs.Memory.ReadByteRange(0x20, 0x18, "ROM");
                 if (!Enumerable.SequenceEqual(rom_ident.GetRange(0, 0x15), new List<byte>(Encoding.UTF8.GetBytes("THE LEGEND OF ZELDA \0")))) {
                     this.model = ModelState.FromSaveAndKnowledge(Native.save_default(), Native.knowledge_none());
-                    UpdateGame(false, $"Game: Expected OoT or OoTR, found {APIs.GameInfo.GetRomName()} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})");
+                    UpdateGame(false, $"Game: Expected OoT or OoTR, found {APIs.GameInfo.GetGameInfo()?.Name ?? "Null"} ({string.Join<byte>(", ", rom_ident.GetRange(0, 0x15))})");
                 } else {
                     var version = rom_ident.GetRange(0x15, 3);
                     this.isVanilla = Enumerable.SequenceEqual(version, new List<byte>(new byte[] { 0, 0, 0 }));
@@ -635,7 +636,7 @@ namespace Net.Fenhl.OotAutoTracker {
 
         public override void UpdateValues(ToolFormUpdateType type) {
             if (type != ToolFormUpdateType.PreFrame) { return; } //TODO setting to also enable auto-tracking during turbo (ToolFormUpdateType.FastPreFrame)?
-            if (APIs.GameInfo.GetRomName() == "Null") { return; }
+            if ((APIs.GameInfo.GetGameInfo()?.Name ?? "Null") == "Null") { return; }
             bool changed = true;
             if (this.rawRam == null) {
                 this.rawRam = new RawRam(APIs.Memory);

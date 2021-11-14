@@ -6,7 +6,7 @@
 use semver::Version;
 
 pub fn bizhawk_version() -> [u16; 4] {
-    winver::get_file_version_info("C:\\Users\\fenhl\\bin\\BizHawk\\EmuHawk.exe").expect("failed to parse BizHawk version")
+    winver::get_file_version_info("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/EmuHawk.exe").expect("failed to parse BizHawk version")
 }
 
 pub fn version() -> Version {

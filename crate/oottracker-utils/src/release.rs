@@ -66,7 +66,10 @@ use {
 
 #[derive(Debug, From)]
 enum Error {
-    #[cfg(windows)] BizHawkOutdated,
+    #[cfg(windows)] BizHawkOutdated {
+        latest: Version,
+        local: Version,
+    },
     #[cfg(windows)] BizHawkVersionRegression,
     #[cfg(windows)] BroadcastRecv(broadcast::error::RecvError),
     CommandExit(&'static str, ExitStatus),
@@ -148,7 +151,7 @@ async fn release_client() -> Result<reqwest::Client, Error> {
 }
 
 #[cfg(windows)]
-async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
+async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo, Version), Error> {
     eprintln!("creating reqwest client");
     let client = release_client().await?;
     //TODO make sure working dir is clean and on default branch and up to date with remote and remote is up to date
@@ -162,13 +165,33 @@ async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
             Greater => {}
         }
     }
+    eprintln!("checking BizHawk version");
+    let [major, minor, patch, _] = oottracker_bizhawk::bizhawk_version();
+    let local_version = Version::new(major.into(), minor.into(), patch.into());
+    let remote_version_string = client.post("https://api.github.com/graphql")
+        .bearer_auth(include_str!("../../../assets/release-token"))
+        .json(&BizHawkVersionQuery::build_query(biz_hawk_version_query::Variables {}))
+        .send().await?
+        .error_for_status()?
+        .json::<Response<biz_hawk_version_query::ResponseData>>().await?
+        .data.ok_or(Error::EmptyResponse)?
+        .repository.ok_or(Error::MissingBizHawkRepo)?
+        .latest_release.ok_or(Error::NoBizHawkReleases)?
+        .name.ok_or(Error::UnnamedRelease)?;
+    let (major, minor, patch) = remote_version_string.split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_tuple().expect("iter::repeat produces an infinite iterator");
+    let remote_version = Version::new(major?, minor?, patch?);
+    match local_version.cmp(&remote_version) {
+        Less => return Err(Error::BizHawkOutdated { local: local_version, latest: remote_version }),
+        Equal => {}
+        Greater => return Err(Error::BizHawkVersionRegression),
+    }
     eprintln!("waiting for Rust lock");
     let lock_dir = Path::new(&env::var_os("TEMP").ok_or(Error::MissingEnvar("TEMP"))?).join("syncbin-startup-rust.lock");
     let lock = DirLock::new(&lock_dir).await?;
     eprintln!("updating Rust for x86_64");
     Command::new("rustup").arg("update").arg("stable").check("rustup", verbose).await?;
     lock.drop_async().await?;
-    Ok((client, repo))
+    Ok((client, repo, local_version))
 }
 
 #[cfg(windows)]
@@ -180,7 +203,7 @@ async fn setup(verbose: bool) -> Result<(reqwest::Client, Repo), Error> {
 struct BizHawkVersionQuery;
 
 #[cfg(windows)]
-async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool) -> Result<(), Error> {
+async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool, version: Version) -> Result<(), Error> {
     eprintln!("building oottracker-csharp");
     Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo build --package=oottracker-csharp", verbose).await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building oottracker-bizhawk");
@@ -190,26 +213,7 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: br
     {
         let mut zip = ZipWriter::new(&mut buf); //TODO replace with an async zip writer
         zip.start_file("README.txt", FileOptions::default())?;
-        let [major, minor, patch, _] = oottracker_bizhawk::bizhawk_version();
-        let local_version = Version::new(major.into(), minor.into(), patch.into());
-        let remote_version_string = client.post("https://api.github.com/graphql")
-            .bearer_auth(include_str!("../../../assets/release-token"))
-            .json(&BizHawkVersionQuery::build_query(biz_hawk_version_query::Variables {}))
-            .send().await?
-            .error_for_status()?
-            .json::<Response<biz_hawk_version_query::ResponseData>>().await?
-            .data.ok_or(Error::EmptyResponse)?
-            .repository.ok_or(Error::MissingBizHawkRepo)?
-            .latest_release.ok_or(Error::NoBizHawkReleases)?
-            .name.ok_or(Error::UnnamedRelease)?;
-        let (major, minor, patch) = remote_version_string.split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_tuple().expect("iter::repeat produces an infinite iterator");
-        let remote_version = Version::new(major?, minor?, patch?);
-        match local_version.cmp(&remote_version) {
-            Less => return Err(Error::BizHawkOutdated),
-            Equal => {}
-            Greater => return Err(Error::BizHawkVersionRegression),
-        }
-        write!(&mut zip, include_str!("../../../assets/bizhawk-readme.txt"), local_version)?;
+        write!(&mut zip, include_str!("../../../assets/bizhawk-readme.txt"), version)?;
         zip.start_file("OotAutoTracker.dll", FileOptions::default())?;
         std::io::copy(&mut std::fs::File::open("crate/oottracker-bizhawk/OotAutoTracker/BizHawk/ExternalTools/OotAutoTracker.dll")?, &mut zip)?;
         zip.start_file("oottracker.dll", FileOptions::default())?;
@@ -340,7 +344,7 @@ async fn main(args: Args) -> Result<(), Error> {
 #[cfg(windows)]
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
-    let (client, repo) = setup(args.verbose).await?; // don't show release notes editor if version check could still fail
+    let (client, repo, bizhawk_version) = setup(args.verbose).await?; // don't show release notes editor if version check could still fail
     let (release_tx, release_rx_bizhawk) = broadcast::channel(1);
     let release_rx_gui = release_tx.subscribe();
     let release_rx_macos = release_tx.subscribe();
@@ -371,7 +375,7 @@ async fn main(args: Args) -> Result<(), Error> {
     }
 
     build_tasks![
-        build_bizhawk(&client, &repo, release_rx_bizhawk, args.verbose),
+        build_bizhawk(&client, &repo, release_rx_bizhawk, args.verbose, bizhawk_version),
         build_gui(&client, &repo, release_rx_gui, args.verbose),
         build_macos(&client, &repo, release_rx_macos, args.verbose),
         build_pj64(&client, &repo, release_rx_pj64),
