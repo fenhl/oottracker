@@ -9,7 +9,7 @@ proc-macro = true
 
 [dependencies]
 convert_case = "0.4"
-directories = "3"
+directories = "4"
 graphql_client = "0.10"
 itertools = "0.10"
 proc-macro2 = "1"
@@ -30,7 +30,7 @@ path = "../ootr"
 path = "../ootr-dynamic"
 
 [dependencies.pyo3]
-version = "0.14"
+version = "0.15"
 features = ["auto-initialize"]
 
 [dependencies.quote-value]

@@ -5,7 +5,7 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [dependencies]
-async-proto = "0.8"
+async-proto = "0.9"
 derivative = "2"
 semver = "1"
 

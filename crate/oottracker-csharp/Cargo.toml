@@ -14,7 +14,7 @@ libc = "0.2"
 semver = "1"
 
 [dependencies.async-proto]
-version = "0.8"
+version = "0.9"
 features = ["write-sync"]
 
 [dependencies.oottracker]

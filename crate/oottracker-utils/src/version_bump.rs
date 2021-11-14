@@ -37,6 +37,7 @@ enum Args {
 enum Error {
     Io(io::Error),
     MissingPackageEntry,
+    MissingVersionEntry,
     PackageIsNotTable,
     ParseInt(ParseIntError),
     Plist(plist::Error),
@@ -48,6 +49,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::MissingPackageEntry => write!(f, "found Cargo manifest without “package” entry"),
+            Error::MissingVersionEntry => write!(f, "found “package” entry in Cargo manifest without “version” entry"),
             Error::PackageIsNotTable => write!(f, "“package” entry in Cargo manifest was not a table"),
             Error::ParseInt(e) => e.fmt(f),
             Error::Plist(e) => write!(f, "plist error: {}", e),
@@ -95,8 +97,8 @@ async fn main(args: Args) -> Result<(), Error> {
     while let Some(entry) = crates.next_entry().await? {
         let manifest_path = entry.path().join("Cargo.toml");
         let mut manifest = fs::read_to_string(&manifest_path).await?.parse::<toml_edit::Document>()?;
-        *manifest.as_table_mut().get_mut("package").ok_or(Error::MissingPackageEntry)?.as_table_mut().ok_or(Error::PackageIsNotTable)?.entry("version")
-            = toml_edit::Item::Value(toml_edit::decorated(version.to_string().into(), " ", ""));
+        *manifest.as_table_mut().get_mut("package").ok_or(Error::MissingPackageEntry)?.as_table_mut().ok_or(Error::PackageIsNotTable)?.get_mut("version").ok_or(Error::MissingVersionEntry)?
+            = toml_edit::Item::Value(toml_edit::Value::from(version.to_string()).decorated(" ", ""));
         fs::write(manifest_path, manifest.to_string().into_bytes()).await?;
     }
     Ok(())

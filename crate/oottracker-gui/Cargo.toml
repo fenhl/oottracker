@@ -8,7 +8,7 @@ edition = "2021"
 winres = "0.1"
 
 [dependencies]
-async-proto = "0.8"
+async-proto = "0.9"
 derivative = "2"
 futures = "0.3"
 iced_futures = "0.3"

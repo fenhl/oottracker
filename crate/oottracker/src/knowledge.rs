@@ -360,7 +360,7 @@ impl Protocol for Knowledge {
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
-                n => return Err(ReadError::UnknownVariant(n)),
+                n => return Err(ReadError::UnknownVariant8(n)),
             })
         })
     }
