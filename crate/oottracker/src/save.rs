@@ -443,10 +443,10 @@ impl TryFrom<Vec<u8>> for Inventory {
 
     fn try_from(raw_data: Vec<u8>) -> Result<Inventory, Vec<u8>> {
         macro_rules! bool_item {
-            ($offset:literal, $($value:pat)|+) => {{
+            ($offset:literal, $value:pat) => {{
                 match *raw_data.get($offset).ok_or_else(|| raw_data.clone())? {
                     item_ids::NONE => false,
-                    $($value)|+ => true,
+                    $value => true,
                     _ => return Err(raw_data),
                 }
             }};
