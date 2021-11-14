@@ -2,7 +2,11 @@ use {
     std::{
         array::TryFromSliceError,
         borrow::Borrow,
-        convert::TryInto as _,
+        convert::{
+            TryFrom,
+            TryInto as _,
+        },
+        fmt,
         future::Future,
         io::prelude::*,
         ops::{
@@ -24,6 +28,10 @@ use {
     itertools::{
         EitherOrBoth,
         Itertools as _,
+    },
+    serde::{
+        Deserialize,
+        Serialize,
     },
     tokio::io::{
         AsyncRead,
@@ -86,7 +94,14 @@ pub enum DecodeError {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "error decoding RAM: {:?}", self)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(try_from = "Vec<Vec<u8>>", into = "Vec<Vec<u8>>")]
 pub struct Ram {
     pub save: Save,
     pub current_scene_id: u8,
@@ -196,7 +211,7 @@ impl Ram {
         ).try_collect::<_, Vec<_>, _>()?)
     }
 
-    fn to_ranges(&self) -> Vec<Vec<u8>> {
+    pub fn to_ranges(&self) -> Vec<Vec<u8>> {
         let mut chest_and_room_clear = Vec::with_capacity(8);
         chest_and_room_clear.extend_from_slice(&self.current_scene_chest_flags.to_be_bytes());
         chest_and_room_clear.extend_from_slice(&self.current_scene_room_clear_flags.to_be_bytes());
@@ -309,4 +324,18 @@ impl<'a, 'b> Sub<&'b Ram> for &'a Ram {
 pub struct Delta {
     save: save::Delta,
     current_scene_data: Option<(u8, u32, u32, u32)>,
+}
+
+impl From<Ram> for Vec<Vec<u8>> {
+    fn from(ram: Ram) -> Self {
+        ram.to_ranges()
+    }
+}
+
+impl TryFrom<Vec<Vec<u8>>> for Ram {
+    type Error = DecodeError;
+
+    fn try_from(ranges: Vec<Vec<u8>>) -> Result<Self, DecodeError> {
+        Self::from_range_bufs(ranges)
+    }
 }

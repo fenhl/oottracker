@@ -9,7 +9,6 @@ use {
 };
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(crate) struct RawRegion {
     pub region_name: String,
     #[allow(unused)] // taken from filename

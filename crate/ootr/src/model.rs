@@ -1,11 +1,17 @@
 use {
     std::{
+        convert::TryFrom,
         fmt,
         str::FromStr,
     },
     async_proto::Protocol,
     enum_iterator::IntoEnumIterator,
     quote_value::QuoteValue,
+    serde::{
+        Deserialize,
+        Serialize,
+    },
+    crate::item::Item,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
@@ -15,6 +21,25 @@ pub enum Dungeon {
     BottomOfTheWell,
     GerudoTrainingGrounds,
     GanonsCastle,
+}
+
+impl Dungeon {
+    pub fn rando_name(&self) -> &'static str {
+        match self {
+            Self::Main(MainDungeon::DekuTree) => "Deku Tree",
+            Self::Main(MainDungeon::DodongosCavern) => "Dodongos Cavern",
+            Self::Main(MainDungeon::JabuJabu) => "Jabu Jabus Belly",
+            Self::Main(MainDungeon::ForestTemple) => "Forest Temple",
+            Self::Main(MainDungeon::FireTemple) => "Fire Temple",
+            Self::Main(MainDungeon::WaterTemple) => "Water Temple",
+            Self::Main(MainDungeon::ShadowTemple) => "Shadow Temple",
+            Self::Main(MainDungeon::SpiritTemple) => "Spirit Temple",
+            Self::IceCavern => "Ice Cavern",
+            Self::BottomOfTheWell => "Bottom of the Well",
+            Self::GerudoTrainingGrounds => "Gerudo Training Ground",
+            Self::GanonsCastle => "Ganons Castle",
+        }
+    }
 }
 
 impl FromStr for Dungeon {
@@ -49,10 +74,65 @@ pub enum DungeonReward {
     Stone(Stone),
 }
 
+impl FromStr for DungeonReward {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
+        Ok(match s.parse() {
+            Ok(med) => Self::Medallion(med),
+            Err(()) => Self::Stone(s.parse()?),
+        })
+    }
+}
+
+impl TryFrom<Item> for DungeonReward {
+    type Error = ();
+
+    fn try_from(item: Item) -> Result<Self, ()> {
+        item.0.parse()
+    }
+}
+
+impl fmt::Display for DungeonReward {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Medallion(med) => med.fmt(f),
+            Self::Stone(stone) => stone.fmt(f),
+        }
+    }
+}
+
+impl From<DungeonReward> for Item {
+    fn from(reward: DungeonReward) -> Self {
+        Self(reward.to_string())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
 pub enum DungeonRewardLocation {
     LinksPocket,
     Dungeon(MainDungeon),
+}
+
+impl DungeonRewardLocation {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::LinksPocket => "Links Pocket",
+            Self::Dungeon(dungeon) => dungeon.reward_location(),
+        }
+    }
+}
+
+impl FromStr for DungeonRewardLocation {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
+        Ok(if s == "Links Pocket" {
+            Self::LinksPocket
+        } else {
+            Self::Dungeon(s.parse()?)
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
@@ -65,6 +145,21 @@ pub enum MainDungeon {
     WaterTemple,
     ShadowTemple,
     SpiritTemple,
+}
+
+impl MainDungeon {
+    pub fn reward_location(&self) -> &'static str {
+        match self {
+            Self::DekuTree => "Queen Gohma",
+            Self::DodongosCavern => "King Dodongo",
+            Self::JabuJabu => "Barinade",
+            Self::ForestTemple => "Phantom Ganon",
+            Self::FireTemple => "Volvagia",
+            Self::WaterTemple => "Morpha",
+            Self::ShadowTemple => "Bongo Bongo",
+            Self::SpiritTemple => "Twinrova",
+        }
+    }
 }
 
 impl FromStr for MainDungeon {
@@ -100,7 +195,7 @@ impl fmt::Display for MainDungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, Deserialize, Serialize, QuoteValue)]
 pub enum Medallion {
     Light,
     Forest,
@@ -124,11 +219,84 @@ impl Medallion {
     }
 }
 
+impl FromStr for Medallion {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
+        Ok(match s {
+            "Light Medallion" => Self::Light,
+            "Forest Medallion" => Self::Forest,
+            "Fire Medallion" => Self::Fire,
+            "Water Medallion" => Self::Water,
+            "Shadow Medallion" => Self::Shadow,
+            "Spirit Medallion" => Self::Spirit,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<Item> for Medallion {
+    type Error = ();
+
+    fn try_from(item: Item) -> Result<Self, ()> {
+        item.0.parse()
+    }
+}
+
+impl fmt::Display for Medallion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} Medallion", self.element())
+    }
+}
+
+impl From<Medallion> for Item {
+    fn from(med: Medallion) -> Self {
+        Self(med.to_string())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol)]
 pub enum Stone {
     KokiriEmerald,
     GoronRuby,
     ZoraSapphire,
+}
+
+impl FromStr for Stone {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
+        Ok(match s {
+            "Kokiri Emerald" => Self::KokiriEmerald,
+            "Goron Ruby" => Self::GoronRuby,
+            "Zora Sapphire" => Self::ZoraSapphire,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<Item> for Stone {
+    type Error = ();
+
+    fn try_from(item: Item) -> Result<Self, ()> {
+        item.0.parse()
+    }
+}
+
+impl fmt::Display for Stone {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KokiriEmerald => write!(f, "Kokiri Emerald"),
+            Self::GoronRuby => write!(f, "Goron Ruby"),
+            Self::ZoraSapphire => write!(f, "Zora Sapphire"),
+        }
+    }
+}
+
+impl From<Stone> for Item {
+    fn from(stone: Stone) -> Self {
+        Self(stone.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Copy, QuoteValue)]

@@ -8,7 +8,9 @@ edition = "2018"
 futures = "0.3"
 #horrorshow = "0.8" #TODO PR changes, wait for publish
 iced_core = "0.4"
+lazy-regex = "2"
 rocket = "0.5.0-rc.1"
+serde_json = "1"
 warp = "0.3"
 
 [dependencies.async-proto]
@@ -30,6 +32,11 @@ path = "../ootr"
 
 [dependencies.oottracker]
 path = "../oottracker"
+
+[dependencies.sqlx]
+version = "0.5"
+default-features = false
+features = ["json", "macros", "postgres", "runtime-tokio-rustls"]
 
 [dependencies.structopt]
 version = "0.3"

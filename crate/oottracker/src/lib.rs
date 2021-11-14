@@ -14,6 +14,10 @@ use {
     enum_iterator::IntoEnumIterator as _,
     itertools::Itertools as _,
     semver::Version,
+    serde::{
+        Deserialize,
+        Serialize,
+    },
     ootr::{
         Rando,
         access,
@@ -52,7 +56,7 @@ mod text;
 pub mod ui;
 pub mod websocket;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Protocol)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Protocol, Deserialize, Serialize)]
 pub struct ModelState {
     pub knowledge: Knowledge,
     pub ram: Ram,

@@ -10,6 +10,7 @@ ExecStart=/home/fenhl/.cargo/bin/cargo run --release --package=oottracker-web
 User=fenhl
 Group=fenhl
 WorkingDirectory=/opt/git/github.com/fenhl/oottracker/master
+EnvironmentFile=/opt/git/github.com/fenhl/oottracker/master/assets/web/env.txt
 
 [Install]
 WantedBy=multi-user.target

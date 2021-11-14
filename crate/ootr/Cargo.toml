@@ -16,3 +16,7 @@ branch = "fields"
 [dependencies.quote-value]
 git = "https://github.com/fenhl/quote-value" #TODO publish
 branch = "main"
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]

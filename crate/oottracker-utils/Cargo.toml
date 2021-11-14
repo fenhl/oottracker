@@ -72,12 +72,6 @@ path = "../oottracker-bizhawk"
 #[target.'cfg(windows)'.dependencies.oottracker-csharp] #TODO
 #path = "../oottracker-csharp"
 
-[target.'cfg(windows)'.dependencies.oottracker-updater]
-path = "../oottracker-updater"
-
-[target.'cfg(windows)'.dependencies.oottracker-web]
-path = "../oottracker-web"
-
 [target.'cfg(windows)'.dependencies.reqwest]
 version = "0.11"
 default-features = false

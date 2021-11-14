@@ -21,6 +21,7 @@ use {
             status::NotFound,
         },
     },
+    sqlx::PgPool,
     oottracker::{
         ModelState,
         ui::{
@@ -30,8 +31,11 @@ use {
         },
     },
     crate::{
+        Error,
         Restreams,
         Rooms,
+        edit_room,
+        get_room,
         restream::render_double_cell,
     },
 };
@@ -152,34 +156,33 @@ async fn restream_double_room_layout(restreams: &State<Restreams>, restreamer: S
 }
 
 #[rocket::get("/room/<name>")]
-async fn room(rooms: &State<Rooms>, name: String) -> Result<Html<String>, horrorshow::Error> {
-    let mut rooms = rooms.lock().await;
-    let room = rooms.entry(name.clone()).or_default();
-    let layout = TrackerLayout::default();
-    tracker_page("default", box_html! {
-        @for cell in layout.cells() {
-            : cell.id.view(&name, cell.idx.try_into().expect("too many cells"), &room.model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
-        }
-    }).write_to_html()
+async fn room(rooms: &State<Rooms>, name: String) -> Result<Html<String>, Error> {
+    Ok(get_room(rooms, name.clone(), |room| {
+        let layout = TrackerLayout::default();
+        tracker_page("default", box_html! {
+            @for cell in layout.cells() {
+                : cell.id.view(&name, cell.idx.try_into().expect("too many cells"), &room.model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
+            }
+        }).write_to_html()
+    }).await??)
 }
 
 #[rocket::get("/room/<name>/click/<cell_id>")]
-async fn click(rooms: &State<Rooms>, name: String, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
-    {
-        let mut rooms = rooms.lock().await;
-        let room = rooms.entry(name.clone()).or_default();
+async fn click(pool: &State<PgPool>, rooms: &State<Rooms>, name: String, cell_id: u8) -> Result<Redirect, Error> {
+    edit_room(pool, rooms, name.clone(), |room| {
         let layout = TrackerLayout::default();
-        layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(&mut room.model);
-    }
+        layout.cells().get(usize::from(cell_id)).ok_or(Error::CellId)?.id.kind().click(&mut room.model);
+        Ok(())
+    }).await?;
     Ok(Redirect::to(rocket::uri!(room(name))))
 }
 
-pub(crate) fn rocket(rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build> {
+pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build> {
     rocket::custom(rocket::Config {
         port: 24807,
-        //TODO configure secret_key for release mode
         ..rocket::Config::default()
     })
+    .manage(pool)
     .manage(rooms)
     .manage(restreams)
     .mount("/static", FileServer::new(relative!("../../assets/web/static"), rocket::fs::Options::None))

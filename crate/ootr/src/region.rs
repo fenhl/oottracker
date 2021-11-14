@@ -9,6 +9,10 @@ use {
     },
     async_proto::Protocol,
     quote_value::QuoteValue,
+    serde::{
+        Deserialize,
+        Serialize,
+    },
     crate::{
         Rando,
         access,
@@ -16,7 +20,8 @@ use {
     },
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol, Deserialize, Serialize, QuoteValue)]
+#[serde(rename_all = "snake_case")]
 pub enum Mq {
     Vanilla,
     Mq,

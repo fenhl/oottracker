@@ -4,6 +4,11 @@ use {
             HashMap,
             HashSet,
         },
+        convert::{
+            TryFrom,
+            TryInto as _,
+        },
+        fmt,
         future::Future,
         io::prelude::*,
         ops::BitAnd,
@@ -16,18 +21,30 @@ use {
     },
     collect_mac::collect,
     derivative::Derivative,
+    derive_more::From,
+    itertools::Itertools as _,
+    serde::{
+        Deserialize,
+        Serialize,
+    },
+    serde_json::{
+        Value as Json,
+        json,
+    },
     tokio::io::{
         AsyncRead,
         AsyncWrite,
     },
     ootr::{
+        item::Item,
         model::*,
         region::Mq,
     },
 };
 
-#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq, Protocol)]
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq, Protocol, Deserialize, Serialize)]
 #[derivative(Default)]
+#[serde(rename_all = "snake_case")]
 pub enum ProgressionMode {
     /// No progression available. Should only occur in multiworld and no-logic seeds.
     Bk,
@@ -42,8 +59,9 @@ pub enum ProgressionMode {
     Done,
 }
 
-#[derive(Derivative, Debug, Clone, PartialEq, Eq)]
+#[derive(Derivative, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[derivative(Default)]
+#[serde(try_from = "KnowledgeJson", into = "KnowledgeJson")]
 pub struct Knowledge {
     pub bool_settings: HashMap<String, bool>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
     pub string_settings: HashMap<String, HashSet<String>>, //TODO hardcode settings instead? (or only hardcode some settings and fall back to this for unknown settings)
@@ -385,4 +403,114 @@ impl Protocol for Knowledge {
         }
         Ok(())
     }
+}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(default)]
+struct KnowledgeJson { // knowledge in what should eventually be a superset of the plando format. TODO always use this type instead of `Knowledge`
+    settings: HashMap<String, Json>,
+    dungeons: HashMap<String, Mq>,
+    trials: HashMap<Medallion, TrialActive>,
+    entrances: HashMap<String, Vec<Entrance>>,
+    locations: HashMap<String, Vec<Item>>,
+    progression_mode: ProgressionMode,
+}
+
+impl From<Knowledge> for KnowledgeJson {
+    fn from(knowledge: Knowledge) -> Self {
+        let Knowledge { bool_settings, string_settings, tricks, mq, active_trials, dungeon_reward_locations, exits: _, progression_mode } = knowledge;
+        let mut settings = bool_settings.into_iter().map(|(setting, enabled)| (setting, json!(enabled))).collect::<HashMap<_, _>>();
+        settings.extend(string_settings.into_iter().map(|(setting, values)| (setting, json!(values))));
+        settings.insert(format!("allowed_tricks"), json!(tricks));
+        let mut locations = HashMap::<_, Vec<Item>>::new();
+        for (reward, loc) in dungeon_reward_locations {
+            locations.entry(loc.as_str().to_owned()).or_default().push(reward.into());
+        }
+        Self {
+            settings, progression_mode, locations,
+            dungeons: mq.into_iter().map(|(dungeon, mq)| (dungeon.rando_name().to_owned(), mq)).collect(),
+            trials: active_trials.into_iter().map(|(trial, active)| (trial, active.into())).collect(),
+            entrances: HashMap::default(), //TODO
+        }
+    }
+}
+
+#[derive(From)]
+enum KnowledgeFromJsonError {
+    Json(serde_json::Error),
+    ValueType,
+}
+
+impl fmt::Display for KnowledgeFromJsonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Json(e) => e.fmt(f),
+            Self::ValueType => write!(f, "unexpected JSON value type"),
+        }
+    }
+}
+
+impl TryFrom<KnowledgeJson> for Knowledge {
+    type Error = KnowledgeFromJsonError;
+
+    fn try_from(knowledge: KnowledgeJson) -> Result<Self, KnowledgeFromJsonError> {
+        let KnowledgeJson { settings, dungeons, trials, entrances: _, locations, progression_mode } = knowledge;
+        let mut bool_settings = HashMap::default();
+        let mut string_settings = HashMap::default();
+        let mut tricks = HashMap::default();
+        for (name, value) in settings {
+            if name == "allowed_tricks" {
+                tricks = serde_json::from_value(value)?;
+                continue
+            }
+            match value {
+                Json::Bool(enabled) => { bool_settings.insert(name, enabled); }
+                Json::Array(values) => { string_settings.insert(name, values.into_iter().map(|value| serde_json::from_value(value)).try_collect()?); }
+                _ => return Err(KnowledgeFromJsonError::ValueType),
+            }
+        }
+        let mut dungeon_reward_locations = HashMap::default();
+        for (loc, items) in locations {
+            let loc = loc.parse()?;
+            for item in items {
+                let item = item.try_into()?;
+                dungeon_reward_locations.insert(item, loc);
+            }
+        }
+        Ok(Self {
+            bool_settings, string_settings, dungeon_reward_locations, progression_mode,
+            mq: dungeons.into_iter().map(|(dungeon, mq)| Ok::<_, KnowledgeFromJsonError>((dungeon.parse()?, mq))).try_collect()?,
+            active_trials: trials.into_iter().map(|(trial, active)| (trial, active.into())).collect(),
+            exits: Some(HashMap::default()), //TODO
+            tricks: Some(tricks),
+        })
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum TrialActive {
+    Inactive,
+    Active,
+}
+
+impl From<bool> for TrialActive {
+    fn from(active: bool) -> Self {
+        if active { Self::Active } else { Self::Inactive }
+    }
+}
+
+impl From<TrialActive> for bool {
+    fn from(active: TrialActive) -> Self {
+        match active {
+            TrialActive::Active => true,
+            TrialActive::Inactive => false,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct Entrance {
+    region: String,
+    from: String,
 }

@@ -11,6 +11,7 @@ use {
         StreamExt as _,
     },
     iced_core::keyboard::Modifiers as KeyboardModifiers,
+    sqlx::PgPool,
     tokio::{
         sync::Mutex,
         time::sleep,
@@ -31,13 +32,15 @@ use {
         Error,
         Restreams,
         Rooms,
+        edit_room,
+        get_room,
         restream::render_double_cell,
     },
 };
 
 type WsSink = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
-async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
+async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
     let ping_sink = WsSink::clone(&sink);
     tokio::spawn(async move {
         loop {
@@ -204,63 +207,43 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                 let rooms = Rooms::clone(&rooms);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
-                    let (mut old_model, mut rx) = {
-                        let mut rooms = rooms.lock().await;
-                        let room = rooms.entry(room.clone()).or_default();
-                        let model = room.model.clone();
-                        if ServerMessage::InitRaw(model.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
-                        (model, room.rx.clone())
-                    };
-                    while let Ok(()) = rx.changed().await { //TODO better error handling
-                        let new_model = {
-                            let mut rooms = rooms.lock().await;
-                            let room = rooms.entry(room.clone()).or_default();
-                            room.model.clone()
-                        };
+                    let (mut old_model, mut rx) = get_room(&rooms, room.clone(), |room| (room.model.clone(), room.rx.clone())).await?;
+                    ServerMessage::InitRaw(old_model.clone()).write_warp(&mut *sink.lock().await).await?;
+                    while let Ok(()) = rx.changed().await {
+                        let new_model = get_room(&rooms, room.clone(), |room| room.model.clone()).await?;
                         if old_model != new_model {
-                            if (ServerMessage::UpdateRaw(&new_model - &old_model)).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                            (ServerMessage::UpdateRaw(&new_model - &old_model)).write_warp(&mut *sink.lock().await).await?;
                         }
                         old_model = new_model;
                     }
-                });
+                    Ok::<_, Error>(())
+                }); //TODO send errors from task to client
             }
             ClientMessage::SubscribeRoom { room, layout } => {
                 let rooms = Rooms::clone(&rooms);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
-                    let (mut old_cells, mut rx) = {
-                        let mut rooms = rooms.lock().await;
-                        let room = rooms.entry(room.clone()).or_default();
-                        let cells = layout.cells().into_iter()
+                    let (mut old_cells, mut rx) = get_room(&rooms, room.clone(), |room| (
+                        layout.cells().into_iter()
                             .map(|cell| cell.id.kind().render(&room.model))
-                            .collect::<Vec<_>>();
-                        if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
-                        (cells, room.rx.clone())
-                    };
-                    while let Ok(()) = rx.changed().await { //TODO better error handling
-                        let new_cells = {
-                            let mut rooms = rooms.lock().await;
-                            let room = rooms.entry(room.clone()).or_default();
-                            layout.cells().into_iter().map(|cell| cell.id.kind().render(&room.model)).collect::<Vec<_>>()
-                        };
+                            .collect::<Vec<_>>(),
+                        room.rx.clone(),
+                    )).await?;
+                    ServerMessage::Init(old_cells.clone()).write_warp(&mut *sink.lock().await).await?;
+                    while let Ok(()) = rx.changed().await {
+                        let new_cells = get_room(&rooms, room.clone(), |room| layout.cells().into_iter().map(|cell| cell.id.kind().render(&room.model)).collect::<Vec<_>>()).await?;
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
                             if old_cell != new_cell {
-                                if (ServerMessage::Update { cell_id: i.try_into().expect("too many cells"), new_cell: new_cell.clone() }).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                                (ServerMessage::Update { cell_id: i.try_into().expect("too many cells"), new_cell: new_cell.clone() }).write_warp(&mut *sink.lock().await).await?;
                             }
                         }
                         old_cells = new_cells;
                     }
-                });
+                    Ok::<_, Error>(())
+                }); //TODO send errors from task to client
             }
-            ClientMessage::SetRaw { room, state } => {
-                let mut rooms = rooms.lock().await;
-                let room = rooms.entry(room.clone()).or_default();
-                room.model = state;
-                room.tx.send(()).expect("failed to notify websockets about state change");
-            }
+            ClientMessage::SetRaw { room, state } => edit_room(pool, &rooms, room, |room| { room.model = state; Ok(()) }).await?,
             ClientMessage::ClickRoom { room, layout, cell_id, right } => {
-                let mut rooms = rooms.lock().await;
-                let room = rooms.entry(room.clone()).or_default();
                 let cell = match layout.cells().get(usize::from(cell_id)) {
                     Some(cell) => cell.id,
                     None => {
@@ -268,25 +251,27 @@ async fn client_session(rooms: Rooms, restreams: Restreams, mut stream: impl Str
                         return Ok(())
                     }
                 };
-                if right {
-                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
-                } else {
-                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
-                }
-                room.tx.send(()).expect("failed to notify websockets about state change");
+                edit_room(pool, &rooms, room, |room| {
+                    if right {
+                        let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
+                    } else {
+                        let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
+                    }
+                    Ok(())
+                }).await?;
             }
         }
     }
 }
 
-async fn client_connection(rooms: Rooms, restreams: Restreams, ws: WebSocket) {
+async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Restreams, ws: WebSocket) {
     let (ws_sink, ws_stream) = ws.split();
     let ws_sink = WsSink::new(Mutex::new(ws_sink));
-    if let Err(e) = client_session(rooms, restreams, ws_stream, WsSink::clone(&ws_sink)).await {
+    if let Err(e) = client_session(&pool, rooms, restreams, ws_stream, WsSink::clone(&ws_sink)).await {
         let _ = ServerMessage::from_error(e).write_warp(&mut *ws_sink.lock().await).await;
     }
 }
 
-pub(crate) async fn ws_handler(rooms: Rooms, restreams: Restreams, ws: warp::ws::Ws) -> Result<impl Reply, Rejection> {
-    Ok(ws.on_upgrade(|ws| client_connection(rooms, restreams, ws)))
+pub(crate) async fn ws_handler(pool: PgPool, rooms: Rooms, restreams: Restreams, ws: warp::ws::Ws) -> Result<impl Reply, Rejection> {
+    Ok(ws.on_upgrade(move |ws| client_connection(pool, rooms, restreams, ws)))
 }
