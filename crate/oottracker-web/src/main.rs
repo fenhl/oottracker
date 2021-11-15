@@ -91,7 +91,7 @@ impl RoomState {
 
     pub(crate) async fn force_save(&mut self, pool: &PgPool) -> Result<(), Error> {
         let ModelState { ref knowledge, ref ram } = self.model;
-        sqlx::query!("INSERT INTO rooms (name, knowledge, ram) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET knowledge = EXCLUDED.knowledge, ram = EXCLUDED.ram", self.name, serde_json::to_value(knowledge)?, &ram.to_ranges()).execute(pool).await?;
+        sqlx::query!("INSERT INTO rooms (name, knowledge, ram) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET knowledge = EXCLUDED.knowledge, ram = EXCLUDED.ram", self.name, serde_json::to_value(knowledge)?, &ram.to_ranges()[..]).execute(pool).await?;
         self.last_saved = Instant::now();
         Ok(())
     }

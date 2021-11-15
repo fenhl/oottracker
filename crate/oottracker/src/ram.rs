@@ -211,15 +211,17 @@ impl Ram {
         ).try_collect::<_, Vec<_>, _>()?)
     }
 
-    pub fn to_ranges(&self) -> Vec<Vec<u8>> {
+    pub fn to_ranges(&self) -> [Vec<u8>; NUM_RANGES] {
         let mut chest_and_room_clear = Vec::with_capacity(8);
         chest_and_room_clear.extend_from_slice(&self.current_scene_chest_flags.to_be_bytes());
         chest_and_room_clear.extend_from_slice(&self.current_scene_room_clear_flags.to_be_bytes());
-        vec![
+        [
             self.save.to_save_data(),
             vec![self.current_scene_id],
             self.current_scene_switch_flags.to_be_bytes().into(),
             chest_and_room_clear,
+            self.current_text_box_id.to_be_bytes().into(),
+            self.text_box_contents.into(),
         ]
     }
 
@@ -275,8 +277,7 @@ impl Protocol for Ram {
 
     fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
         Box::pin(async move {
-            let ranges = self.to_ranges();
-            for range in ranges {
+            for range in self.to_ranges() {
                 sink.write_all(&range).await?;
             }
             Ok(())
@@ -284,8 +285,7 @@ impl Protocol for Ram {
     }
 
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
-        let ranges = self.to_ranges();
-        for range in ranges {
+        for range in self.to_ranges() {
             sink.write_all(&range)?;
         }
         Ok(())
@@ -328,7 +328,7 @@ pub struct Delta {
 
 impl From<Ram> for Vec<Vec<u8>> {
     fn from(ram: Ram) -> Self {
-        ram.to_ranges()
+        ram.to_ranges().into()
     }
 }
 
