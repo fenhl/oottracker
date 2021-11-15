@@ -9,10 +9,6 @@ name = "oottracker-format-ram"
 path = "src/format_ram.rs"
 
 [[bin]]
-name = "oottracker-mac-release-test"
-path = "src/mac_release_test.rs"
-
-[[bin]]
 name = "oottracker-release"
 path = "src/release.rs"
 
