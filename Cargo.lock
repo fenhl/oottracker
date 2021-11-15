@@ -3420,7 +3420,6 @@ dependencies = [
  "rocket",
  "serde_json",
  "sqlx",
- "structopt",
  "tokio",
  "warp",
  "wheel",

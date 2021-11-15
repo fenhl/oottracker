@@ -34,7 +34,6 @@ use {
         postgres::PgConnectOptions,
         types::Json,
     },
-    structopt::StructOpt,
     tokio::sync::{
         Mutex,
         RwLock,
@@ -165,11 +164,8 @@ impl<'r> rocket::response::Responder<'r, 'static> for Error {
     }
 }
 
-#[derive(StructOpt)]
-struct Args {} // for --help/--version support
-
 #[wheel::main]
-async fn main(Args {}: Args) -> Result<(), Error> {
+async fn main() -> Result<(), Error> {
     let pool = PgPool::connect_with(PgConnectOptions::default().database("oottracker").application_name("oottracker-web")).await?;
     let rooms = {
         let mut rooms = HashMap::default();

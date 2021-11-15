@@ -38,10 +38,6 @@ version = "0.5"
 default-features = false
 features = ["json", "macros", "postgres", "runtime-tokio-rustls"]
 
-[dependencies.structopt]
-version = "0.3"
-features = ["paw"]
-
 [dependencies.tokio]
 version = "1"
 features = ["sync"]
