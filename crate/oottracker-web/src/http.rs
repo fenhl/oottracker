@@ -64,7 +64,7 @@ fn tracker_page<'a>(layout_name: &'a str, items: Box<dyn RenderBox + 'a>) -> Box
                 title : "OoT Tracker";
                 meta(name = "author", content = "Fenhl");
                 meta(name = "viewport", content = "width=device-width, initial-scale=1");
-                link(rel = "icon", type = "image/vnd.microsoft.icon", href = "/static/img/icon.ico");
+                link(rel = "icon", sizes = "512x512", type = "image/png", href = "/static/img/favicon.png");
                 link(rel = "stylesheet", href = "/static/common.css");
             }
             body {
