@@ -23,7 +23,7 @@ pub(crate) struct Plist {
 }
 
 pub(crate) async fn check_cli_version(package: &str, version: &Version) {
-    let cli_output = String::from_utf8(Command::new("cargo").arg("run").arg(format!("--package={}", package)).arg("--").arg("--version").stdout(Stdio::piped()).output().await.expect("failed to run CLI with --version").stdout).expect("CLI version output is invalid UTF-8");
+    let cli_output = String::from_utf8(Command::new("cargo").arg("run").arg(format!("--package={}", package)).arg("--").arg("--version").env("DATABASE_URL", include_str!("../../../assets/web/env.txt").split_once('=').unwrap().1).stdout(Stdio::piped()).output().await.expect("failed to run CLI with --version").stdout).expect("CLI version output is invalid UTF-8");
     let (cli_name, cli_version) = cli_output.trim_end().split(' ').collect_tuple().expect("no space in CLI version output");
     assert_eq!(cli_name, package);
     assert_eq!(*version, cli_version.parse().expect("failed to parse CLI version"));
@@ -40,6 +40,6 @@ pub(crate) async fn version() -> Version {
     //assert_eq!(version, oottracker_csharp::version()); //TODO
     check_cli_version("oottracker-gui", &version).await;
     check_cli_version("oottracker-updater", &version).await;
-    check_cli_version("oottracker-web", &version).await; //TODO set DATABASE_URL envar
+    check_cli_version("oottracker-web", &version).await;
     version
 }
