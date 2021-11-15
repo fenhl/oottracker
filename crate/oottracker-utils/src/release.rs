@@ -221,6 +221,7 @@ async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: br
     }
     eprintln!("uploading oottracker-bizhawk-win64.zip");
     repo.release_attach(client, &release_rx.recv().await?, "oottracker-bizhawk-win64.zip", "application/zip", buf.into_inner()).await?;
+    eprintln!("BizHawk build done");
     Ok(())
 }
 
@@ -232,6 +233,7 @@ async fn build_gui(client: &reqwest::Client, repo: &Repo, mut release_rx: broadc
     Command::new("cargo").arg("build").arg("--release").arg("--package=oottracker-gui").check("cargo build --package=oottracker-gui", verbose).await?;
     eprintln!("uploading oottracker-win64.exe");
     repo.release_attach(client, &release_rx.recv().await?, "oottracker-win64.exe", "application/vnd.microsoft.portable-executable", fs::read("target/release/oottracker-gui.exe").await?).await?;
+    eprintln!("Windows GUI build done");
     Ok(())
 }
 
@@ -245,6 +247,7 @@ async fn build_macos(client: &reqwest::Client, repo: &Repo, mut release_rx: broa
     Command::new("scp").arg(format!("{}:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac.dmg", MACOS_ADDR)).arg("assets/oottracker-mac.dmg").check("scp", verbose).await?;
     eprintln!("uploading oottracker-mac.dmg");
     repo.release_attach(client, &release_rx.recv().await?, "oottracker-mac.dmg", "application/x-apple-diskimage", fs::read("assets/oottracker-mac.dmg").await?).await?;
+    eprintln!("macOS build done");
     Ok(())
 }
 
@@ -275,6 +278,7 @@ async fn build_pj64(client: &reqwest::Client, repo: &Repo, mut release_rx: broad
     io::copy(&mut base, &mut buf).await?;
     eprintln!("uploading oottracker-pj64.js");
     repo.release_attach(client, &release_rx.recv().await?, "oottracker-pj64.js", "text/javascript", buf).await?;
+    eprintln!("Project64 build done");
     Ok(())
 }
 
@@ -283,9 +287,10 @@ async fn build_web(verbose: bool) -> Result<(), Error> {
     eprintln!("updating repo on mercredi");
     Command::new("ssh").arg("mercredi").arg("cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only").check("ssh", verbose).await?;
     eprintln!("building oottracker.fenhl.net");
-    Command::new("ssh").arg("mercredi").arg("cd /opt/git/github.com/fenhl/oottracker/master && cargo build --release --package=oottracker-web").check("ssh", verbose).await?;
+    Command::new("ssh").arg("mercredi").arg(concat!("env -C /opt/git/github.com/fenhl/oottracker/master ", include_str!("../../../assets/web/env.txt"), " cargo build --release --package=oottracker-web")).check("ssh", verbose).await?;
     eprintln!("restarting oottracker.fenhl.net");
     Command::new("ssh").arg("mercredi").arg("sudo systemctl restart oottracker-web").check("ssh", verbose).await?;
+    eprintln!("web build done");
     Ok(())
 }
 
