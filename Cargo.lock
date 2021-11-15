@@ -3214,7 +3214,7 @@ checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
 
 [[package]]
 name = "ootr"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "async-proto",
  "derivative",
@@ -3226,7 +3226,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-dynamic"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "derive_more",
  "itertools 0.10.1",
@@ -3241,7 +3241,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "once_cell",
  "ootr",
@@ -3251,7 +3251,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static-derive"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "convert_case",
  "derive_more",
@@ -3272,7 +3272,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "async-proto",
  "async-stream",
@@ -3307,7 +3307,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-bizhawk"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "semver 1.0.4",
  "wheel",
@@ -3316,7 +3316,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-csharp"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "async-proto",
  "itertools 0.10.1",
@@ -3327,7 +3327,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-derive"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "convert_case",
  "itertools 0.10.1",
@@ -3338,7 +3338,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-gui"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "async-proto",
  "derivative",
@@ -3365,7 +3365,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-updater"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "derive_more",
  "itertools 0.10.1",
@@ -3379,7 +3379,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-utils"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3407,7 +3407,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-web"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "async-proto",
  "derive_more",
