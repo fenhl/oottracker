@@ -1,4 +1,4 @@
-**Warning:** As of 2020-11-03, [the racing rules](https://wiki.ootrandomizer.com/index.php?title=Rules#Universal_Rules) prohibit all usage of trackers capable of auto-tracking even in manual mode. How exactly this applies to my tracker is unclear pending discussion with the RaceMods.
+**Warning:** As of 2021-11-15, [the racing rules](https://wiki.ootrandomizer.com/index.php?title=Rules#Universal_Rules) prohibit all usage of trackers capable of auto-tracking even in manual mode. How exactly this applies to my tracker is unclear pending a decision from the RaceMods.
 
 This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include:
 
