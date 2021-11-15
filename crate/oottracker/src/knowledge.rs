@@ -437,15 +437,22 @@ impl From<Knowledge> for KnowledgeJson {
 
 #[derive(From)]
 enum KnowledgeFromJsonError {
+    #[from]
     Json(serde_json::Error),
-    ValueType,
+    UnknownDungeon(String),
+    UnknownItem(Item),
+    UnknownLocation(String),
+    ValueType(Json),
 }
 
 impl fmt::Display for KnowledgeFromJsonError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Json(e) => e.fmt(f),
-            Self::ValueType => write!(f, "unexpected JSON value type"),
+            Self::UnknownDungeon(name) => write!(f, "unknown dungeon: {}", name),
+            Self::UnknownItem(item) => write!(f, "unknown item: {}", item.0),
+            Self::UnknownLocation(name) => write!(f, "unknown location: {}", name),
+            Self::ValueType(value) => write!(f, "unexpected JSON value type for value {}", value),
         }
     }
 }
@@ -466,20 +473,20 @@ impl TryFrom<KnowledgeJson> for Knowledge {
             match value {
                 Json::Bool(enabled) => { bool_settings.insert(name, enabled); }
                 Json::Array(values) => { string_settings.insert(name, values.into_iter().map(|value| serde_json::from_value(value)).try_collect()?); }
-                _ => return Err(KnowledgeFromJsonError::ValueType),
+                _ => return Err(KnowledgeFromJsonError::ValueType(value)),
             }
         }
         let mut dungeon_reward_locations = HashMap::default();
         for (loc, items) in locations {
-            let loc = loc.parse()?;
+            let loc = loc.parse().map_err(|()| KnowledgeFromJsonError::UnknownLocation(loc))?;
             for item in items {
-                let item = item.try_into()?;
+                let item = item.clone().try_into().map_err(|()| KnowledgeFromJsonError::UnknownItem(item))?;
                 dungeon_reward_locations.insert(item, loc);
             }
         }
         Ok(Self {
             bool_settings, string_settings, dungeon_reward_locations, progression_mode,
-            mq: dungeons.into_iter().map(|(dungeon, mq)| Ok::<_, KnowledgeFromJsonError>((dungeon.parse()?, mq))).try_collect()?,
+            mq: dungeons.into_iter().map(|(dungeon, mq)| Ok::<_, KnowledgeFromJsonError>((dungeon.parse().map_err(|()| KnowledgeFromJsonError::UnknownDungeon(dungeon))?, mq))).try_collect()?,
             active_trials: trials.into_iter().map(|(trial, active)| (trial, active.into())).collect(),
             exits: Some(HashMap::default()), //TODO
             tricks: Some(tricks),

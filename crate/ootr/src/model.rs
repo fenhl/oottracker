@@ -130,7 +130,7 @@ impl FromStr for DungeonRewardLocation {
         Ok(if s == "Links Pocket" {
             Self::LinksPocket
         } else {
-            Self::Dungeon(s.parse()?)
+            Self::Dungeon(MainDungeon::from_reward_location(s).ok_or(())?)
         })
     }
 }
@@ -148,6 +148,20 @@ pub enum MainDungeon {
 }
 
 impl MainDungeon {
+    pub fn from_reward_location(loc: &str) -> Option<Self> {
+        match loc {
+            "Queen Gohma" => Some(Self::DekuTree),
+            "King Dodongo" => Some(Self::DodongosCavern),
+            "Barinade" => Some(Self::JabuJabu),
+            "Phantom Ganon" => Some(Self::ForestTemple),
+            "Volvagia" => Some(Self::FireTemple),
+            "Morpha" => Some(Self::WaterTemple),
+            "Bongo Bongo" => Some(Self::ShadowTemple),
+            "Twinrova" => Some(Self::SpiritTemple),
+            _ => None,
+        }
+    }
+
     pub fn reward_location(&self) -> &'static str {
         match self {
             Self::DekuTree => "Queen Gohma",
