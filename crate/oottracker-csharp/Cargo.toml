@@ -8,6 +8,10 @@ edition = "2021"
 name = "oottracker"
 crate-type = ["cdylib"]
 
+[build-dependencies.winver]
+git = "https://github.com/fenhl/winver"
+branch = "main"
+
 [dependencies]
 itertools = "0.10"
 libc = "0.2"
@@ -19,3 +23,7 @@ features = ["write-sync"]
 
 [dependencies.oottracker]
 path = "../oottracker"
+
+[dependencies.winver]
+git = "https://github.com/fenhl/winver"
+branch = "main"

@@ -3323,6 +3323,7 @@ dependencies = [
  "libc",
  "oottracker",
  "semver 1.0.4",
+ "winver",
 ]
 
 [[package]]

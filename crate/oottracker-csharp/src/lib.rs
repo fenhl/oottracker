@@ -116,6 +116,17 @@ pub fn version() -> Version {
     Version::parse(env!("CARGO_PKG_VERSION")).expect("failed to parse current version")
 }
 
+#[no_mangle] pub extern "C" fn expected_bizhawk_version_string() -> StringHandle {
+    StringHandle::from_string(include_str!(concat!(env!("OUT_DIR"), "/bizhawk-version.txt")))
+}
+
+#[no_mangle] pub extern "C" fn running_bizhawk_version_string() -> StringHandle {
+    StringHandle::from_string(match winver::get_file_version_info("EmuHawk.exe") {
+        Ok([major, minor, patch, _]) => format!("{}.{}.{}", major, minor, patch),
+        Err(e) => format!("(error: {})", e),
+    })
+}
+
 #[no_mangle] pub extern "C" fn version_string() -> StringHandle {
     StringHandle::from_string(version())
 }

@@ -13,6 +13,8 @@ using BizHawk.Client.EmuHawk;
 
 namespace Net.Fenhl.OotAutoTracker {
     internal class Native {
+        [DllImport("oottracker")] internal static extern StringHandle expected_bizhawk_version_string();
+        [DllImport("oottracker")] internal static extern StringHandle running_bizhawk_version_string();
         [DllImport("oottracker")] internal static extern StringHandle version_string();
         [DllImport("oottracker")] internal static extern TrackerLayout layout_default();
         [DllImport("oottracker")] internal static extern void layout_free(IntPtr layout);
@@ -456,6 +458,8 @@ namespace Net.Fenhl.OotAutoTracker {
 
         public MainForm() {
             SuspendLayout();
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
             this.ClientSize = new Size(720, 896);
             this.Icon = new Icon(typeof(MainForm).Assembly.GetManifestResourceStream("Net.Fenhl.OotAutoTracker.Resources.icon.ico"));
             this.BackColor = Color.Black;
@@ -494,6 +498,8 @@ namespace Net.Fenhl.OotAutoTracker {
                             foreach (PictureBox cell in this.cells) {
                                 cell.Visible = false;
                             }
+                            this.FormBorderStyle = FormBorderStyle.Sizable;
+                            this.MaximizeBox = true;
                         }
                     });
                 }
@@ -508,7 +514,7 @@ namespace Net.Fenhl.OotAutoTracker {
             this.label_Version.Name = "label_Version";
             this.label_Version.Size = new Size(96, 25);
             this.label_Version.TabIndex = 0;
-            this.label_Version.Text = $"OoT autotracker version {Native.version_string().AsString()}";
+            this.label_Version.Text = $"OoT autotracker version {Native.version_string().AsString()} for BizHawk version {Native.expected_bizhawk_version_string().AsString()}";
             this.label_Version.Visible = false;
             this.Controls.Add(this.label_Version);
 
@@ -568,6 +574,11 @@ namespace Net.Fenhl.OotAutoTracker {
             this.button_Close_Menu.Text = "Done";
             this.button_Close_Menu.Visible = false;
             this.button_Close_Menu.Click += new EventHandler((object sender, EventArgs e) => {
+                if (this.WindowState == FormWindowState.Maximized) {
+                    this.WindowState = FormWindowState.Normal;
+                }
+                this.FormBorderStyle = FormBorderStyle.FixedSingle;
+                this.MaximizeBox = false;
                 this.ClientSize = new Size(720, 896);
                 this.label_Version.Visible = false;
                 this.label_Game.Visible = false;
