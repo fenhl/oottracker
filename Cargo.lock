@@ -3369,6 +3369,8 @@ name = "oottracker-updater"
 version = "0.6.4"
 dependencies = [
  "derive_more",
+ "iced",
+ "image",
  "itertools 0.10.1",
  "oottracker",
  "reqwest",
