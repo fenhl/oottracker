@@ -154,7 +154,7 @@ impl Application for App {
             State::WaitDownload => Text::new("Finishing download…").into(),
             State::Launch => Text::new("Starting new version…").into(),
             State::Done => Text::new("Closing updater…").into(),
-            State::Error(ref e) => Text::new(format!("error: {}", e)).into(),
+            State::Error(ref e) => Text::new(format!("error: {}", e)).into(), //TODO show info on how to get support
         }
     }
 
@@ -179,10 +179,10 @@ enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "I/O error: {}", e),
-            Error::MissingAsset => write!(f, "release does not have a download for this platform"),
-            Error::NoReleases => write!(f, "there are no released versions"),
-            Error::Reqwest(e) => if let Some(url) = e.url() {
+            Self::Io(e) => write!(f, "I/O error: {}", e),
+            Self::MissingAsset => write!(f, "release does not have a download for this platform"),
+            Self::NoReleases => write!(f, "there are no released versions"),
+            Self::Reqwest(e) => if let Some(url) = e.url() {
                 write!(f, "HTTP error at {}: {}", url, e)
             } else {
                 write!(f, "HTTP error: {}", e)
@@ -200,7 +200,6 @@ fn main(Args { path }: Args) -> iced::Result {
             icon: Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height()).ok(), // simply omit the icon if loading it fails
             ..window::Settings::default()
         },
-        flags: path,
-        ..Settings::default()
+        ..Settings::with_flags(path)
     })
 }

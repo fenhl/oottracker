@@ -58,6 +58,16 @@ impl Repo {
         ))
     }
 
+    pub async fn release_by_tag(&self, client: &Client, tag: &str) -> reqwest::Result<Option<Release>> {
+        let response = client.get(&format!("https://api.github.com/repos/{}/{}/releases/tags/{}", self.user, self.name, tag))
+            .send().await?;
+        if response.status() == StatusCode::NOT_FOUND { return Ok(None) } // no release with this tag
+        Ok(Some(
+            response.error_for_status()?
+                .json::<Release>().await?
+        ))
+    }
+
     /// Creates a draft release, which can be published using `Repo::publish_release`.
     pub async fn create_release(&self, client: &Client, name: String, tag_name: String, body: String) -> reqwest::Result<Release> {
         Ok(

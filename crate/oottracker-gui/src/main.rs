@@ -1038,8 +1038,7 @@ fn main(args: Args) -> Result<(), Error> {
             icon: Some(Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height())?),
             ..window::Settings::default()
         },
-        flags: args,
-        ..Settings::default()
+        ..Settings::with_flags(args)
     })?;
     Ok(())
 }
