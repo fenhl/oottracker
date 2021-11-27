@@ -2,10 +2,6 @@ use {
     std::{
         array::TryFromSliceError,
         borrow::Borrow,
-        convert::{
-            TryFrom,
-            TryInto as _,
-        },
         fmt,
         future::Future,
         io::prelude::*,

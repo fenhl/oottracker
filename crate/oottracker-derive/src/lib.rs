@@ -3,7 +3,6 @@
 
 use {
     std::{
-        convert::TryFrom,
         fs::{
             self,
             File,

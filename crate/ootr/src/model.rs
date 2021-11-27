@@ -1,6 +1,5 @@
 use {
     std::{
-        convert::TryFrom,
         fmt,
         str::FromStr,
     },

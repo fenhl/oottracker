@@ -4,10 +4,6 @@ use {
             HashMap,
             HashSet,
         },
-        convert::{
-            TryFrom,
-            TryInto as _,
-        },
         fmt,
         future::Future,
         io::prelude::*,

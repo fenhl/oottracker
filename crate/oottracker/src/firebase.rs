@@ -5,10 +5,6 @@ use {
             BTreeMap,
             hash_map::DefaultHasher,
         },
-        convert::{
-            TryFrom as _,
-            TryInto as _,
-        },
         fmt,
         hash::{
             Hash,

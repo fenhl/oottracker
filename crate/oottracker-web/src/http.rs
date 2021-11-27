@@ -1,5 +1,4 @@
 use {
-    std::convert::TryInto as _,
     horrorshow::{
         box_html,
         helper::doctype,

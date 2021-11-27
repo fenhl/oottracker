@@ -2,7 +2,6 @@
 
 use {
     std::{
-        convert::TryFrom as _,
         ffi::CString,
         fmt,
         net::{
