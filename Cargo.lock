@@ -3478,6 +3478,7 @@ dependencies = [
  "itertools 0.10.1",
  "libc",
  "oottracker",
+ "reqwest",
  "semver 1.0.4",
  "winver",
 ]

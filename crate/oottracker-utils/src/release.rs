@@ -204,6 +204,8 @@ struct BizHawkVersionQuery;
 
 #[cfg(windows)]
 async fn build_bizhawk(client: &reqwest::Client, repo: &Repo, mut release_rx: broadcast::Receiver<Release>, verbose: bool, version: Version) -> Result<(), Error> {
+    eprintln!("building oottracker-updater-bizhawk.exe");
+    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-pc-windows-msvc").arg("--package=oottracker-updater-bizhawk").check("cargo build --package=oottracker-updater-bizhawk", verbose).await?;
     eprintln!("building oottracker-csharp");
     Command::new("cargo").arg("build").arg("--package=oottracker-csharp").check("cargo build --package=oottracker-csharp", verbose).await?; //TODO figure out why release builds crash at runtime, then reenable --release here
     eprintln!("building oottracker-bizhawk");

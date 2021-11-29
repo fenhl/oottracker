@@ -16,6 +16,12 @@ namespace Net.Fenhl.OotAutoTracker {
         [DllImport("oottracker")] internal static extern StringHandle expected_bizhawk_version_string();
         [DllImport("oottracker")] internal static extern StringHandle running_bizhawk_version_string();
         [DllImport("oottracker")] internal static extern StringHandle version_string();
+        [DllImport("oottracker")] internal static extern BoolResult update_available();
+        [DllImport("oottracker")] internal static extern void bool_result_free(IntPtr bool_res);
+        [DllImport("oottracker")] internal static extern bool bool_result_is_ok(BoolResult bool_res);
+        [DllImport("oottracker")] internal static extern bool bool_result_unwrap(IntPtr bool_res);
+        [DllImport("oottracker")] internal static extern StringHandle bool_result_debug_err(IntPtr bool_res);
+        [DllImport("oottracker")] internal static extern UnitResult run_updater();
         [DllImport("oottracker")] internal static extern TrackerLayout layout_default();
         [DllImport("oottracker")] internal static extern void layout_free(IntPtr layout);
         [DllImport("oottracker")] internal static extern TrackerCell layout_cell(TrackerLayout layout, byte idx);
@@ -85,6 +91,35 @@ namespace Net.Fenhl.OotAutoTracker {
                 Native.string_free(this.handle);
             }
             return true;
+        }
+    }
+
+    internal class BoolResult : SafeHandle {
+        internal BoolResult() : base(IntPtr.Zero, true) {}
+
+        public override bool IsInvalid {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
+                Native.bool_result_free(handle);
+            }
+            return true;
+        }
+
+        internal bool IsOk() => Native.bool_result_is_ok(this);
+
+        internal bool Unwrap() {
+            var inner = Native.bool_result_unwrap(this.handle);
+            this.handle = IntPtr.Zero; // bool_result_unwrap takes ownership
+            return inner;
+        }
+
+        internal StringHandle DebugErr() {
+            var err = Native.bool_result_debug_err(this.handle);
+            this.handle = IntPtr.Zero; // bool_result_debug_err takes ownership
+            return err;
         }
     }
 
@@ -428,6 +463,8 @@ namespace Net.Fenhl.OotAutoTracker {
     public sealed class MainForm : ToolFormBase, IExternalToolForm {
         private PictureBox[] cells = new PictureBox[52];
         private Label label_Version = new Label();
+        private Button button_Update = new Button();
+        private Label label_Update = new Label();
         private Label label_Game = new Label();
         //private Label label_Connection = new Label();
         private Label label_Save = new Label();
@@ -490,6 +527,8 @@ namespace Net.Fenhl.OotAutoTracker {
                         MouseEventArgs me = (MouseEventArgs) e;
                         if (me.Button == MouseButtons.Right) {
                             this.label_Version.Visible = true;
+                            this.button_Update.Visible = true;
+                            this.label_Update.Visible = true;
                             this.label_Game.Visible = true;
                             //this.label_Connection.Visible = true;
                             this.label_Save.Visible = true;
@@ -518,13 +557,54 @@ namespace Net.Fenhl.OotAutoTracker {
             this.label_Version.Visible = false;
             this.Controls.Add(this.label_Version);
 
+            // button_Update
+            this.button_Update.ForeColor = Color.White;
+            this.button_Update.AutoSize = true;
+            this.button_Update.Location = new Point(12, 34);
+            this.button_Update.Name = "button_Update";
+            this.button_Update.Size = new Size(96, 25);
+            this.button_Update.TabIndex = 1;
+            this.button_Update.Text = "Check for updates…";
+            this.button_Update.Visible = false;
+            this.button_Update.Click += new EventHandler((object sender, EventArgs e) => {
+                this.label_Update.Text = "Checking for updates…";
+                using (var update_available_res = Native.update_available()) {
+                    if (update_available_res.IsOk()) {
+                        if (update_available_res.Unwrap()) {
+                            this.label_Update.Text = "An update is available";
+                            using (var run_updater_res = Native.run_updater()) {
+                                if (!run_updater_res.IsOk()) {
+                                    this.label_Update.Text = run_updater_res.DebugErr().AsString();
+                                }
+                            }
+                        } else {
+                            this.label_Update.Text = $"You are up to date as of {DateTime.Now}";
+                        }
+                    } else {
+                        this.label_Update.Text = update_available_res.DebugErr().AsString();
+                    }
+                }
+            });
+            this.Controls.Add(this.button_Update);
+
+            // label_Update
+            this.label_Update.ForeColor = Color.White;
+            this.label_Update.AutoSize = true;
+            this.label_Update.Location = new Point(222, 39);
+            this.label_Update.Name = "label_Update";
+            this.label_Update.Size = new Size(96, 25);
+            this.label_Update.TabIndex = 2;
+            this.label_Update.Text = "";
+            this.label_Update.Visible = false;
+            this.Controls.Add(this.label_Update);
+
             // label_Game
             this.label_Game.ForeColor = Color.White;
             this.label_Game.AutoSize = true;
-            this.label_Game.Location = new Point(12, 34);
+            this.label_Game.Location = new Point(12, 84);
             this.label_Game.Name = "label_Game";
             this.label_Game.Size = new Size(96, 25);
-            this.label_Game.TabIndex = 1;
+            this.label_Game.TabIndex = 3;
             this.label_Game.Text = "Game: loading";
             this.label_Game.Visible = false;
             this.Controls.Add(this.label_Game);
@@ -533,10 +613,10 @@ namespace Net.Fenhl.OotAutoTracker {
             // label_Connection
             this.label_Connection.ForeColor = Color.White;
             this.label_Connection.AutoSize = true;
-            this.label_Connection.Location = new Point(12, 59);
+            this.label_Connection.Location = new Point(12, 109);
             this.label_Connection.Name = "label_Connection";
             this.label_Connection.Size = new Size(96, 25);
-            this.label_Connection.TabIndex = 2;
+            this.label_Connection.TabIndex = 4;
             this.label_Connection.Text = "Connection: waiting for game";
             this.label_Connection.Visible = false;
             this.Controls.Add(this.label_Connection);
@@ -545,10 +625,10 @@ namespace Net.Fenhl.OotAutoTracker {
             // label_Save
             this.label_Save.ForeColor = Color.White;
             this.label_Save.AutoSize = true;
-            this.label_Save.Location = new Point(12, /*84*/ 59);
+            this.label_Save.Location = new Point(12, /*134*/ 109);
             this.label_Save.Name = "label_Save";
             this.label_Save.Size = new Size(96, 25);
-            this.label_Save.TabIndex = 3;
+            this.label_Save.TabIndex = /*5*/ 4;
             this.label_Save.Text = "Save: waiting for game";
             this.label_Save.Visible = false;
             this.Controls.Add(this.label_Save);
@@ -556,10 +636,10 @@ namespace Net.Fenhl.OotAutoTracker {
             // label_Help
             this.label_Help.ForeColor = Color.White;
             this.label_Help.AutoSize = true;
-            this.label_Help.Location = new Point(12, /*109*/ 84);
+            this.label_Help.Location = new Point(12, /*159*/ 134);
             this.label_Help.Name = "label_Help";
             this.label_Help.Size = new Size(96, 25);
-            this.label_Help.TabIndex = 4;
+            this.label_Help.TabIndex = /*6*/ 5;
             this.label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
             this.label_Help.Visible = false;
             this.Controls.Add(this.label_Help);
@@ -567,10 +647,10 @@ namespace Net.Fenhl.OotAutoTracker {
             // button_Close_Menu
             this.button_Close_Menu.ForeColor = Color.White;
             this.button_Close_Menu.AutoSize = true;
-            this.button_Close_Menu.Location = new Point(12, /*134*/ 109);
+            this.button_Close_Menu.Location = new Point(12, /*184*/ 159);
             this.button_Close_Menu.Name = "button_Close_Menu";
             this.button_Close_Menu.Size = new Size(96, 25);
-            this.button_Close_Menu.TabIndex = 5;
+            this.button_Close_Menu.TabIndex = /*7*/ 6;
             this.button_Close_Menu.Text = "Done";
             this.button_Close_Menu.Visible = false;
             this.button_Close_Menu.Click += new EventHandler((object sender, EventArgs e) => {
@@ -581,6 +661,8 @@ namespace Net.Fenhl.OotAutoTracker {
                 this.MaximizeBox = false;
                 this.ClientSize = new Size(720, 896);
                 this.label_Version.Visible = false;
+                this.button_Update.Visible = false;
+                this.label_Update.Visible = false;
                 this.label_Game.Visible = false;
                 //this.label_Connection.Visible = false;
                 this.label_Save.Visible = false;
