@@ -930,7 +930,7 @@ cells! {
     Bottle: OptionalOverlay {
         main_img: ImageInfo::new("bottle"),
         overlay_img: ImageInfo::new("letter"),
-        active: Box::new(|state| (state.ram.save.inv.emptiable_bottles() > 0, state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered
+        active: Box::new(|state| (state.ram.save.inv.emptiable_bottles() > 0, state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered or Open Fountain is known (https://github.com/fenhl/oottracker/issues/21)
         toggle_main: Box::new(|state| {
             let new_val = if state.ram.save.inv.emptiable_bottles() > 0 { 0 } else { 1 };
             state.ram.save.inv.set_emptiable_bottles(new_val);
@@ -947,7 +947,7 @@ cells! {
     },
     RutosLetter: Simple {
         img: ImageInfo::new("UNIMPLEMENTED"),
-        active: Box::new(|state| state.ram.save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered
+        active: Box::new(|state| state.ram.save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered or Open Fountain is known (https://github.com/fenhl/oottracker/issues/21)
         toggle: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
     },
     Scale: Sequence {
@@ -1407,9 +1407,18 @@ cells! {
     Ocarina: Overlay {
         main_img: ImageInfo::new("ocarina"),
         overlay_img: ImageInfo::new("scarecrow"),
-        active: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))), //TODO only show free Scarecrow's Song once it's known (by settings string input or by check)
+        //TODO this has multiple issues:
+        // * it leaks the info that the free scarecrow setting is active as soon as the scarecrow song has been set as child
+        // * it doesn't display free scarecrow song known from settings input
+        // see also https://github.com/fenhl/oottracker/issues/21
+        active: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.scarecrow_song_child && state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))),
         toggle_main: Box::new(|state| state.ram.save.inv.ocarina = !state.ram.save.inv.ocarina),
-        toggle_overlay: Box::new(|state| state.ram.save.event_chk_inf.9.toggle(EventChkInf9::SCARECROW_SONG)), //TODO make sure free scarecrow knowledge is toggled off properly
+        toggle_overlay: Box::new(|state| if state.ram.save.scarecrow_song_child && state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG) {
+            state.ram.save.event_chk_inf.9.remove(EventChkInf9::SCARECROW_SONG);
+        } else {
+            state.ram.save.scarecrow_song_child = true;
+            state.ram.save.event_chk_inf.9.insert(EventChkInf9::SCARECROW_SONG);
+        }), //TODO make sure free scarecrow knowledge is toggled properly
     },
     Beans: Simple { //TODO overlay with number bought if autotracker is on & shuffle beans is off
         img: ImageInfo::new("beans"),

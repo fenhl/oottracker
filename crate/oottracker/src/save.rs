@@ -997,6 +997,7 @@ pub struct Save {
     pub event_chk_inf: EventChkInf,
     pub item_get_inf: ItemGetInf,
     pub inf_table: InfTable,
+    pub scarecrow_song_child: bool,
     pub game_mode: GameMode,
 }
 
@@ -1100,6 +1101,11 @@ impl Save {
             event_chk_inf: try_get_offset!("event_chk_inf", 0x0ed4, 0x1c),
             item_get_inf: try_get_offset!("item_get_inf", 0x0ef0, 0x8),
             inf_table: try_get_offset!("inf_table", 0x0ef8, 0x3c),
+            scarecrow_song_child: match get_offset!("scarecrow_song_child", 0x12c5) {
+                0 => false,
+                1 => true,
+                value => return Err(DecodeError::UnexpectedValue { value, offset: 0x12c5, field: "scarecrow_song_child" }),
+            },
             game_mode: try_get_offset!("game_mode", 0x135c, 0x4),
         })
     }
@@ -1110,7 +1116,7 @@ impl Save {
             is_adult, time_of_day, magic, biggoron_sword, dmt_biggoron_checked, inv, inv_amounts,
             equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags,
             gold_skulltulas, big_poes, fishing_context, event_chk_inf, item_get_inf, inf_table,
-            game_mode,
+            scarecrow_song_child, game_mode,
         } = self;
         buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
@@ -1141,6 +1147,7 @@ impl Save {
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
         buf.splice(0x0ef0..0x0ef8, Vec::from(item_get_inf));
         buf.splice(0x0ef8..0x0f34, Vec::from(inf_table));
+        buf[0x12c5] = if *scarecrow_song_child { 1 } else { 0 };
         buf.splice(0x135c..0x1360, Vec::from(game_mode));
         buf
     }
