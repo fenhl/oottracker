@@ -125,5 +125,9 @@ flags_list! {
             "Market Lost Dog" = 0x02,
             "GF HBA 1000 Points" = 0x01,
         },
+        55: {
+            TOT_ALTAR_READ_STONE_LOCATIONS = 0x02,
+            TOT_ALTAR_READ_MEDALLION_LOCATIONS = 0x01,
+        },
     }
 }

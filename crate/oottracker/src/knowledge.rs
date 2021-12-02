@@ -169,7 +169,7 @@ impl Knowledge {
                 Dungeon::Main(MainDungeon::SpiritTemple) => Mq::Vanilla,
                 Dungeon::IceCavern => Mq::Vanilla,
                 Dungeon::BottomOfTheWell => Mq::Vanilla,
-                Dungeon::GerudoTrainingGrounds => Mq::Vanilla,
+                Dungeon::GerudoTrainingGround => Mq::Vanilla,
                 Dungeon::GanonsCastle => Mq::Vanilla,
             ],
             exits: None, //TODO properly initialize with all exits

@@ -69,6 +69,7 @@ namespace Net.Fenhl.OotAutoTracker {
         [DllImport("oottracker")] internal static extern bool ram_equal(Ram ram1, Ram ram2);
         [DllImport("oottracker")] internal static extern void model_set_ram(ModelState model, Ram ram);
         [DllImport("oottracker")] internal static extern Save ram_clone_save(Ram ram);
+        [DllImport("oottracker")] internal static extern void model_set_tracker_ctx(ModelState model, int length, IntPtr data);
     }
 
     internal class StringHandle : SafeHandle {
@@ -358,6 +359,12 @@ namespace Net.Fenhl.OotAutoTracker {
         }
 
         public void SetRam(Ram ram) => Native.model_set_ram(this, ram);
+
+        internal void SetAutoTrackerContext(IMemoryApi memoryApi, long addr, int length) {
+            IntPtr data = Marshal.AllocHGlobal(length);
+            Marshal.Copy(memoryApi.ReadByteRange(addr, length, "System Bus").ToArray(), 0, data, length);
+            Native.model_set_tracker_ctx(this, length, data);
+        }
     }
 
     internal class RamResult : SafeHandle {
@@ -481,6 +488,8 @@ namespace Net.Fenhl.OotAutoTracker {
 
         private bool isVanilla;
         //private TcpStream? stream;
+        private uint? autoTrackerContextAddr;
+        private uint autoTrackerContextVersion = 0;
         private RawRam? rawRam;
         private Ram? prevRam;
         private List<byte> prevSaveData = new List<byte>();
@@ -678,6 +687,7 @@ namespace Net.Fenhl.OotAutoTracker {
         }
 
         public override void Restart() {
+            APIs.Memory.SetBigEndian(true);
             this.model.Dispose();
             /*
             if (this.stream != null) { this.stream.Disconnect().Dispose(); }
@@ -730,6 +740,31 @@ namespace Net.Fenhl.OotAutoTracker {
         public override void UpdateValues(ToolFormUpdateType type) {
             if (type != ToolFormUpdateType.PreFrame) { return; } //TODO setting to also enable auto-tracking during turbo (ToolFormUpdateType.FastPreFrame)?
             if ((APIs.GameInfo.GetGameInfo()?.Name ?? "Null") == "Null") { return; }
+            if (this.autoTrackerContextAddr == null && Enumerable.SequenceEqual(APIs.Memory.ReadByteRange(0x11a5d0 + 0x1c, 6, "RDRAM"), new List<byte>(Encoding.UTF8.GetBytes("ZELDAZ")))) { // don't check auto-tracker context version while rom is loaded but not properly initialized
+                var randoContextAddr = 0x8040_0000;
+                var newAutoTrackerContextAddr = APIs.Memory.ReadU32(randoContextAddr + 0xc, "System Bus");
+                if (newAutoTrackerContextAddr >= 0x8000_0000 && newAutoTrackerContextAddr != 0xffff_ffff) {
+                    this.autoTrackerContextAddr = newAutoTrackerContextAddr;
+                    this.autoTrackerContextVersion = APIs.Memory.ReadU32(newAutoTrackerContextAddr, "System Bus");
+                    var length = 0;
+                    switch (this.autoTrackerContextVersion) {
+                        case 0: {
+                            // no extra features supported
+                            break;
+                        }
+                        case 1: {
+                            length = 0x38;
+                            break;
+                        }
+                        default: {
+                            throw new NotImplementedException($"auto-tracker context version {this.autoTrackerContextVersion} not supported"); //TODO display error instead of crashing
+                        }
+                    }
+                    if (length > 0) {
+                        this.model.SetAutoTrackerContext(APIs.Memory, newAutoTrackerContextAddr, length);
+                    }
+                }
+            }
             bool changed = true;
             if (this.rawRam == null) {
                 this.rawRam = new RawRam(APIs.Memory);

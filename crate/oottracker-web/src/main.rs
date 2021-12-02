@@ -44,6 +44,7 @@ use {
         Knowledge,
         ModelState,
         Ram,
+        TrackerCtx,
     },
     crate::restream::RestreamState,
 };
@@ -89,7 +90,7 @@ impl RoomState {
     }
 
     pub(crate) async fn force_save(&mut self, pool: &PgPool) -> Result<(), Error> {
-        let ModelState { ref knowledge, ref ram } = self.model;
+        let ModelState { ref knowledge, ref ram, .. } = self.model; //TODO include tracker context
         sqlx::query!("INSERT INTO rooms (name, knowledge, ram) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET knowledge = EXCLUDED.knowledge, ram = EXCLUDED.ram", self.name, serde_json::to_value(knowledge)?, &ram.to_ranges()[..]).execute(pool).await?;
         self.last_saved = Instant::now();
         Ok(())
@@ -171,7 +172,7 @@ async fn main() -> Result<(), Error> {
         let mut rooms = HashMap::default();
         let mut query = sqlx::query!(r#"SELECT name, knowledge as "knowledge: Json<Knowledge>", ram FROM rooms"#).fetch(&pool);
         while let Some(room) = query.try_next().await? {
-            let state = RoomState::from_model(&room.name, ModelState { knowledge: room.knowledge.0, ram: Ram::from_range_bufs(room.ram)? });
+            let state = RoomState::from_model(&room.name, ModelState { knowledge: room.knowledge.0, ram: Ram::from_range_bufs(room.ram)?, tracker_ctx: TrackerCtx::default() });
             rooms.insert(room.name, state);
         }
         Rooms::new(Mutex::new(rooms))

@@ -30,7 +30,9 @@ use {
     ootr::{
         item::Item,
         model::{
+            Dungeon,
             DungeonReward,
+            MainDungeon,
             Medallion,
             Stone,
             TimeRange,
@@ -767,53 +769,91 @@ impl<'a> From<&'a QuestItems> for Vec<u8> {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct BossKeys {
-    pub forest_temple: bool,
-    pub fire_temple: bool,
-    pub water_temple: bool,
-    pub spirit_temple: bool,
-    pub shadow_temple: bool,
-    pub ganons_castle: bool,
+bitflags! {
+    #[derive(Default)]
+    pub struct DungeonItems: u8 {
+        const MAP = 0x04;
+        const COMPASS = 0x02;
+        const BOSS_KEY = 0x01;
+    }
 }
 
-impl TryFrom<Vec<u8>> for BossKeys {
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct AllDungeonItems {
+    pub deku_tree: DungeonItems,
+    pub dodongos_cavern: DungeonItems,
+    pub jabu_jabu: DungeonItems,
+    pub forest_temple: DungeonItems,
+    pub fire_temple: DungeonItems,
+    pub water_temple: DungeonItems,
+    pub spirit_temple: DungeonItems,
+    pub shadow_temple: DungeonItems,
+    pub bottom_of_the_well: DungeonItems,
+    pub ice_cavern: DungeonItems,
+    pub ganons_castle: DungeonItems,
+}
+
+impl AllDungeonItems {
+    pub fn get(&self, dungeon: Dungeon) -> DungeonItems {
+        match dungeon {
+            Dungeon::Main(MainDungeon::DekuTree) => self.deku_tree,
+            Dungeon::Main(MainDungeon::DodongosCavern) => self.dodongos_cavern,
+            Dungeon::Main(MainDungeon::JabuJabu) => self.jabu_jabu,
+            Dungeon::Main(MainDungeon::ForestTemple) => self.forest_temple,
+            Dungeon::Main(MainDungeon::FireTemple) => self.fire_temple,
+            Dungeon::Main(MainDungeon::WaterTemple) => self.water_temple,
+            Dungeon::Main(MainDungeon::ShadowTemple) => self.shadow_temple,
+            Dungeon::Main(MainDungeon::SpiritTemple) => self.spirit_temple,
+            Dungeon::IceCavern => self.ice_cavern,
+            Dungeon::BottomOfTheWell => self.bottom_of_the_well,
+            Dungeon::GerudoTrainingGround => DungeonItems::default(),
+            Dungeon::GanonsCastle => self.ganons_castle,
+        }
+    }
+}
+
+impl TryFrom<Vec<u8>> for AllDungeonItems {
     type Error = Vec<u8>;
 
-    fn try_from(raw_data: Vec<u8>) -> Result<BossKeys, Vec<u8>> {
+    fn try_from(raw_data: Vec<u8>) -> Result<Self, Vec<u8>> {
         macro_rules! get {
             ($idx:expr) => {{
-                raw_data[$idx] & 0x01 == 0x01
+                DungeonItems::from_bits_truncate(raw_data[$idx])
             }};
         }
 
         if raw_data.len() != 0x14 { return Err(raw_data) }
-        Ok(BossKeys {
+        Ok(Self {
+            deku_tree: get!(0x00),
+            dodongos_cavern: get!(0x01),
+            jabu_jabu: get!(0x02),
             forest_temple: get!(0x03),
             fire_temple: get!(0x04),
             water_temple: get!(0x05),
             spirit_temple: get!(0x06),
             shadow_temple: get!(0x07),
+            bottom_of_the_well: get!(0x08),
+            ice_cavern: get!(0x09),
             ganons_castle: get!(0x0a),
         })
     }
 }
 
-impl<'a> From<&'a BossKeys> for [u8; 0x14] {
-    fn from(boss_keys: &BossKeys) -> [u8; 0x14] {
+impl<'a> From<&'a AllDungeonItems> for [u8; 0x14] {
+    fn from(items: &AllDungeonItems) -> [u8; 0x14] {
         [
-            0, 0, 0, if boss_keys.forest_temple { 1 } else { 0 },
-            if boss_keys.fire_temple { 1 } else { 0 }, if boss_keys.water_temple { 1 } else { 0 }, if boss_keys.spirit_temple { 1 } else { 0 }, if boss_keys.shadow_temple { 1 } else { 0 },
-            0, 0, if boss_keys.ganons_castle { 1 } else { 0 }, 0,
+            items.deku_tree.bits(), items.dodongos_cavern.bits(), items.jabu_jabu.bits(), items.forest_temple.bits(),
+            items.fire_temple.bits(), items.water_temple.bits(), items.spirit_temple.bits(), items.shadow_temple.bits(),
+            items.bottom_of_the_well.bits(), items.ice_cavern.bits(), items.ganons_castle.bits(), 0,
             0, 0, 0, 0,
             0, 0, 0, 0,
         ]
     }
 }
 
-impl<'a> From<&'a BossKeys> for Vec<u8> {
-    fn from(boss_keys: &BossKeys) -> Vec<u8> {
-        <[u8; 0x14]>::from(boss_keys).into()
+impl<'a> From<&'a AllDungeonItems> for Vec<u8> {
+    fn from(items: &AllDungeonItems) -> Vec<u8> {
+        <[u8; 0x14]>::from(items).into()
     }
 }
 
@@ -825,7 +865,7 @@ pub struct SmallKeys {
     pub spirit_temple: u8,
     pub shadow_temple: u8,
     pub bottom_of_the_well: u8,
-    pub gerudo_training_grounds: u8,
+    pub gerudo_training_ground: u8,
     pub thieves_hideout: u8,
     pub ganons_castle: u8,
 }
@@ -848,7 +888,7 @@ impl TryFrom<Vec<u8>> for SmallKeys {
             spirit_temple: get!(0x06),
             shadow_temple: get!(0x07),
             bottom_of_the_well: get!(0x08),
-            gerudo_training_grounds: get!(0x0b),
+            gerudo_training_ground: get!(0x0b),
             thieves_hideout: get!(0x0c),
             ganons_castle: get!(0x0d),
         })
@@ -860,7 +900,7 @@ impl<'a> From<&'a SmallKeys> for [u8; 0x13] {
         [
             0, 0, 0, small_keys.forest_temple,
             small_keys.fire_temple, small_keys.water_temple, small_keys.spirit_temple, small_keys.shadow_temple,
-            small_keys.bottom_of_the_well, 0, 0, small_keys.gerudo_training_grounds,
+            small_keys.bottom_of_the_well, 0, 0, small_keys.gerudo_training_ground,
             small_keys.thieves_hideout, small_keys.ganons_castle, 0, 0,
             0, 0, 0,
         ]
@@ -987,7 +1027,7 @@ pub struct Save {
     pub equipment: Equipment,
     pub upgrades: Upgrades,
     pub quest_items: QuestItems,
-    pub boss_keys: BossKeys,
+    pub dungeon_items: AllDungeonItems,
     pub small_keys: SmallKeys,
     pub skull_tokens: u8,
     pub scene_flags: SceneFlags,
@@ -1091,7 +1131,7 @@ impl Save {
             equipment: try_get_offset!("equipment", 0x009c, 0x2),
             upgrades: try_get_offset!("upgrades", 0x00a0, 0x4),
             quest_items: try_get_offset!("quest_items", 0x00a4, 0x4),
-            boss_keys: try_get_offset!("boss_keys", 0x00a8, 0x14),
+            dungeon_items: try_get_offset!("dungeon_items", 0x00a8, 0x14),
             small_keys: try_get_offset!("small_keys", 0x00bc, 0x13),
             skull_tokens: BigEndian::read_i16(get_offset!("skull_tokens", 0x00d0, 0x2)).try_into()?,
             scene_flags: try_get_offset!("scene_flags", 0x00d4, 101 * 0x1c),
@@ -1114,11 +1154,11 @@ impl Save {
         let mut buf = vec![0; SIZE];
         let Save {
             is_adult, time_of_day, magic, biggoron_sword, dmt_biggoron_checked, inv, inv_amounts,
-            equipment, upgrades, quest_items, boss_keys, small_keys, skull_tokens, scene_flags,
+            equipment, upgrades, quest_items, dungeon_items, small_keys, skull_tokens, scene_flags,
             gold_skulltulas, big_poes, fishing_context, event_chk_inf, item_get_inf, inf_table,
             scarecrow_song_child, game_mode,
         } = self;
-        buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().iter().copied());
+        buf.splice(0x0004..0x0008, if *is_adult { 0i32 } else { 1 }.to_be_bytes().into_iter());
         buf.splice(0x000c..0x000e, Vec::from(time_of_day));
         buf.splice(0x001c..0x0022, b"ZELDAZ".into_iter().copied());
         buf[0x0032] = magic.into();
@@ -1137,12 +1177,12 @@ impl Save {
         buf.splice(0x009c..0x009e, Vec::from(equipment));
         buf.splice(0x00a0..0x00a4, Vec::from(upgrades));
         buf.splice(0x00a4..0x00a8, Vec::from(quest_items));
-        buf.splice(0x00a8..0x00bc, Vec::from(boss_keys));
+        buf.splice(0x00a8..0x00bc, Vec::from(dungeon_items));
         buf.splice(0x00bc..0x00cf, Vec::from(small_keys));
-        buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().iter().copied());
+        buf.splice(0x00d0..0x00d2, i16::from(*skull_tokens).to_be_bytes().into_iter());
         buf.splice(0x00d4..0x00d4 + 101 * 0x1c, Vec::from(scene_flags));
         buf.splice(0x0e9c..0x0eb4, Vec::from(gold_skulltulas));
-        buf.splice(0x0ebc..0x0ec0, u32::from(100 * big_poes).to_be_bytes().iter().copied());
+        buf.splice(0x0ebc..0x0ec0, u32::from(100 * big_poes).to_be_bytes().into_iter());
         buf.splice(0x0ec0..0x0ec4, Vec::from(fishing_context));
         buf.splice(0x0ed4..0x0ef0, Vec::from(event_chk_inf));
         buf.splice(0x0ef0..0x0ef8, Vec::from(item_get_inf));
@@ -1209,7 +1249,7 @@ impl Save {
             //TODO add already opened doors (if Keysy is known or off)
             "Small Key (Fire Temple)" => self.small_keys.fire_temple,
             "Small Key (Forest Temple)" => self.small_keys.forest_temple,
-            "Small Key (Gerudo Training Grounds)" => self.small_keys.gerudo_training_grounds,
+            "Small Key (Gerudo Training Ground)" => self.small_keys.gerudo_training_ground,
             "Small Key (Spirit Temple)" => self.small_keys.spirit_temple,
             "Small Key (Water Temple)" => self.small_keys.water_temple,
             "Weird Egg" => (self.inv.child_trade_item != ChildTradeItem::None).into(),

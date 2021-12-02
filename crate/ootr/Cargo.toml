@@ -5,9 +5,10 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [dependencies]
-async-proto = "0.9"
+async-proto = "0.10"
 derivative = "2"
 semver = "1"
+serde_plain = "1"
 
 [dependencies.enum-iterator]
 git = "https://github.com/dasgefolge/enum-iterator"

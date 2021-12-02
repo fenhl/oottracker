@@ -14,7 +14,7 @@ serde_json = "1"
 warp = "0.3"
 
 [dependencies.async-proto]
-version = "0.9"
+version = "0.10"
 features = ["warp"]
 
 [dependencies.derive_more]

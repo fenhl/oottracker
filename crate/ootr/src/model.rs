@@ -10,6 +10,10 @@ use {
         Deserialize,
         Serialize,
     },
+    serde_plain::{
+        derive_deserialize_from_fromstr,
+        derive_serialize_from_display,
+    },
     crate::item::Item,
 };
 
@@ -18,7 +22,7 @@ pub enum Dungeon {
     Main(MainDungeon),
     IceCavern,
     BottomOfTheWell,
-    GerudoTrainingGrounds,
+    GerudoTrainingGround,
     GanonsCastle,
 }
 
@@ -35,7 +39,7 @@ impl Dungeon {
             Self::Main(MainDungeon::SpiritTemple) => "Spirit Temple",
             Self::IceCavern => "Ice Cavern",
             Self::BottomOfTheWell => "Bottom of the Well",
-            Self::GerudoTrainingGrounds => "Gerudo Training Ground",
+            Self::GerudoTrainingGround => "Gerudo Training Ground",
             Self::GanonsCastle => "Ganons Castle",
         }
     }
@@ -48,7 +52,7 @@ impl FromStr for Dungeon {
         MainDungeon::from_str(s).map(Dungeon::Main).or_else(|_| match s {
             "Ice Cavern" => Ok(Dungeon::IceCavern),
             "Bottom of the Well" => Ok(Dungeon::BottomOfTheWell),
-            "Gerudo Training Ground" | "Gerudo Training Grounds" => Ok(Dungeon::GerudoTrainingGrounds),
+            "Gerudo Training Ground" | "Gerudo Training Grounds" => Ok(Dungeon::GerudoTrainingGround),
             "Ganon's Castle" | "Ganons Castle" => Ok(Dungeon::GanonsCastle),
             _ => Err(()),
         })
@@ -61,7 +65,7 @@ impl fmt::Display for Dungeon {
             Dungeon::Main(main) => main.fmt(f),
             Dungeon::IceCavern => write!(f, "Ice Cavern"),
             Dungeon::BottomOfTheWell => write!(f, "Bottom of the Well"),
-            Dungeon::GerudoTrainingGrounds => write!(f, "Gerudo Training Grounds"),
+            Dungeon::GerudoTrainingGround => write!(f, "Gerudo Training Ground"),
             Dungeon::GanonsCastle => write!(f, "Ganon's Castle"),
         }
     }
@@ -100,6 +104,9 @@ impl fmt::Display for DungeonReward {
         }
     }
 }
+
+derive_deserialize_from_fromstr!(DungeonReward, "dungeon reward");
+derive_serialize_from_display!(DungeonReward);
 
 impl From<DungeonReward> for Item {
     fn from(reward: DungeonReward) -> Self {
@@ -207,6 +214,9 @@ impl fmt::Display for MainDungeon {
         }
     }
 }
+
+derive_deserialize_from_fromstr!(MainDungeon, "main dungeon");
+derive_serialize_from_display!(MainDungeon);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, Deserialize, Serialize, QuoteValue)]
 pub enum Medallion {

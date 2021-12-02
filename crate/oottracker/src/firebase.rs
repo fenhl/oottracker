@@ -129,8 +129,8 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
 
     fn set_cell(&self, state: &mut ModelState, cell_id: TrackerCellId, value: Json) -> Result<(), Json> {
         match cell_id.kind() {
-            BossKey { active, toggle } => if active(&state.ram.save.boss_keys) != value.as_bool().ok_or_else(|| value.clone())? {
-                toggle(&mut state.ram.save.boss_keys);
+            BossKey { active, toggle } => if active(&state.ram.save.dungeon_items) != value.as_bool().ok_or_else(|| value.clone())? {
+                toggle(&mut state.ram.save.dungeon_items);
             },
             Composite { active, toggle_left, toggle_right, .. } => {
                 let (active_left, active_right) = active(state);
@@ -721,7 +721,7 @@ impl Hash for DynRoom {
 
 fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
     match cell_kind {
-        BossKey { active, .. } => json!(active(&state.ram.save.boss_keys)),
+        BossKey { active, .. } => json!(active(&state.ram.save.dungeon_items)),
         Composite { active, .. } => json!(match active(state) {
             (false, false) => 0,
             (true, false) => 1,

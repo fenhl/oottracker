@@ -202,8 +202,8 @@ impl DungeonRewardLocationExt for HashMap<DungeonReward, DungeonRewardLocation> 
 pub enum TrackerCellKind {
     BigPoeTriforce, // auto-trackers show big Poe count unless at least 1 Triforce piece has been collected, manual mode only shows Triforce pieces
     BossKey {
-        active: Box<dyn Fn(&BossKeys) -> bool>,
-        toggle: Box<dyn Fn(&mut BossKeys)>,
+        active: Box<dyn Fn(&AllDungeonItems) -> bool>,
+        toggle: Box<dyn Fn(&mut AllDungeonItems)>,
     },
     Composite {
         left_img: ImageInfo,
@@ -307,7 +307,7 @@ impl TrackerCellKind {
             },
             BossKey { active, .. } => CellRender {
                 img: ImageInfo::extra("boss_key"),
-                style: if active(&state.ram.save.boss_keys) { CellStyle::Normal } else { CellStyle::Dimmed },
+                style: if active(&state.ram.save.dungeon_items) { CellStyle::Normal } else { CellStyle::Dimmed },
                 overlay: CellOverlay::None,
             },
             Composite { left_img, right_img, both_img, active, .. } => {
@@ -325,7 +325,7 @@ impl TrackerCellKind {
             }
             CompositeKeys { boss, small } => {
                 let (has_boss_key, num_small_keys) = if let (BossKey { active, .. }, TrackerCellKind::SmallKeys { get, .. }) = (boss.kind(), small.kind()) {
-                    (active(&state.ram.save.boss_keys), get(&state.ram.save.small_keys))
+                    (active(&state.ram.save.dungeon_items), get(&state.ram.save.small_keys))
                 } else {
                     unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
                 };
@@ -458,7 +458,7 @@ impl TrackerCellKind {
                             Dungeon::Main(MainDungeon::SpiritTemple) => "spirit_text",
                             Dungeon::IceCavern => "ice_text",
                             Dungeon::BottomOfTheWell => "well_text",
-                            Dungeon::GerudoTrainingGrounds => "gtg_text",
+                            Dungeon::GerudoTrainingGround => "gtg_text",
                             Dungeon::GanonsCastle => "ganon_text",
                         }) },
                         style: if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) { LocationStyle::Mq } else { LocationStyle::Normal },
@@ -599,7 +599,7 @@ impl TrackerCellKind {
                 let num_small = get_small(&state.ram.save.small_keys);
                 if num_small == max_small_vanilla.max(max_small_mq) { //TODO check MQ knowledge? Does plentiful go to +1?
                     set_small(&mut state.ram.save.small_keys, 0);
-                    toggle_boss(&mut state.ram.save.boss_keys);
+                    toggle_boss(&mut state.ram.save.dungeon_items);
                 } else {
                     set_small(&mut state.ram.save.small_keys, num_small + 1);
                 }
@@ -664,7 +664,7 @@ impl TrackerCellKind {
             match self {
                 Composite { toggle_left, .. } | Overlay { toggle_main: toggle_left, .. } => toggle_left(state),
                 CompositeKeys { boss, .. } => if let BossKey { toggle, .. } = boss.kind() {
-                    toggle(&mut state.ram.save.boss_keys);
+                    toggle(&mut state.ram.save.dungeon_items);
                 } else {
                     unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
                 },
@@ -1642,8 +1642,8 @@ cells! {
         max_mq: 6,
     },
     ForestBossKey: BossKey {
-        active: Box::new(|keys| keys.forest_temple),
-        toggle: Box::new(|keys| keys.forest_temple = !keys.forest_temple),
+        active: Box::new(|keys| keys.forest_temple.contains(DungeonItems::BOSS_KEY)),
+        toggle: Box::new(|keys| keys.forest_temple.toggle(DungeonItems::BOSS_KEY)),
     },
     ForestKeys: CompositeKeys {
         small: TrackerCellId::ForestSmallKeys,
@@ -1657,8 +1657,8 @@ cells! {
         max_mq: 5,
     },
     FireBossKey: BossKey {
-        active: Box::new(|keys| keys.fire_temple),
-        toggle: Box::new(|keys| keys.fire_temple = !keys.fire_temple),
+        active: Box::new(|keys| keys.fire_temple.contains(DungeonItems::BOSS_KEY)),
+        toggle: Box::new(|keys| keys.fire_temple.toggle(DungeonItems::BOSS_KEY)),
     },
     FireKeys: CompositeKeys {
         small: TrackerCellId::FireSmallKeys,
@@ -1672,8 +1672,8 @@ cells! {
         max_mq: 2,
     },
     WaterBossKey: BossKey {
-        active: Box::new(|keys| keys.water_temple),
-        toggle: Box::new(|keys| keys.water_temple = !keys.water_temple),
+        active: Box::new(|keys| keys.water_temple.contains(DungeonItems::BOSS_KEY)),
+        toggle: Box::new(|keys| keys.water_temple.toggle(DungeonItems::BOSS_KEY)),
     },
     WaterKeys: CompositeKeys {
         small: TrackerCellId::WaterSmallKeys,
@@ -1687,8 +1687,8 @@ cells! {
         max_mq: 6,
     },
     ShadowBossKey: BossKey {
-        active: Box::new(|keys| keys.shadow_temple),
-        toggle: Box::new(|keys| keys.shadow_temple = !keys.shadow_temple),
+        active: Box::new(|keys| keys.shadow_temple.contains(DungeonItems::BOSS_KEY)),
+        toggle: Box::new(|keys| keys.shadow_temple.toggle(DungeonItems::BOSS_KEY)),
     },
     ShadowKeys: CompositeKeys {
         small: TrackerCellId::ShadowSmallKeys,
@@ -1702,8 +1702,8 @@ cells! {
         max_mq: 7,
     },
     SpiritBossKey: BossKey {
-        active: Box::new(|keys| keys.spirit_temple),
-        toggle: Box::new(|keys| keys.spirit_temple = !keys.spirit_temple),
+        active: Box::new(|keys| keys.spirit_temple.contains(DungeonItems::BOSS_KEY)),
+        toggle: Box::new(|keys| keys.spirit_temple.toggle(DungeonItems::BOSS_KEY)),
     },
     SpiritKeys: CompositeKeys {
         small: TrackerCellId::SpiritSmallKeys,
@@ -1724,10 +1724,10 @@ cells! {
         max_vanilla: 4,
         max_mq: 4,
     },
-    GtgMq: Mq(Dungeon::GerudoTrainingGrounds),
+    GtgMq: Mq(Dungeon::GerudoTrainingGround),
     GtgSmallKeys: TrackerCellKind::SmallKeys {
-        get: Box::new(|keys| keys.gerudo_training_grounds),
-        set: Box::new(|keys, value| keys.gerudo_training_grounds = value),
+        get: Box::new(|keys| keys.gerudo_training_ground),
+        set: Box::new(|keys, value| keys.gerudo_training_ground = value),
         max_vanilla: 9,
         max_mq: 3,
     },
@@ -1739,8 +1739,8 @@ cells! {
         max_mq: 3,
     },
     GanonBossKey: BossKey {
-        active: Box::new(|keys| keys.ganons_castle),
-        toggle: Box::new(|keys| keys.ganons_castle = !keys.ganons_castle),
+        active: Box::new(|keys| keys.ganons_castle.contains(DungeonItems::BOSS_KEY)),
+        toggle: Box::new(|keys| keys.ganons_castle.toggle(DungeonItems::BOSS_KEY)),
     },
     GanonKeys: CompositeKeys {
         small: TrackerCellId::GanonSmallKeys,

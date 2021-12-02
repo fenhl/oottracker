@@ -24,6 +24,7 @@ use {
     semver::Version,
     oottracker::{
         ModelState,
+        TrackerCtx,
         github::Repo,
         knowledge::*,
         proto::{
@@ -480,6 +481,7 @@ pub fn version() -> Version {
     HandleOwned::new(ModelState {
         knowledge: *knowledge.into_box(),
         ram: (*save.into_box()).into(),
+        tracker_ctx: TrackerCtx::default(),
     })
 }
 
@@ -562,4 +564,17 @@ pub fn version() -> Version {
 /// `ram` must point at a valid `Ram` and must not be mutated during the function call.
 #[no_mangle] pub unsafe extern "C" fn ram_clone_save(ram: *const Ram) -> HandleOwned<Save> {
     HandleOwned::new((&*ram).save.clone())
+}
+
+/// # Safety
+///
+/// `model` must point at a valid `ModelState` and mut not be read or mutated during the function call.
+///
+/// `data` must point at the start of a valid slice with the given `length` and must not be mutated for the duration of the function call.
+#[no_mangle] pub unsafe extern "C" fn model_set_tracker_ctx(model: *mut ModelState, length: i32, data: *const u8) {
+    assert!(!data.is_null());
+    let model = &mut *model;
+    let data = slice::from_raw_parts(data, length.try_into().expect("negative or excessive length"));
+    model.tracker_ctx = TrackerCtx::new(data);
+    model.update_knowledge();
 }

@@ -23,7 +23,7 @@ semver = "1"
 serde_json = "1"
 
 [dependencies.async-proto]
-version = "0.9"
+version = "0.10"
 features = ["serde_json", "tokio-tungstenite", "write-sync"]
 
 [dependencies.derive_more]

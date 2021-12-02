@@ -311,24 +311,24 @@ impl<R: Rando> CheckExt for Check<R> {
                 "Ice Cavern MQ Map Chest" => None, //TODO
                 "Ice Cavern MQ Freestanding PoH" => None, //TODO
 
-                // Gerudo Training Grounds MQ
-                "Gerudo Training Grounds MQ Lobby Right Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Lobby Left Chest" => None, //TODO
-                "Gerudo Training Grounds MQ First Iron Knuckle Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Before Heavy Block Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Eye Statue Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Flame Circle Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Second Iron Knuckle Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Dinolfos Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Ice Arrows Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Right Central Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Path First Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Right Side Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Path Third Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Maze Path Second Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Hidden Ceiling Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Underwater Silver Rupee Chest" => None, //TODO
-                "Gerudo Training Grounds MQ Heavy Block Chest" => None, //TODO
+                // Gerudo Training Ground MQ
+                "Gerudo Training Ground MQ Lobby Right Chest" => None, //TODO
+                "Gerudo Training Ground MQ Lobby Left Chest" => None, //TODO
+                "Gerudo Training Ground MQ First Iron Knuckle Chest" => None, //TODO
+                "Gerudo Training Ground MQ Before Heavy Block Chest" => None, //TODO
+                "Gerudo Training Ground MQ Eye Statue Chest" => None, //TODO
+                "Gerudo Training Ground MQ Flame Circle Chest" => None, //TODO
+                "Gerudo Training Ground MQ Second Iron Knuckle Chest" => None, //TODO
+                "Gerudo Training Ground MQ Dinolfos Chest" => None, //TODO
+                "Gerudo Training Ground MQ Ice Arrows Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Right Central Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Path First Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Right Side Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Path Third Chest" => None, //TODO
+                "Gerudo Training Ground MQ Maze Path Second Chest" => None, //TODO
+                "Gerudo Training Ground MQ Hidden Ceiling Chest" => None, //TODO
+                "Gerudo Training Ground MQ Underwater Silver Rupee Chest" => None, //TODO
+                "Gerudo Training Ground MQ Heavy Block Chest" => None, //TODO
 
                 // Ganon's Castle MQ
                 "Ganons Castle MQ Water Trial Chest" => None, //TODO
