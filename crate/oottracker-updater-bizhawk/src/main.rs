@@ -10,6 +10,7 @@ use {
         os::windows::ffi::OsStringExt as _,
         path::PathBuf,
         ptr::null_mut,
+        sync::Arc,
         time::Duration,
     },
     async_zip::error::ZipError,
@@ -22,9 +23,16 @@ use {
         Clipboard,
         Command,
         Element,
+        HorizontalAlignment,
+        Length,
         Settings,
         widget::{
+            button::{
+                self,
+                Button,
+            },
             Column,
+            Row,
             Text,
         },
         window::{
@@ -34,6 +42,7 @@ use {
     },
     image::DynamicImage,
     itertools::Itertools as _,
+    open::that as open,
     semver::Version,
     structopt::StructOpt,
     tokio::{
@@ -41,9 +50,12 @@ use {
         time::sleep,
     },
     tokio_util::io::StreamReader,
-    wheel::fs::{
-        self,
-        File,
+    wheel::{
+        FromArc,
+        fs::{
+            self,
+            File,
+        },
     },
     windows::Win32::{
         Foundation::{
@@ -92,11 +104,29 @@ enum Message {
     BizHawkZip(Bytes),
     Launch,
     Done,
+    DiscordInvite,
+    DiscordChannel,
+    NewIssue,
+    Cloned,
+}
+
+impl Clone for Message {
+    fn clone(&self) -> Self {
+        match self {
+            Self::DiscordInvite => Self::DiscordInvite,
+            Self::DiscordChannel => Self::DiscordChannel,
+            Self::NewIssue => Self::NewIssue,
+            _ => Self::Cloned,
+        }
+    }
 }
 
 struct App {
     args: Args,
     state: State,
+    discord_invite_btn: button::State,
+    discord_channel_btn: button::State,
+    new_issue_btn: button::State,
 }
 
 impl Application for App {
@@ -111,7 +141,13 @@ impl Application for App {
             }
             Ok(Message::Exited)
         }.into();
-        (App { args, state: State::WaitExit }, cmd)
+        (App {
+            args,
+            state: State::WaitExit,
+            discord_invite_btn: button::State::default(),
+            discord_channel_btn: button::State::default(),
+            new_issue_btn: button::State::default(),
+        }, cmd)
     }
 
     fn title(&self) -> String { format!("updating the OoT auto-tracker…") }
@@ -252,6 +288,28 @@ impl Application for App {
                 self.state = State::Done;
                 Command::none()
             }
+            Ok(Message::DiscordInvite) => {
+                if let Err(e) = open("https://discord.gg/BGRrKKn") {
+                    self.state = State::Error(e.into());
+                }
+                Command::none()
+            }
+            Ok(Message::DiscordChannel) => {
+                if let Err(e) = open("https://discord.com/channels/274180765816848384/476723801032491008") {
+                    self.state = State::Error(e.into());
+                }
+                Command::none()
+            }
+            Ok(Message::NewIssue) => {
+                if let Err(e) = open("https://github.com/fenhl/oottracker/issues/new") {
+                    self.state = State::Error(e.into());
+                }
+                Command::none()
+            }
+            Ok(Message::Cloned) => {
+                self.state = State::Error(Error::Cloned);
+                Command::none()
+            }
             Err(e) => {
                 self.state = State::Error(e);
                 Command::none()
@@ -261,7 +319,10 @@ impl Application for App {
 
     fn view(&mut self) -> Element<'_, Result<Message, Error>> {
         match self.state {
-            State::WaitExit => Text::new("Please close BizHawk to start the update.").into(),
+            State::WaitExit => Column::new()
+                .push(Text::new("An update for the OoT auto-tracker for BizHawk is available."))
+                .push(Text::new("Please close BizHawk to start the update."))
+                .into(),
             State::GetTrackerRelease => Text::new("Checking latest tracker release…").into(),
             State::DownloadTracker => Text::new("Starting tracker download…").into(),
             State::ExtractTracker => Text::new("Downloading and extracting tracker…").into(),
@@ -272,9 +333,20 @@ impl Application for App {
             State::Launch => Text::new("Starting new version…").into(),
             State::Done => Text::new("Closing updater…").into(),
             State::Error(ref e) => Column::new()
-                .push(Text::new(format!("error: {}", e)))
+                .push(Text::new("Error").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new(e.to_string()))
                 .push(Text::new(format!("debug info: {:?}", e)))
-                .into(), //TODO show info on how to get support
+                .push(Text::new("Support").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("• Ask in #setup-support on the OoT Randomizer Discord. Feel free to ping @Fenhl#4813."))
+                .push(Row::new()
+                    .push(Button::new(&mut self.discord_invite_btn, Text::new("invite link")).on_press(Ok(Message::DiscordInvite)))
+                    .push(Button::new(&mut self.discord_channel_btn, Text::new("direct channel link")).on_press(Ok(Message::DiscordChannel)))
+                )
+                .push(Row::new()
+                    .push(Text::new("• Or "))
+                    .push(Button::new(&mut self.new_issue_btn, Text::new("open an issue")).on_press(Ok(Message::NewIssue)))
+                )
+                .into(),
         }
     }
 
@@ -290,27 +362,36 @@ struct Args {
     local_bizhawk_version: Version,
 }
 
-#[derive(Debug, From)]
+#[derive(Debug, From, FromArc, Clone)]
 enum Error {
     BizHawkVersionRegression,
-    Io(io::Error),
+    Cloned,
+    #[from_arc]
+    Io(Arc<io::Error>),
     MissingAsset,
     MissingReadme,
     NoReleases,
-    Process(heim::process::ProcessError),
+    #[from_arc]
+    Process(Arc<heim::process::ProcessError>),
     ReadmeFormat,
-    Reqwest(reqwest::Error),
-    SemVer(semver::Error),
+    #[from_arc]
+    Reqwest(Arc<reqwest::Error>),
+    #[from_arc]
+    SemVer(Arc<semver::Error>),
     UnexpectedZipEntry,
-    Wheel(wheel::Error),
+    #[from_arc]
+    Wheel(Arc<wheel::Error>),
+    #[from]
     Windows(WIN32_ERROR),
-    Zip(ZipError),
+    #[from_arc]
+    Zip(Arc<ZipError>),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BizHawkVersionRegression => write!(f, ""),
+            Self::BizHawkVersionRegression => write!(f, "The update requires an older version of BizHawk. Update manually at your own risk, or ask Fenhl to release a new version."),
+            Self::Cloned => write!(f, "clone of unexpected message kind"),
             Self::Io(e) => write!(f, "I/O error: {}", e),
             Self::MissingAsset => write!(f, "release does not have a download for this platform"),
             Self::MissingReadme => write!(f, "the file README.md is missing from the download"),

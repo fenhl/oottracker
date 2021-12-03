@@ -8,16 +8,26 @@ use {
         fmt,
         io,
         path::PathBuf,
+        sync::Arc,
         time::Duration,
     },
-    derive_more::From,
     iced::{
         Application,
         Clipboard,
         Command,
         Element,
+        HorizontalAlignment,
+        Length,
         Settings,
-        widget::Text,
+        widget::{
+            button::{
+                self,
+                Button,
+            },
+            Column,
+            Row,
+            Text,
+        },
         window::{
             self,
             Icon,
@@ -25,13 +35,17 @@ use {
     },
     image::DynamicImage,
     itertools::Itertools as _,
+    open::that as open,
     structopt::StructOpt,
     tokio::{
-        fs::File,
         io::AsyncWriteExt as _,
         time::sleep,
     },
     tokio_stream::StreamExt as _,
+    wheel::{
+        FromArc,
+        fs::File,
+    },
     oottracker::{
         github::{
             ReleaseAsset,
@@ -65,11 +79,29 @@ enum Message {
     Downloaded(File),
     WaitedDownload,
     Done,
+    DiscordInvite,
+    DiscordChannel,
+    NewIssue,
+    Cloned,
+}
+
+impl Clone for Message {
+    fn clone(&self) -> Self {
+        match self {
+            Self::DiscordInvite => Self::DiscordInvite,
+            Self::DiscordChannel => Self::DiscordChannel,
+            Self::NewIssue => Self::NewIssue,
+            _ => Self::Cloned,
+        }
+    }
 }
 
 struct App {
     path: PathBuf,
     state: State,
+    discord_invite_btn: button::State,
+    discord_channel_btn: button::State,
+    new_issue_btn: button::State,
 }
 
 impl Application for App {
@@ -78,7 +110,13 @@ impl Application for App {
     type Flags = PathBuf;
 
     fn new(path: PathBuf) -> (Self, Command<Result<Message, Error>>) {
-        (App { path, state: State::Init }, async {
+        (App {
+            path,
+            state: State::Init,
+            discord_invite_btn: button::State::default(),
+            discord_channel_btn: button::State::default(),
+            new_issue_btn: button::State::default(),
+        }, async {
             let client = reqwest::Client::builder()
                 .user_agent(concat!("oottracker-updater/", env!("CARGO_PKG_VERSION")))
                 .build()?;
@@ -138,6 +176,28 @@ impl Application for App {
                 self.state = State::Done;
                 Command::none()
             }
+            Ok(Message::DiscordInvite) => {
+                if let Err(e) = open("https://discord.gg/BGRrKKn") {
+                    self.state = State::Error(e.into());
+                }
+                Command::none()
+            }
+            Ok(Message::DiscordChannel) => {
+                if let Err(e) = open("https://discord.com/channels/274180765816848384/476723801032491008") {
+                    self.state = State::Error(e.into());
+                }
+                Command::none()
+            }
+            Ok(Message::NewIssue) => {
+                if let Err(e) = open("https://github.com/fenhl/oottracker/issues/new") {
+                    self.state = State::Error(e.into());
+                }
+                Command::none()
+            }
+            Ok(Message::Cloned) => {
+                self.state = State::Error(Error::Cloned);
+                Command::none()
+            }
             Err(e) => {
                 self.state = State::Error(e);
                 Command::none()
@@ -154,7 +214,21 @@ impl Application for App {
             State::WaitDownload => Text::new("Finishing download…").into(),
             State::Launch => Text::new("Starting new version…").into(),
             State::Done => Text::new("Closing updater…").into(),
-            State::Error(ref e) => Text::new(format!("error: {}", e)).into(), //TODO show info on how to get support
+            State::Error(ref e) => Column::new()
+                .push(Text::new("Error").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new(e.to_string()))
+                .push(Text::new(format!("debug info: {:?}", e)))
+                .push(Text::new("Support").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("• Ask in #setup-support on the OoT Randomizer Discord. Feel free to ping @Fenhl#4813."))
+                .push(Row::new()
+                    .push(Button::new(&mut self.discord_invite_btn, Text::new("invite link")).on_press(Ok(Message::DiscordInvite)))
+                    .push(Button::new(&mut self.discord_channel_btn, Text::new("direct channel link")).on_press(Ok(Message::DiscordChannel)))
+                )
+                .push(Row::new()
+                    .push(Text::new("• Or "))
+                    .push(Button::new(&mut self.new_issue_btn, Text::new("open an issue")).on_press(Ok(Message::NewIssue)))
+                )
+                .into(),
         }
     }
 
@@ -168,17 +242,23 @@ struct Args {
     path: PathBuf,
 }
 
-#[derive(Debug, From)]
+#[derive(Debug, FromArc, Clone)]
 enum Error {
-    Io(io::Error),
+    Cloned,
+    #[from_arc]
+    Io(Arc<io::Error>),
     MissingAsset,
     NoReleases,
-    Reqwest(reqwest::Error),
+    #[from_arc]
+    Reqwest(Arc<reqwest::Error>),
+    #[from_arc]
+    Wheel(Arc<wheel::Error>),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cloned => write!(f, "clone of unexpected message kind"),
             Self::Io(e) => write!(f, "I/O error: {}", e),
             Self::MissingAsset => write!(f, "release does not have a download for this platform"),
             Self::NoReleases => write!(f, "there are no released versions"),
@@ -187,6 +267,7 @@ impl fmt::Display for Error {
             } else {
                 write!(f, "HTTP error: {}", e)
             },
+            Self::Wheel(e) => e.fmt(f),
         }
     }
 }

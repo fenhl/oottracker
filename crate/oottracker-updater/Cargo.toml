@@ -7,12 +7,8 @@ edition = "2021"
 [dependencies]
 image = "0.23"
 itertools = "0.10"
+open = "2"
 tokio-stream = "0.1"
-
-[dependencies.derive_more]
-version = "0.99"
-default-features = false
-features = ["from"]
 
 [dependencies.iced]
 version = "0.3"
@@ -32,7 +28,7 @@ features = ["paw"]
 
 [dependencies.tokio]
 version = "1"
-features = ["fs", "time"]
+features = ["time"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
