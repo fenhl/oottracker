@@ -22,7 +22,18 @@ namespace Net.Fenhl.OotAutoTracker {
         [DllImport("oottracker")] internal static extern bool bool_result_unwrap(IntPtr bool_res);
         [DllImport("oottracker")] internal static extern StringHandle bool_result_debug_err(IntPtr bool_res);
         [DllImport("oottracker")] internal static extern UnitResult run_updater();
-        [DllImport("oottracker")] internal static extern TrackerLayout layout_default();
+        [DllImport("oottracker")] internal static extern Config config_default();
+        [DllImport("oottracker")] internal static extern OptConfigResult config_load();
+        [DllImport("oottracker")] internal static extern void opt_config_result_free(IntPtr opt_cfg_res);
+        [DllImport("oottracker")] internal static extern bool opt_config_result_is_ok(OptConfigResult opt_cfg_res);
+        [DllImport("oottracker")] internal static extern bool opt_config_result_is_ok_some(OptConfigResult opf_cfg_res);
+        [DllImport("oottracker")] internal static extern Config opt_config_result_unwrap_unwrap_or_default(IntPtr opt_cfg_res);
+        [DllImport("oottracker")] internal static extern StringHandle opt_config_result_debug_err(IntPtr opt_cfg_res);
+        [DllImport("oottracker")] internal static extern void config_free(IntPtr cfg);
+        [DllImport("oottracker")] internal static extern bool config_update_check_is_some(Config cfg);
+        [DllImport("oottracker")] internal static extern bool config_update_check(Config cfg);
+        [DllImport("oottracker")] internal static extern UnitResult config_set_update_check(Config cfg, bool auto_update_check);
+        [DllImport("oottracker")] internal static extern TrackerLayout config_layout(Config cfg);
         [DllImport("oottracker")] internal static extern void layout_free(IntPtr layout);
         [DllImport("oottracker")] internal static extern TrackerCell layout_cell(TrackerLayout layout, byte idx);
         [DllImport("oottracker")] internal static extern void cell_free(IntPtr cell);
@@ -95,6 +106,56 @@ namespace Net.Fenhl.OotAutoTracker {
         }
     }
 
+    internal class OptConfigResult : SafeHandle {
+        internal OptConfigResult() : base(IntPtr.Zero, true) {}
+
+        public override bool IsInvalid {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
+                Native.opt_config_result_free(this.handle);
+            }
+            return true;
+        }
+
+        internal bool IsOk() => Native.opt_config_result_is_ok(this);
+        internal bool IsOkSome() => Native.opt_config_result_is_ok_some(this);
+
+        internal Config UnwrapUnwrapOrDefault() {
+            var cfg = Native.opt_config_result_unwrap_unwrap_or_default(this.handle);
+            this.handle = IntPtr.Zero; // opt_config_result_unwrap_unwrap_or_default takes ownership
+            return cfg;
+        }
+
+        internal StringHandle DebugErr() {
+            var err = Native.opt_config_result_debug_err(this.handle);
+            this.handle = IntPtr.Zero; // opt_config_result_debug_err takes ownership
+            return err;
+        }
+    }
+
+    internal class Config : SafeHandle {
+        internal Config() : base(IntPtr.Zero, true) {}
+
+        public override bool IsInvalid {
+            get { return this.handle == IntPtr.Zero; }
+        }
+
+        protected override bool ReleaseHandle() {
+            if (!this.IsInvalid) {
+                Native.config_free(this.handle);
+            }
+            return true;
+        }
+
+        internal TrackerLayout Layout() => Native.config_layout(this);
+        internal bool UpdateCheckIsSome() => Native.config_update_check_is_some(this);
+        internal bool UpdateCheck() => Native.config_update_check(this);
+        internal UnitResult SetUpdateCheck(bool auto_update_check) => Native.config_set_update_check(this, auto_update_check);
+    }
+
     internal class BoolResult : SafeHandle {
         internal BoolResult() : base(IntPtr.Zero, true) {}
 
@@ -104,7 +165,7 @@ namespace Net.Fenhl.OotAutoTracker {
 
         protected override bool ReleaseHandle() {
             if (!this.IsInvalid) {
-                Native.bool_result_free(handle);
+                Native.bool_result_free(this.handle);
             }
             return true;
         }
@@ -225,7 +286,7 @@ namespace Net.Fenhl.OotAutoTracker {
 
         protected override bool ReleaseHandle() {
             if (!this.IsInvalid) {
-                Native.unit_result_free(handle);
+                Native.unit_result_free(this.handle);
             }
             return true;
         }
@@ -465,7 +526,7 @@ namespace Net.Fenhl.OotAutoTracker {
         }
     }
 
-    [ExternalTool("OoT autotracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
+    [ExternalTool("OoT auto-tracker", Description = "An auto-tracking plugin for Fenhl's OoT tracker")]
     [ExternalToolEmbeddedIcon("Net.Fenhl.OotAutoTracker.Resources.icon.ico")]
     public sealed class MainForm : ToolFormBase, IExternalToolForm {
         private PictureBox[] cells = new PictureBox[52];
@@ -482,10 +543,12 @@ namespace Net.Fenhl.OotAutoTracker {
         private ApiContainer APIs => _apiContainer ?? throw new NullReferenceException();
 
         public override bool BlocksInputWhenFocused { get; } = false;
-        protected override string WindowTitleStatic => "OoT autotracker";
+        protected override string WindowTitleStatic => "OoT auto-tracker";
 
         public override bool AskSaveChanges() => true;
 
+        private bool initialized = false;
+        private Config cfg = Native.config_default();
         private bool isVanilla;
         //private TcpStream? stream;
         private uint? autoTrackerContextAddr;
@@ -495,7 +558,6 @@ namespace Net.Fenhl.OotAutoTracker {
         private List<byte> prevSaveData = new List<byte>();
         private Save? prevSave;
         private ModelState model = ModelState.FromSaveAndKnowledge(Native.save_default(), Native.knowledge_none());
-        private TrackerLayout layout = Native.layout_default();
         private string[] cellImages = new string[52];
 
         private bool gameOk = false;
@@ -562,7 +624,7 @@ namespace Net.Fenhl.OotAutoTracker {
             this.label_Version.Name = "label_Version";
             this.label_Version.Size = new Size(96, 25);
             this.label_Version.TabIndex = 0;
-            this.label_Version.Text = $"OoT autotracker version {Native.version_string().AsString()} for BizHawk version {Native.expected_bizhawk_version_string().AsString()}";
+            this.label_Version.Text = $"OoT auto-tracker version {Native.version_string().AsString()} for BizHawk version {Native.expected_bizhawk_version_string().AsString()}";
             this.label_Version.Visible = false;
             this.Controls.Add(this.label_Version);
 
@@ -576,23 +638,7 @@ namespace Net.Fenhl.OotAutoTracker {
             this.button_Update.Text = "Check for updates…";
             this.button_Update.Visible = false;
             this.button_Update.Click += new EventHandler((object sender, EventArgs e) => {
-                this.label_Update.Text = "Checking for updates…";
-                using (var update_available_res = Native.update_available()) {
-                    if (update_available_res.IsOk()) {
-                        if (update_available_res.Unwrap()) {
-                            this.label_Update.Text = "An update is available";
-                            using (var run_updater_res = Native.run_updater()) {
-                                if (!run_updater_res.IsOk()) {
-                                    this.label_Update.Text = run_updater_res.DebugErr().AsString();
-                                }
-                            }
-                        } else {
-                            this.label_Update.Text = $"You are up to date as of {DateTime.Now}";
-                        }
-                    } else {
-                        this.label_Update.Text = update_available_res.DebugErr().AsString();
-                    }
-                }
+                CheckForUpdates();
             });
             this.Controls.Add(this.button_Update);
 
@@ -687,6 +733,31 @@ namespace Net.Fenhl.OotAutoTracker {
         }
 
         public override void Restart() {
+            if (!this.initialized) {
+                using (var cfg_res = Native.config_load()) {
+                    if (cfg_res.IsOk()) {
+                        if (!cfg_res.IsOkSome()) {
+                            this.DialogController.ShowMessageBox(this, "Welcome to the OoT auto-tracker!\nTo change settings, right-click a Medallion.");
+                        }
+                        this.cfg = cfg_res.UnwrapUnwrapOrDefault();
+                        UpdateCells();
+                        if (!cfg.UpdateCheckIsSome()) {
+                            using (var res = this.cfg.SetUpdateCheck(this.DialogController.ShowMessageBox2(this, "Check for updates on startup?"))) {
+                                if (!res.IsOk()) {
+                                    this.DialogController.ShowMessageBox(this, $"failed to save config file: {res.DebugErr().ToString()}");
+                                }
+                            }
+                        }
+                        if (this.cfg.UpdateCheck()) {
+                            CheckForUpdates();
+                        }
+                    } else {
+                        this.DialogController.ShowMessageBox(this, $"failed to load config file: {cfg_res.DebugErr().ToString()}");
+                    }
+                }
+                this.initialized = true;
+            }
+
             APIs.Memory.SetBigEndian(true);
             this.model.Dispose();
             /*
@@ -831,14 +902,16 @@ namespace Net.Fenhl.OotAutoTracker {
         }
 
         private void UpdateCells() {
-            for (byte i = 0; i < 52; i++) {
-                using (TrackerCell cell = layout.Cell(i)) {
-                    string new_img = cell.Image(this.model).AsString();
-                    if (new_img == this.cellImages[i]) { continue; }
-                    this.cellImages[i] = new_img;
-                    var stream = typeof(MainForm).Assembly.GetManifestResourceStream($"Net.Fenhl.OotAutoTracker.Resources.{new_img}.png");
-                    if (stream == null) { throw new Exception($"image stream for cell {i} ({new_img}) is null"); }
-                    this.cells[i].Image = Image.FromStream(stream);
+            using (var layout = this.cfg.Layout()) {
+                for (byte i = 0; i < 52; i++) {
+                    using (TrackerCell cell = layout.Cell(i)) {
+                        string new_img = cell.Image(this.model).AsString();
+                        if (new_img == this.cellImages[i]) { continue; }
+                        this.cellImages[i] = new_img;
+                        var stream = typeof(MainForm).Assembly.GetManifestResourceStream($"Net.Fenhl.OotAutoTracker.Resources.{new_img}.png");
+                        if (stream == null) { throw new Exception($"image stream for cell {i} ({new_img}) is null"); }
+                        this.cells[i].Image = Image.FromStream(stream);
+                    }
                 }
             }
         }
@@ -868,6 +941,26 @@ namespace Net.Fenhl.OotAutoTracker {
                 label_Help.Text = "";
             } else {
                 label_Help.Text = "If you need help, you can ask in #setup-support on Discord.";
+            }
+        }
+
+        private void CheckForUpdates() {
+            this.label_Update.Text = "Checking for updates…";
+            using (var update_available_res = Native.update_available()) {
+                if (update_available_res.IsOk()) {
+                    if (update_available_res.Unwrap()) {
+                        this.label_Update.Text = "An update is available";
+                        using (var run_updater_res = Native.run_updater()) {
+                            if (!run_updater_res.IsOk()) {
+                                this.label_Update.Text = run_updater_res.DebugErr().AsString();
+                            }
+                        }
+                    } else {
+                        this.label_Update.Text = $"You are up to date as of {DateTime.Now}";
+                    }
+                } else {
+                    this.label_Update.Text = update_available_res.DebugErr().AsString();
+                }
             }
         }
     }

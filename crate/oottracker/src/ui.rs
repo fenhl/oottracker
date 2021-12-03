@@ -39,10 +39,7 @@ use {
             self,
             File,
         },
-        io::{
-            AsyncReadExt as _,
-            AsyncWriteExt as _,
-        },
+        io::AsyncReadExt as _,
     },
     wheel::FromArc,
     ootr::{
@@ -116,12 +113,28 @@ impl Config {
         Ok(Some(serde_json::from_str(&buf)?)) //TODO use async-json instead
     }
 
+    pub fn new_sync() -> Result<Option<Config>, Error> {
+        let dirs = dirs()?;
+        match std::fs::File::open(dirs.config_dir().join("config.json")) {
+            Ok(file) => Ok(Some(serde_json::from_reader(file)?)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub async fn save(&self) -> Result<(), Error> {
         let dirs = dirs()?;
-        let buf = serde_json::to_vec(self)?; //TODO use async-json instead
+        let buf = serde_json::to_vec_pretty(self)?; //TODO use async-json instead
         fs::create_dir_all(dirs.config_dir()).await?;
-        let mut file = File::create(dirs.config_dir().join("config.json")).await?;
-        file.write_all(&buf).await?;
+        fs::write(dirs.config_dir().join("config.json"), &buf).await?;
+        Ok(())
+    }
+
+    pub fn save_sync(&self) -> Result<(), Error> {
+        let dirs = dirs()?;
+        let buf = serde_json::to_vec_pretty(self)?; //TODO indent by 4 spaces, sort object keys, add trailing newline
+        std::fs::create_dir_all(dirs.config_dir())?;
+        std::fs::write(dirs.config_dir().join("config.json"), &buf)?;
         Ok(())
     }
 }
@@ -1420,7 +1433,7 @@ cells! {
             state.ram.save.event_chk_inf.9.insert(EventChkInf9::SCARECROW_SONG);
         }), //TODO make sure free scarecrow knowledge is toggled properly
     },
-    Beans: Simple { //TODO overlay with number bought if autotracker is on & shuffle beans is off
+    Beans: Simple { //TODO overlay with number bought if auto-tracking is on & shuffle beans is off
         img: ImageInfo::new("beans"),
         active: Box::new(|state| state.ram.save.inv.beans),
         toggle: Box::new(|state| state.ram.save.inv.beans = !state.ram.save.inv.beans),

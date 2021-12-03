@@ -6,7 +6,7 @@ HOW TO INSTALL/UPDATE
 HOW TO USE
 
 1. Open BizHawk (EmuHawk.exe)
-2. In BizHawk, go to Tools menu > External Tool > OoT autotracker
+2. In BizHawk, go to Tools menu > External Tool > OoT auto-tracker
 3. The tracker window will open. You can right-click on a Medallion to see debugging output.
 4. Open the ROM. The tracker should now automatically update based on your item status.
 

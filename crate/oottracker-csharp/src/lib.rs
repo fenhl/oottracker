@@ -44,6 +44,7 @@ use {
             CellOverlay,
             CellRender,
             CellStyle,
+            Config,
             ImageDirContext,
             LocationStyle,
             TrackerCellId,
@@ -202,8 +203,84 @@ pub fn version() -> Version {
     HandleOwned::new(inner())
 }
 
-#[no_mangle] pub extern "C" fn layout_default() -> HandleOwned<TrackerLayout> {
-    HandleOwned::new(TrackerLayout::default_auto())
+#[no_mangle] pub extern "C" fn config_default() -> HandleOwned<Config> {
+    HandleOwned::new(Config::default())
+}
+
+#[no_mangle] pub extern "C" fn config_load() -> HandleOwned<DebugResult<Option<Config>>> {
+    HandleOwned::new(Config::new_sync().map_err(DebugError::from))
+}
+
+/// # Safety
+///
+/// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_free(opt_cfg_res: HandleOwned<DebugResult<Option<Config>>>) {
+    let _ = opt_cfg_res.into_box();
+}
+
+/// # Safety
+///
+/// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`.
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_is_ok(opt_cfg_res: *const DebugResult<Option<Config>>) -> bool {
+    (&*opt_cfg_res).is_ok()
+}
+
+/// # Safety
+///
+/// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`.
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_is_ok_some(opt_cfg_res: *const DebugResult<Option<Config>>) -> bool {
+    (&*opt_cfg_res).as_ref().map_or(false, |opt_cfg| opt_cfg.is_some())
+}
+
+/// # Safety
+///
+/// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_unwrap_unwrap_or_default(opt_cfg_res: HandleOwned<DebugResult<Option<Config>>>) -> HandleOwned<Config> {
+    HandleOwned::new(opt_cfg_res.into_box().unwrap().unwrap_or_default())
+}
+
+/// # Safety
+///
+/// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`. This function takes ownership of the `DebugResult`.
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_debug_err(opt_cfg_res: HandleOwned<DebugResult<Option<Config>>>) -> StringHandle {
+    StringHandle::from_string(opt_cfg_res.into_box().unwrap_err())
+}
+
+/// # Safety
+///
+/// `cfg` must point at a valid `Config`. This function takes ownership of the `Config`.
+#[no_mangle] pub unsafe extern "C" fn config_free(cfg: HandleOwned<Config>) {
+    let _ = cfg.into_box();
+}
+
+/// # Safety
+///
+/// `cfg` must point at a valid `Config`.
+#[no_mangle] pub unsafe extern "C" fn config_update_check_is_some(cfg: *const Config) -> bool {
+    (&*cfg).auto_update_check.is_some()
+}
+
+/// # Safety
+///
+/// `cfg` must point at a valid `Config`.
+#[no_mangle] pub unsafe extern "C" fn config_update_check(cfg: *const Config) -> bool {
+    (&*cfg).auto_update_check.unwrap()
+}
+
+/// # Safety
+///
+/// `cfg` must be a unique pointer at a valid `Config`.
+#[no_mangle] pub unsafe extern "C" fn config_set_update_check(cfg: *mut Config, auto_update_check: bool) -> HandleOwned<DebugResult<()>> {
+    let cfg = &mut *cfg;
+    cfg.auto_update_check = Some(auto_update_check);
+    HandleOwned::new(cfg.save_sync().map_err(DebugError::from))
+}
+
+/// # Safety
+///
+/// `cfg` must point at a valid `Config`.
+#[no_mangle] pub unsafe extern "C" fn config_layout(cfg: *const Config) -> HandleOwned<TrackerLayout> {
+    HandleOwned::new(TrackerLayout::new_auto(&*cfg))
 }
 
 /// # Safety
