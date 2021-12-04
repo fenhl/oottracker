@@ -64,6 +64,7 @@ use {
 
 #[cfg(windows)] const MACOS_ADDR: &str = "192.168.178.63";
 
+#[allow(dead_code)] // some fields are only used for Debug
 #[derive(Debug, From)]
 enum Error {
     #[cfg(windows)] BizHawkOutdated {

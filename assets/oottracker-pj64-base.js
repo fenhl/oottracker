@@ -1,6 +1,6 @@
 // The constants above are generated from Rust code in crate/oottracker-utils/src/release.rs. If they're missing, you have the wrong file.
 
-const VERSION = 4; // do not rename this variable, the build script checks against it
+const VERSION = 5; // do not rename this variable, the build script checks against it
 var RAM_INIT_PACKET_LENGTH = 1;
 for (var i = 0; i < RAM_RANGES.length; i++) {
     RAM_INIT_PACKET_LENGTH += RAM_RANGES[i][1];
@@ -24,6 +24,7 @@ sock.connect({host: "127.0.0.1", port: TCP_PORT}, function() {
     new DataView(handshake).setUint8(0, VERSION);
     sock.write(new Buffer(new Uint8Array(handshake)), function() {
         console.log('Connected to OoT Tracker');
+        //TODO send auto-tracker context
         var rawRam = null;
         events.ondraw(function() {
             var changed = true;
