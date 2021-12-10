@@ -52,7 +52,7 @@ path = "../oottracker-derive"
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["json", "rustls-tls", "trust-dns"]
+features = ["blocking", "json", "rustls-tls", "trust-dns"]
 
 [dependencies.serde]
 version = "1"
@@ -60,7 +60,7 @@ features = ["derive"]
 
 [dependencies.tokio]
 version = "1"
-features = ["fs", "net", "sync", "time"]
+features = ["fs", "io-util", "net", "sync", "time"]
 
 [dependencies.tokio-stream]
 version = "0.1"

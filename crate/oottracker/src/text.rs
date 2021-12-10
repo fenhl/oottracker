@@ -165,7 +165,7 @@ impl DungeonRewardLocationExt for DungeonRewardLocation {
             Some(Self::Dungeon(MainDungeon::ShadowTemple))
         } else if eat_any_color_str(s, b"One inside a \x05\x00goddess of the sand\x05\x0f...") || eat_any_color_str(s, b"One in the \x05\x00Spirit Temple\x05\x0f...") {
             Some(Self::Dungeon(MainDungeon::SpiritTemple))
-        } else if eat_any_color_str(s, b"One in \x05\x00@'s pocket\x05\x0f...") || eat_any_color_str(s, b"One \x05\x00@ already has\x05\x0f...") {
+        } else if eat_any_color_str(s, b"One in \x05\x00@'s pocket\x05\x0f...") || eat_any_color_str(s, b"One \x05\x00@ already has\x05\x0f...") { //TODO check for the current player name instead
             Some(Self::LinksPocket)
         } else {
             None
