@@ -55,6 +55,21 @@ use {
 };
 
 #[repr(transparent)]
+pub struct FfiBool(u32);
+
+impl From<bool> for FfiBool {
+    fn from(b: bool) -> Self {
+        Self(b.into())
+    }
+}
+
+impl From<FfiBool> for bool {
+    fn from(FfiBool(b): FfiBool) -> Self {
+        b != 0
+    }
+}
+
+#[repr(transparent)]
 pub struct HandleOwned<T: ?Sized>(*mut T); //TODO *mut Fragile<T>
 
 impl<T: ?Sized> HandleOwned<T> {
@@ -165,15 +180,15 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `bool_res` must point at a valid `DebugResult<bool>`.
-#[no_mangle] pub unsafe extern "C" fn bool_result_is_ok(bool_res: *const DebugResult<bool>) -> bool {
-    (&*bool_res).is_ok()
+#[no_mangle] pub unsafe extern "C" fn bool_result_is_ok(bool_res: *const DebugResult<bool>) -> FfiBool {
+    (&*bool_res).is_ok().into()
 }
 
 /// # Safety
 ///
 /// `bool_res` must point at a valid `DebugResult<bool>`. This function takes ownership of the `DebugResult`.
-#[no_mangle] pub unsafe extern "C" fn bool_result_unwrap(bool_res: HandleOwned<DebugResult<bool>>) -> bool {
-    bool_res.into_box().unwrap()
+#[no_mangle] pub unsafe extern "C" fn bool_result_unwrap(bool_res: HandleOwned<DebugResult<bool>>) -> FfiBool {
+    bool_res.into_box().unwrap().into()
 }
 
 /// # Safety
@@ -221,15 +236,15 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`.
-#[no_mangle] pub unsafe extern "C" fn opt_config_result_is_ok(opt_cfg_res: *const DebugResult<Option<Config>>) -> bool {
-    (&*opt_cfg_res).is_ok()
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_is_ok(opt_cfg_res: *const DebugResult<Option<Config>>) -> FfiBool {
+    (&*opt_cfg_res).is_ok().into()
 }
 
 /// # Safety
 ///
 /// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`.
-#[no_mangle] pub unsafe extern "C" fn opt_config_result_is_ok_some(opt_cfg_res: *const DebugResult<Option<Config>>) -> bool {
-    (&*opt_cfg_res).as_ref().map_or(false, |opt_cfg| opt_cfg.is_some())
+#[no_mangle] pub unsafe extern "C" fn opt_config_result_is_ok_some(opt_cfg_res: *const DebugResult<Option<Config>>) -> FfiBool {
+    (&*opt_cfg_res).as_ref().map_or(false, |opt_cfg| opt_cfg.is_some()).into()
 }
 
 /// # Safety
@@ -256,23 +271,23 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `cfg` must point at a valid `Config`.
-#[no_mangle] pub unsafe extern "C" fn config_update_check_is_some(cfg: *const Config) -> bool {
-    (&*cfg).auto_update_check.is_some()
+#[no_mangle] pub unsafe extern "C" fn config_update_check_is_some(cfg: *const Config) -> FfiBool {
+    (&*cfg).auto_update_check.is_some().into()
 }
 
 /// # Safety
 ///
 /// `cfg` must point at a valid `Config`.
-#[no_mangle] pub unsafe extern "C" fn config_update_check(cfg: *const Config) -> bool {
-    (&*cfg).auto_update_check.unwrap()
+#[no_mangle] pub unsafe extern "C" fn config_update_check(cfg: *const Config) -> FfiBool {
+    (&*cfg).auto_update_check.unwrap().into()
 }
 
 /// # Safety
 ///
 /// `cfg` must be a unique pointer at a valid `Config`.
-#[no_mangle] pub unsafe extern "C" fn config_set_update_check(cfg: *mut Config, auto_update_check: bool) -> HandleOwned<DebugResult<()>> {
+#[no_mangle] pub unsafe extern "C" fn config_set_update_check(cfg: *mut Config, auto_update_check: FfiBool) -> HandleOwned<DebugResult<()>> {
     let cfg = &mut *cfg;
-    cfg.auto_update_check = Some(auto_update_check);
+    cfg.auto_update_check = Some(auto_update_check.into());
     HandleOwned::new(cfg.save_sync().map_err(DebugError::from))
 }
 
@@ -374,8 +389,8 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `tcp_stream_res` must point at a valid `DebugResult<TcpStream>`.
-#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_is_ok(tcp_stream_res: *const DebugResult<TcpStream>) -> bool {
-    (&*tcp_stream_res).is_ok()
+#[no_mangle] pub unsafe extern "C" fn tcp_stream_result_is_ok(tcp_stream_res: *const DebugResult<TcpStream>) -> FfiBool {
+    (&*tcp_stream_res).is_ok().into()
 }
 
 /// # Safety
@@ -424,8 +439,8 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `io_res` must point at a valid `DebugResult<()>`.
-#[no_mangle] pub unsafe extern "C" fn unit_result_is_ok(unit_res: *const DebugResult<()>) -> bool {
-    (&*unit_res).is_ok()
+#[no_mangle] pub unsafe extern "C" fn unit_result_is_ok(unit_res: *const DebugResult<()>) -> FfiBool {
+    (&*unit_res).is_ok().into()
 }
 
 /// # Safety
@@ -454,8 +469,8 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `save_res` must point at a valid `DebugResult<Save>`.
-#[no_mangle] pub unsafe extern "C" fn save_result_is_ok(save_res: *const DebugResult<Save>) -> bool {
-    (&*save_res).is_ok()
+#[no_mangle] pub unsafe extern "C" fn save_result_is_ok(save_res: *const DebugResult<Save>) -> FfiBool {
+    (&*save_res).is_ok().into()
 }
 
 /// # Safety
@@ -500,8 +515,8 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `save1` and `save2` must point at valid `Save`s.
-#[no_mangle] pub unsafe extern "C" fn saves_equal(save1: *const Save, save2: *const Save) -> bool {
-    &*save1 == &*save2
+#[no_mangle] pub unsafe extern "C" fn saves_equal(save1: *const Save, save2: *const Save) -> FfiBool {
+    (&*save1 == &*save2).into()
 }
 
 /// # Safety
@@ -592,8 +607,8 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `ram_res` must point at a valid `DebugResult<Ram>`.
-#[no_mangle] pub unsafe extern "C" fn ram_result_is_ok(ram_res: *const DebugResult<Ram>) -> bool {
-    (&*ram_res).is_ok()
+#[no_mangle] pub unsafe extern "C" fn ram_result_is_ok(ram_res: *const DebugResult<Ram>) -> FfiBool {
+    (&*ram_res).is_ok().into()
 }
 
 /// # Safety
@@ -620,8 +635,8 @@ pub fn version() -> Version {
 /// # Safety
 ///
 /// `ram1` and `ram2` must point at valid `Ram` values.
-#[no_mangle] pub unsafe extern "C" fn ram_equal(ram1: *const Ram, ram2: *const Ram) -> bool {
-    &*ram1 == &*ram2
+#[no_mangle] pub unsafe extern "C" fn ram_equal(ram1: *const Ram, ram2: *const Ram) -> FfiBool {
+    (&*ram1 == &*ram2).into()
 }
 
 /// # Safety
