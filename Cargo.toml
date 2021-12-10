@@ -5,3 +5,6 @@ default-members = ["crate/oottracker"] #TODO change to CLI?
 [patch.crates-io.darwin-libproc] # see https://github.com/heim-rs/darwin-libproc/pull/3 for details
 git = "https://github.com/Orycterope/darwin-libproc"
 branch = "dependencies_versions"
+
+[profile.release]
+lto = "fat"
