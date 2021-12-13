@@ -70,7 +70,7 @@ impl From<FfiBool> for bool {
 }
 
 #[repr(transparent)]
-pub struct HandleOwned<T: ?Sized>(*mut T); //TODO *mut Fragile<T>
+pub struct HandleOwned<T: ?Sized>(*mut T);
 
 impl<T: ?Sized> HandleOwned<T> {
     fn new(value: T) -> HandleOwned<T>

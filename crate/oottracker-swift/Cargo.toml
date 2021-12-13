@@ -1,0 +1,16 @@
+[package]
+name = "oottracker-swift"
+version = "0.7.0"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+edition = "2021"
+
+[lib]
+name = "oottracker"
+crate-type = ["staticlib"]
+
+[build-dependencies]
+cbindgen = "0.20"
+
+[dependencies]
+libc = "0.2"
+semver = "1"

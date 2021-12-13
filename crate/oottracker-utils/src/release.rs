@@ -337,14 +337,21 @@ struct Args {
 #[cfg(target_os = "macos")]
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
-    eprintln!("building oottracker-mac.app for x86_64");
+    // build experimental SwiftUI app
+    eprintln!("building oottracker-mac.app (SwiftUI)");
+    Command::new("xcodebuild").arg("-scheme").arg("OoT Tracker").arg("-configuration").arg("Release").arg("build").current_dir("crate/oottracker-macos/OoT Tracker").check("xcodebuild", args.verbose).await?;
+    //TODO package the generated app, it will be at:
+    // $build_dir/Release/OoT Tracker.app
+    // where $build_dir is xcodebuild -showBuildSettings -project MyApp.xcodeproj | grep ' BUILD_DIR =' | sed -e 's/.*= *//'
+    // build iced app
+    eprintln!("building oottracker-mac.app (iced) for x86_64");
     Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").env("MACOSX_DEPLOYMENT_TARGET", "10.9").check("cargo", args.verbose).await?;
-    eprintln!("building oottracker-mac.app for aarch64");
+    eprintln!("building oottracker-mac.app (iced) for aarch64");
     Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").check("cargo", args.verbose).await?;
-    eprintln!("creating Universal macOS binary");
+    eprintln!("creating Universal macOS binary (iced)");
     fs::create_dir("assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     Command::new("lipo").arg("-create").arg("target/aarch64-apple-darwin/release/oottracker-gui").arg("target/x86_64-apple-darwin/release/oottracker-gui").arg("-output").arg("assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").check("lipo", args.verbose).await?;
-    eprintln!("packing oottracker-mac.dmg");
+    eprintln!("packing oottracker-mac.dmg (iced)");
     Command::new("hdiutil").arg("create").arg("assets/oottracker-mac.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").check("hdiutil", args.verbose).await?;
     Ok(())
 }
