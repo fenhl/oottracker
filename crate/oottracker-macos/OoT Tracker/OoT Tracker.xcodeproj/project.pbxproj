@@ -30,8 +30,8 @@
 		822781BC2764C950001C0A30 /* oottracker-swift.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = "oottracker-swift.xcodeproj"; path = "../../oottracker-swift/oottracker-swift.xcodeproj"; sourceTree = "<group>"; };
 		822781C42764C991001C0A30 /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = usr/lib/libresolv.tbd; sourceTree = SDKROOT; };
 		822781C62764CA6F001C0A30 /* ffi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ffi.swift; sourceTree = "<group>"; };
-		827608782765E9A7009C604C /* oottracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oottracker.h; path = "../../oottracker-swift/oottracker.h"; sourceTree = "<group>"; };
 		8276087A2765E9F0009C604C /* oottracker-bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "oottracker-bridge.h"; sourceTree = "<group>"; };
+		828BD77F2767583F00BE5668 /* oottracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oottracker.h; path = "../../oottracker-swift/oottracker.h"; sourceTree = "<group>"; };
 		828FC15F2764C7FE00EFA9E6 /* OoT Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "OoT Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		828FC1622764C7FE00EFA9E6 /* OoT_TrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OoT_TrackerApp.swift; sourceTree = "<group>"; };
 		828FC1642764C7FE00EFA9E6 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -72,8 +72,8 @@
 		828FC1562764C7FE00EFA9E6 = {
 			isa = PBXGroup;
 			children = (
+				828BD77F2767583F00BE5668 /* oottracker.h */,
 				8276087A2765E9F0009C604C /* oottracker-bridge.h */,
-				827608782765E9A7009C604C /* oottracker.h */,
 				822781BC2764C950001C0A30 /* oottracker-swift.xcodeproj */,
 				828FC1612764C7FE00EFA9E6 /* OoT Tracker */,
 				828FC1602764C7FE00EFA9E6 /* Products */,
