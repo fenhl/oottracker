@@ -36,7 +36,6 @@ use {
     image::DynamicImage,
     itertools::Itertools as _,
     open::that as open,
-    structopt::StructOpt,
     tokio::{
         io::AsyncWriteExt as _,
         time::sleep,
@@ -237,8 +236,9 @@ impl Application for App {
     }
 }
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 struct Args {
+    #[clap(parse(from_os_str))]
     path: PathBuf,
 }
 

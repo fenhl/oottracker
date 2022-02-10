@@ -12,7 +12,6 @@ use {
         Prerelease,
         Version,
     },
-    structopt::StructOpt,
     tokio::{
         fs,
         io,
@@ -23,7 +22,7 @@ use {
 
 mod version;
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 enum Args {
     Major,
     Minor,

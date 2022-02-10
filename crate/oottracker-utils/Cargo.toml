@@ -19,14 +19,14 @@ path = "src/version_bump.rs"
 [dependencies]
 async-trait = "0.1"
 
+[dependencies.clap]
+version = "3"
+features = ["derive"]
+
 [dependencies.derive_more]
 version = "0.99"
 default-features = false
 features = ["from"]
-
-[dependencies.structopt]
-version = "0.3"
-features = ["paw"]
 
 [dependencies.tokio]
 version = "1"

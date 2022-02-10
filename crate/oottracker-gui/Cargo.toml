@@ -19,6 +19,10 @@ num-traits = "0.2"
 semver = "1"
 url = "2"
 
+[dependencies.clap]
+version = "3"
+features = ["derive"]
+
 [dependencies.derive_more]
 version = "0.99"
 default-features = false
@@ -45,10 +49,6 @@ path = "../oottracker"
 version = "0.11"
 default-features = false
 features = ["rustls-tls", "stream", "trust-dns"]
-
-[dependencies.structopt]
-version = "0.3"
-features = ["paw"]
 
 [dependencies.tokio]
 version = "1"

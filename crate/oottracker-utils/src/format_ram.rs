@@ -12,15 +12,15 @@ use {
         path::PathBuf,
     },
     derive_more::From,
-    structopt::StructOpt,
     oottracker::ram::{
         self,
         Ram,
     },
 };
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 struct Args {
+    #[clap(parse(from_os_str))]
     input: PathBuf,
 }
 

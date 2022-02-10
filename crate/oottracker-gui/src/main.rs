@@ -58,7 +58,6 @@ use {
     image::DynamicImage,
     itertools::Itertools as _,
     semver::Version,
-    structopt::StructOpt,
     tokio::fs,
     url::Url,
     wheel::FromArc,
@@ -999,11 +998,11 @@ async fn run_updater(#[cfg_attr(windows, allow(unused))] client: &reqwest::Clien
     }
 }
 
-#[derive(Debug, Default, StructOpt)]
+#[derive(Debug, Default, clap::Parser)]
 struct Args {
-    #[structopt(long = "checks")]
+    #[clap(long = "checks")]
     show_available_checks: bool,
-    #[structopt(long = "logic")]
+    #[clap(long = "logic")]
     show_logic_tracker: bool,
 }
 

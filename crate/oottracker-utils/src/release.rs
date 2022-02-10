@@ -8,7 +8,6 @@ use {
     },
     async_trait::async_trait,
     derive_more::From,
-    structopt::StructOpt,
     ::tokio::{
         fs,
         io,
@@ -19,6 +18,7 @@ use {
     std::{
         cmp::Ordering::*,
         env,
+        ffi::OsString,
         io::{
             Cursor,
             Read as _,
@@ -315,22 +315,22 @@ async fn write_release_notes(args: &Args) -> Result<String, Error> {
     Ok(buf)
 }
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, clap::Parser)]
 struct Args {
     #[cfg(windows)]
     /// Create the GitHub release as a draft
-    #[structopt(long)]
+    #[clap(long)]
     no_publish: bool,
     #[cfg(windows)]
     /// Don't pass `--wait` to the release notes editor
-    #[structopt(short = "W", long)]
+    #[clap(short = 'W', long)]
     no_wait: bool,
     #[cfg(windows)]
     /// the editor for the release notes
-    #[structopt(short = "e", long, default_value = "C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd")]
-    release_notes_editor: String,
+    #[clap(short = 'e', long, parse(from_os_str), default_value = "C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd")]
+    release_notes_editor: OsString,
     /// Show output of build commands
-    #[structopt(short, long)]
+    #[clap(short, long)]
     verbose: bool,
 }
 

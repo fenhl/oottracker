@@ -10,6 +10,10 @@ itertools = "0.10"
 open = "2"
 tokio-stream = "0.1"
 
+[dependencies.clap]
+version = "3"
+features = ["derive"]
+
 [dependencies.iced]
 version = "0.3"
 features = ["image", "tokio"]
@@ -21,10 +25,6 @@ path = "../oottracker"
 version = "0.11"
 default-features = false
 features = ["rustls-tls", "stream"]
-
-[dependencies.structopt]
-version = "0.3"
-features = ["paw"]
 
 [dependencies.tokio]
 version = "1"

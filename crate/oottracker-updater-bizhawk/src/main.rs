@@ -44,7 +44,6 @@ use {
     itertools::Itertools as _,
     open::that as open,
     semver::Version,
-    structopt::StructOpt,
     tokio::{
         io,
         time::sleep,
@@ -355,7 +354,7 @@ impl Application for App {
     }
 }
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 struct Args {
     path: PathBuf,
     pid: u32,
