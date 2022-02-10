@@ -442,7 +442,9 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
     fn update(&mut self, message: Message<ootr_static::Rando>, _: &mut Clipboard) -> Command<Message<ootr_static::Rando>> {
         match message {
             Message::CheckStatusErrorStatic(_) => return self.notify(message),
-            Message::ClientDisconnected => return self.notify(message),
+            Message::ClientDisconnected => if self.notification.as_ref().map_or(true, |&(is_temp, _)| is_temp) { // don't override an existing, probably more descriptive error message
+                return self.notify(message)
+            },
             Message::CloseMenu => self.menu_state = None,
             Message::ConfigError(_) => return self.notify(message),
             Message::Connect => if self.connection.is_some() {
