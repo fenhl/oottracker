@@ -29,6 +29,7 @@ pub enum Expr<R: Rando> {
     Any(Vec<Expr<R>>),
     Age,
     AnonymousEvent(Check<R>, usize),
+    Contains(Box<Expr<R>>, Box<Expr<R>>),
     Eq(Box<Expr<R>>, Box<Expr<R>>),
     Event(String),
     /// used in helper `has_projectile`. Should only compare equal to itself.

@@ -177,10 +177,12 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
                         let right = Expr::parse_inner(rando, ctx, helpers, seq, ast, right, args)?;
                         Ok::<_, ParseError>(if ast.getattr("Eq")?.downcast::<PyType>()?.is_instance(op)? {
                             Expr::Eq(Box::new(left), Box::new(right))
+                        } else if ast.getattr("In")?.downcast::<PyType>()?.is_instance(op)? {
+                            Expr::Contains(Box::new(right), Box::new(left))
                         } else if ast.getattr("NotEq")?.downcast::<PyType>()?.is_instance(op)? {
                             Expr::Not(Box::new(Expr::Eq(Box::new(left), Box::new(right))))
                         } else {
-                            unimplemented!("found Compare expression with non-Eq operator {}", op)
+                            unimplemented!("found Compare expression {} with unsupported operator {}", display_expr(ast, expr), op)
                         })
                     })
                     .try_collect()?
