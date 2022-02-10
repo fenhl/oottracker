@@ -166,7 +166,7 @@ impl<'r> rocket::response::Responder<'r, 'static> for Error {
     }
 }
 
-#[wheel::main]
+#[wheel::main(rocket)]
 async fn main() -> Result<(), Error> {
     let pool = PgPool::connect_with(PgConnectOptions::default().database("oottracker").application_name("oottracker-web")).await?;
     let rooms = {

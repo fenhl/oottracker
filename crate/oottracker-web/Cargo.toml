@@ -45,3 +45,4 @@ features = ["sync"]
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
+features = ["rocket-beta"]
