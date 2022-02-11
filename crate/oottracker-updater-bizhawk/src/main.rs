@@ -355,6 +355,7 @@ impl Application for App {
 }
 
 #[derive(clap::Parser)]
+#[clap(version)]
 struct Args {
     path: PathBuf,
     pid: u32,

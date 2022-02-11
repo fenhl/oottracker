@@ -999,6 +999,7 @@ async fn run_updater(#[cfg_attr(windows, allow(unused))] client: &reqwest::Clien
 }
 
 #[derive(Debug, Default, clap::Parser)]
+#[clap(version)]
 struct Args {
     #[clap(long = "checks")]
     show_available_checks: bool,

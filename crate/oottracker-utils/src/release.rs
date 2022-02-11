@@ -316,6 +316,7 @@ async fn write_release_notes(args: &Args) -> Result<String, Error> {
 }
 
 #[derive(Clone, clap::Parser)]
+#[clap(version)]
 struct Args {
     #[cfg(windows)]
     /// Create the GitHub release as a draft

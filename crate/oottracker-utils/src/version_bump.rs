@@ -23,6 +23,7 @@ use {
 mod version;
 
 #[derive(clap::Parser)]
+#[clap(version)]
 enum Args {
     Major,
     Minor,

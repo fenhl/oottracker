@@ -19,6 +19,7 @@ use {
 };
 
 #[derive(clap::Parser)]
+#[clap(version)]
 struct Args {
     #[clap(parse(from_os_str))]
     input: PathBuf,
