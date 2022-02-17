@@ -2,11 +2,7 @@
 #![forbid(unsafe_code)]
 
 use {
-    std::{
-        fmt,
-        num::ParseIntError,
-    },
-    derive_more::From,
+    std::num::ParseIntError,
     semver::{
         BuildMetadata,
         Prerelease,
@@ -33,29 +29,18 @@ enum Args {
     },
 }
 
-#[derive(From)]
+#[derive(Debug, thiserror::Error)]
 enum Error {
-    Io(io::Error),
+    #[error(transparent)] Io(#[from] io::Error),
+    #[error(transparent)] ParseInt(#[from] ParseIntError),
+    #[error(transparent)] Plist(#[from] plist::Error),
+    #[error(transparent)] Toml(#[from] TomlError),
+    #[error("found Cargo manifest without “package” entry")]
     MissingPackageEntry,
+    #[error("found “package” entry in Cargo manifest without “version” entry")]
     MissingVersionEntry,
+    #[error("“package” entry in Cargo manifest was not a table")]
     PackageIsNotTable,
-    ParseInt(ParseIntError),
-    Plist(plist::Error),
-    Toml(TomlError),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Io(e) => write!(f, "I/O error: {}", e),
-            Error::MissingPackageEntry => write!(f, "found Cargo manifest without “package” entry"),
-            Error::MissingVersionEntry => write!(f, "found “package” entry in Cargo manifest without “version” entry"),
-            Error::PackageIsNotTable => write!(f, "“package” entry in Cargo manifest was not a table"),
-            Error::ParseInt(e) => e.fmt(f),
-            Error::Plist(e) => write!(f, "plist error: {}", e),
-            Error::Toml(e) => e.fmt(f),
-        }
-    }
 }
 
 //FROM https://github.com/dtolnay/semver/issues/243#issuecomment-854337640

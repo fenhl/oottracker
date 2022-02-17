@@ -3,7 +3,6 @@
 
 use {
     std::{
-        fmt,
         fs::File,
         io::{
             self,
@@ -11,7 +10,7 @@ use {
         },
         path::PathBuf,
     },
-    derive_more::From,
+    thiserror::Error,
     oottracker::ram::{
         self,
         Ram,
@@ -25,19 +24,10 @@ struct Args {
     input: PathBuf,
 }
 
-#[derive(From)]
+#[derive(Debug, Error)]
 enum Error {
-    Decode(ram::DecodeError),
-    Io(io::Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Decode(e) => write!(f, "failed to read RAM: {:?}", e),
-            Error::Io(e) => write!(f, "I/O error: {}", e),
-        }
-    }
+    #[error(transparent)] Decode(#[from] ram::DecodeError),
+    #[error(transparent)] Io(#[from] io::Error),
 }
 
 #[wheel::main]

@@ -17,20 +17,22 @@ name = "oottracker-version-bump"
 path = "src/version_bump.rs"
 
 [dependencies]
+async-proto = "0.12"
 async-trait = "0.1"
+thiserror = "1"
 
 [dependencies.clap]
 version = "3"
 features = ["derive"]
 
-[dependencies.derive_more]
-version = "0.99"
-default-features = false
-features = ["from"]
+[dependencies.gres]
+git = "https://github.com/fenhl/gres"
+branch = "main"
+features = ["async-proto", "cli"]
 
 [dependencies.tokio]
 version = "1"
-features = ["fs", "io-util", "macros", "process", "rt-multi-thread"]
+features = ["fs", "io-std", "io-util", "macros", "process", "rt-multi-thread"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
@@ -81,3 +83,6 @@ features = ["serde"]
 [target.'cfg(windows)'.dependencies.serde]
 version = "1"
 features = ["derive"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+directories = "4"

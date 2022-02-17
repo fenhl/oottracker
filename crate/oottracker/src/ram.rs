@@ -100,6 +100,8 @@ impl fmt::Display for DecodeError {
     }
 }
 
+impl std::error::Error for DecodeError {} //TODO use thiserror?
+
 bitflags! {
     #[derive(Default)]
     pub struct Pad: u16 {
