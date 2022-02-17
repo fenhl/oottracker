@@ -2,8 +2,12 @@
 #![forbid(unsafe_code)]
 
 use {
+    std::{
+        env,
+        process::Stdio,
+    },
     async_proto::Protocol,
-    async_trait::async_trait,
+    dir_lock::DirLock,
     gres::Percent,
     thiserror::Error,
     ::tokio::{
@@ -16,7 +20,6 @@ use {
 #[cfg(windows)] use {
     std::{
         cmp::Ordering::*,
-        env,
         ffi::OsString,
         fmt,
         io::{
@@ -28,13 +31,12 @@ use {
         iter,
         num::ParseIntError,
         path::Path,
-        process::Stdio,
         str::FromStr as _,
         sync::Arc,
         time::Duration,
     },
     async_proto::ReadError,
-    dir_lock::DirLock,
+    async_trait::async_trait,
     graphql_client::{
         GraphQLQuery,
         Response,
@@ -73,6 +75,12 @@ use {
     crate::version::version,
 };
 #[cfg(target_os = "macos")] use {
+    directories::BaseDirs,
+    git2::{
+        BranchType,
+        Repository,
+        ResetType,
+    },
     tokio::io::stdout,
     wheel::traits::IoResultExt as _,
 };
@@ -85,6 +93,8 @@ use {
 enum Error {
     #[cfg(windows)] #[error(transparent)] BroadcastRecv(#[from] broadcast::error::RecvError),
     #[error(transparent)] DirLock(#[from] dir_lock::Error),
+    #[cfg(target_os = "macos")] #[error(transparent)] Env(#[from] env::VarError),
+    #[cfg(target_os = "macos")] #[error(transparent)] Git(#[from] git2::Error),
     #[cfg(windows)] #[error(transparent)] InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error(transparent)] Io(#[from] io::Error),
     #[cfg(windows)] #[error(transparent)] ParseInt(#[from] ParseIntError),
@@ -94,6 +104,7 @@ enum Error {
     #[cfg(windows)] #[error(transparent)] SemVer(#[from] semver::Error),
     #[cfg(windows)] #[error(transparent)] Task(#[from] tokio::task::JoinError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[cfg(target_os = "macos")] #[error(transparent)] Write(#[from] async_proto::WriteError),
     #[cfg(windows)] #[error(transparent)] Zip(#[from] ZipError),
     #[cfg(windows)]
     #[error("BizHawk is outdated ({local} installed, {latest} available)")]
@@ -762,9 +773,9 @@ struct Args {
 #[wheel::main(debug)]
 async fn main() -> Result<(), Error> {
     let mut stdout = stdout();
-    MacMessage::Progress { label: "acquiring rustup lock", percent: Percent::new(0) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("acquiring rustup lock"), percent: Percent::new(0) }.write(&mut stdout).await?;
     let lock = DirLock::new("/tmp/syncbin-startup-rust.lock").await?;
-    MacMessage::Progress { label: "updating rustup", percent: Percent::new(5) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("updating rustup"), percent: Percent::new(5) }.write(&mut stdout).await?;
     let mut rustup_cmd = Command::new("rustup");
     rustup_cmd.arg("self");
     rustup_cmd.arg("update");
@@ -773,7 +784,7 @@ async fn main() -> Result<(), Error> {
         rustup_cmd.env("PATH", format!("{}:{}", base_dirs.home_dir().join(".cargo").join("bin").display(), env::var("PATH")?));
     }
     rustup_cmd.check("rustup").await?;
-    MacMessage::Progress { label: "updating Rust", percent: Percent::new(10) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("updating Rust"), percent: Percent::new(10) }.write(&mut stdout).await?;
     let mut rustup_cmd = Command::new("rustup");
     rustup_cmd.arg("update");
     rustup_cmd.arg("stable");
@@ -783,7 +794,7 @@ async fn main() -> Result<(), Error> {
     }
     rustup_cmd.check("rustup").await?;
     lock.drop_async().await?;
-    MacMessage::Progress { label: "cleaning up outdated cargo build artifacts", percent: Percent::new(20) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("cleaning up outdated cargo build artifacts"), percent: Percent::new(20) }.write(&mut stdout).await?;
     let mut sweep_cmd = Command::new("cargo");
     sweep_cmd.arg("sweep");
     sweep_cmd.arg("--installed");
@@ -794,19 +805,19 @@ async fn main() -> Result<(), Error> {
         sweep_cmd.env("PATH", format!("{}:{}", base_dirs.home_dir().join(".cargo").join("bin").display(), env::var("PATH")?));
     }
     sweep_cmd.check("cargo").await?;
-    MacMessage::Progress { label: "updating oottracker repo", percent: Percent::new(25) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("updating oottracker repo"), percent: Percent::new(25) }.write(&mut stdout).await?;
     let repo = Repository::open("/opt/git/github.com/fenhl/oottracker/master")?;
     let mut origin = repo.find_remote("origin")?;
     origin.fetch(&["main"], None, None)?;
     repo.reset(&repo.find_branch("origin/main", BranchType::Remote)?.into_reference().peel_to_commit()?.into_object(), ResetType::Hard, None)?;
-    MacMessage::Progress { label: "building oottracker-mac.app for x86_64", percent: Percent::new(30) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("building oottracker-mac.app for x86_64"), percent: Percent::new(30) }.write(&mut stdout).await?;
     Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").env("MACOSX_DEPLOYMENT_TARGET", "10.9").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("cargo").await?;
-    MacMessage::Progress { label: "building oottracker-mac.app for aarch64", percent: Percent::new(60) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("building oottracker-mac.app for aarch64"), percent: Percent::new(60) }.write(&mut stdout).await?;
     Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("cargo").await?;
-    MacMessage::Progress { label: "creating Universal macOS binary", percent: Percent::new(90) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("creating Universal macOS binary"), percent: Percent::new(90) }.write(&mut stdout).await?;
     fs::create_dir("/opt/git/github.com/fenhl/oottracker/master/assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     Command::new("lipo").arg("-create").arg("target/aarch64-apple-darwin/release/oottracker-gui").arg("target/x86_64-apple-darwin/release/oottracker-gui").arg("-output").arg("assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("lipo").await?;
-    MacMessage::Progress { label: "packing oottracker-mac.dmg", percent: Percent::new(95) }.write(&mut stdout).await?;
+    MacMessage::Progress { label: format!("packing oottracker-mac.dmg"), percent: Percent::new(95) }.write(&mut stdout).await?;
     Command::new("hdiutil").arg("create").arg("assets/oottracker-mac.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("hdiutil").await?;
     Ok(())
 }
