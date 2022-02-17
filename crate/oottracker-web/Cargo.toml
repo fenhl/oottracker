@@ -32,6 +32,7 @@ path = "../ootr"
 
 [dependencies.oottracker]
 path = "../oottracker"
+features = ["horrorshow", "rocket"]
 
 [dependencies.sqlx]
 version = "0.5"

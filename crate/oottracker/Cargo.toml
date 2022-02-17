@@ -18,7 +18,6 @@ iced = "0.3"
 image = "0.23"
 itertools = "0.10"
 once_cell = "1"
-rocket = "0.5.0-rc.1"
 semver = "1"
 serde_json = "1"
 
@@ -39,6 +38,7 @@ branch = "fields"
 git = "https://github.com/fenhl/horrorshow-rs"
 branch = "rocket"
 features = ["rocket"]
+optional = true
 
 [dependencies.ootr]
 path = "../ootr"
@@ -53,6 +53,10 @@ path = "../oottracker-derive"
 version = "0.11"
 default-features = false
 features = ["blocking", "json", "rustls-tls", "trust-dns"]
+
+[dependencies.rocket]
+version = "0.5.0-rc.1"
+optional = true
 
 [dependencies.serde]
 version = "1"

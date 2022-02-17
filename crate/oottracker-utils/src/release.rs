@@ -2,10 +2,7 @@
 #![forbid(unsafe_code)]
 
 use {
-    std::{
-        env,
-        process::Stdio,
-    },
+    std::env,
     async_proto::Protocol,
     dir_lock::DirLock,
     gres::Percent,
@@ -31,6 +28,7 @@ use {
         iter,
         num::ParseIntError,
         path::Path,
+        process::Stdio,
         str::FromStr as _,
         sync::Arc,
         time::Duration,
@@ -81,7 +79,10 @@ use {
         Repository,
         ResetType,
     },
-    tokio::io::stdout,
+    tokio::io::{
+        AsyncWriteExt as _,
+        stdout,
+    },
     wheel::traits::IoResultExt as _,
 };
 
@@ -773,51 +774,56 @@ struct Args {
 #[wheel::main(debug)]
 async fn main() -> Result<(), Error> {
     let mut stdout = stdout();
-    MacMessage::Progress { label: format!("acquiring rustup lock"), percent: Percent::new(0) }.write(&mut stdout).await?;
+
+    macro_rules! progress {
+        ($percent:literal, $label:literal) => {{
+            MacMessage::Progress { label: format!($label), percent: Percent::new($percent) }.write(&mut stdout).await?;
+            stdout.flush().await?;
+        }};
+    }
+
+    progress!(0, "acquiring rustup lock on Mac");
     let lock = DirLock::new("/tmp/syncbin-startup-rust.lock").await?;
-    MacMessage::Progress { label: format!("updating rustup"), percent: Percent::new(5) }.write(&mut stdout).await?;
+    progress!(5, "updating rustup on Mac");
     let mut rustup_cmd = Command::new("rustup");
     rustup_cmd.arg("self");
     rustup_cmd.arg("update");
-    rustup_cmd.stdout(Stdio::null());
     if let Some(base_dirs) = BaseDirs::new() {
         rustup_cmd.env("PATH", format!("{}:{}", base_dirs.home_dir().join(".cargo").join("bin").display(), env::var("PATH")?));
     }
     rustup_cmd.check("rustup").await?;
-    MacMessage::Progress { label: format!("updating Rust"), percent: Percent::new(10) }.write(&mut stdout).await?;
+    progress!(10, "updating Rust on Mac");
     let mut rustup_cmd = Command::new("rustup");
     rustup_cmd.arg("update");
     rustup_cmd.arg("stable");
-    rustup_cmd.stdout(Stdio::null());
     if let Some(base_dirs) = BaseDirs::new() {
         rustup_cmd.env("PATH", format!("{}:{}", base_dirs.home_dir().join(".cargo").join("bin").display(), env::var("PATH")?));
     }
     rustup_cmd.check("rustup").await?;
     lock.drop_async().await?;
-    MacMessage::Progress { label: format!("cleaning up outdated cargo build artifacts"), percent: Percent::new(20) }.write(&mut stdout).await?;
+    progress!(20, "cleaning up outdated cargo build artifacts on Mac");
     let mut sweep_cmd = Command::new("cargo");
     sweep_cmd.arg("sweep");
     sweep_cmd.arg("--installed");
     sweep_cmd.arg("-r");
     sweep_cmd.current_dir("/opt/git");
-    sweep_cmd.stdout(Stdio::null());
     if let Some(base_dirs) = BaseDirs::new() {
         sweep_cmd.env("PATH", format!("{}:{}", base_dirs.home_dir().join(".cargo").join("bin").display(), env::var("PATH")?));
     }
     sweep_cmd.check("cargo").await?;
-    MacMessage::Progress { label: format!("updating oottracker repo"), percent: Percent::new(25) }.write(&mut stdout).await?;
+    progress!(25, "updating oottracker repo on Mac");
     let repo = Repository::open("/opt/git/github.com/fenhl/oottracker/master")?;
     let mut origin = repo.find_remote("origin")?;
     origin.fetch(&["main"], None, None)?;
     repo.reset(&repo.find_branch("origin/main", BranchType::Remote)?.into_reference().peel_to_commit()?.into_object(), ResetType::Hard, None)?;
-    MacMessage::Progress { label: format!("building oottracker-mac.app for x86_64"), percent: Percent::new(30) }.write(&mut stdout).await?;
+    progress!(30, "building oottracker-mac.app for x86_64");
     Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").env("MACOSX_DEPLOYMENT_TARGET", "10.9").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("cargo").await?;
-    MacMessage::Progress { label: format!("building oottracker-mac.app for aarch64"), percent: Percent::new(60) }.write(&mut stdout).await?;
+    progress!(60, "building oottracker-mac.app for aarch64");
     Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("cargo").await?;
-    MacMessage::Progress { label: format!("creating Universal macOS binary"), percent: Percent::new(90) }.write(&mut stdout).await?;
+    progress!(90, "creating Universal macOS binary");
     fs::create_dir("/opt/git/github.com/fenhl/oottracker/master/assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
     Command::new("lipo").arg("-create").arg("target/aarch64-apple-darwin/release/oottracker-gui").arg("target/x86_64-apple-darwin/release/oottracker-gui").arg("-output").arg("assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("lipo").await?;
-    MacMessage::Progress { label: format!("packing oottracker-mac.dmg"), percent: Percent::new(95) }.write(&mut stdout).await?;
+    progress!(95, "packing oottracker-mac.dmg");
     Command::new("hdiutil").arg("create").arg("assets/oottracker-mac.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("hdiutil").await?;
     Ok(())
 }
@@ -845,19 +851,17 @@ async fn main(args: Args) -> Result<(), Error> {
     }
 
     macro_rules! build_tasks {
-        ($($task:expr => $done:literal,)*) => {
-            let ($(with_metavariable!($task, ())),*) = tokio::try_join!($(
-                async { cli.run($task, $done).await? }
-            ),*)?;
+        ($($task:expr,)*) => {
+            let ($(with_metavariable!($task, ())),*) = tokio::try_join!($($task),*)?;
         };
     }
 
     build_tasks![
-        BuildBizHawk::new(client.clone(), repo.clone(), release_rx_bizhawk, bizhawk_version) => "BizHawk build done",
-        BuildGui::new(client.clone(), repo.clone(), release_rx_gui) => "Windows GUI build done",
-        BuildMacOs::new(client.clone(), repo.clone(), release_rx_macos) => "macOS build done",
-        BuildPj64::new(client.clone(), repo.clone(), release_rx_pj64) => "Project64 build done",
-        BuildWeb::default() => "web build done",
+        { let cli = Arc::clone(&cli); let client = client.clone(); let repo = repo.clone(); async move { tokio::spawn(async move { cli.run(BuildBizHawk::new(client, repo, release_rx_bizhawk, bizhawk_version), "BizHawk build done").await? }).await? } },
+        { let cli = Arc::clone(&cli); let client = client.clone(); let repo = repo.clone(); async move { tokio::spawn(async move { cli.run(BuildGui::new(client, repo, release_rx_gui), "Windows GUI build done").await? }).await? } },
+        { let cli = Arc::clone(&cli); let client = client.clone(); let repo = repo.clone(); async move { tokio::spawn(async move { cli.run(BuildMacOs::new(client, repo, release_rx_macos), "macOS build done").await? }).await? } },
+        { let cli = Arc::clone(&cli); let client = client.clone(); let repo = repo.clone(); async move { tokio::spawn(async move { cli.run(BuildPj64::new(client, repo, release_rx_pj64), "Project64 build done").await? }).await? } },
+        { let cli = Arc::clone(&cli); async move { tokio::spawn(async move { cli.run(BuildWeb::default(), "web build done").await? }).await? } },
     ];
     let release = create_release.await??;
     if !args.no_publish {

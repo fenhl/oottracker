@@ -15,21 +15,9 @@ use {
     derivative::Derivative,
     directories::ProjectDirs,
     enum_iterator::IntoEnumIterator,
-    horrorshow::{
-        html,
-        prelude::*,
-    },
     iced::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
-    rocket::{
-        http::uri::fmt::{
-            Formatter,
-            Path,
-            UriDisplay,
-        },
-        request::FromParam,
-    },
     serde::{
         Deserialize,
         Serialize,
@@ -61,6 +49,18 @@ use {
         knowledge::ProgressionMode,
         save::*,
     },
+};
+#[cfg(feature = "horrorshow")] use horrorshow::{
+    html,
+    prelude::*,
+};
+#[cfg(feature = "rocket")] use rocket::{
+    http::uri::fmt::{
+        Formatter,
+        Path,
+        UriDisplay,
+    },
+    request::FromParam,
 };
 
 const VERSION: u8 = 0;
@@ -2002,6 +2002,7 @@ impl<'a> From<&'a Option<Config>> for TrackerLayout {
     }
 }
 
+#[cfg(feature = "rocket")]
 impl fmt::Display for TrackerLayout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -2017,6 +2018,7 @@ impl fmt::Display for TrackerLayout {
     }
 }
 
+#[cfg(feature = "rocket")]
 impl<'a> FromParam<'a> for TrackerLayout {
     type Error = ();
 
@@ -2035,8 +2037,10 @@ impl<'a> FromParam<'a> for TrackerLayout {
     }
 }
 
+#[cfg(feature = "rocket")]
 rocket::http::impl_from_uri_param_identity!([Path] TrackerLayout);
 
+#[cfg(feature = "rocket")]
 impl UriDisplay<Path> for TrackerLayout {
     fn fmt(&self, f: &mut Formatter<'_, Path>) -> fmt::Result {
         f.write_raw(format!("{}", self))
@@ -2069,6 +2073,7 @@ impl DoubleTrackerLayout {
     }
 }
 
+#[cfg(feature = "rocket")]
 impl<'a> FromParam<'a> for DoubleTrackerLayout {
     type Error = ();
 
@@ -2080,6 +2085,7 @@ impl<'a> FromParam<'a> for DoubleTrackerLayout {
     }
 }
 
+#[cfg(feature = "rocket")]
 impl fmt::Display for DoubleTrackerLayout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -2096,6 +2102,7 @@ pub enum CellStyle {
     RightDimmed,
 }
 
+#[cfg(feature = "horrorshow")]
 impl CellStyle {
     fn css_class(&self) -> &'static str {
         match self {
@@ -2128,6 +2135,7 @@ pub enum LocationStyle {
     Mq,
 }
 
+#[cfg(feature = "horrorshow")]
 impl LocationStyle {
     fn css_classes(&self) -> &'static str {
         match self {
@@ -2145,18 +2153,21 @@ pub struct CellRender {
     pub overlay: CellOverlay,
 }
 
+#[cfg(feature = "horrorshow")]
 impl RenderOnce for CellRender {
     fn render_once<'a>(self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
         self.render(tmpl);
     }
 }
 
+#[cfg(feature = "horrorshow")]
 impl RenderMut for CellRender {
     fn render_mut<'a>(&mut self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
         self.render(tmpl);
     }
 }
 
+#[cfg(feature = "horrorshow")]
 impl Render for CellRender {
     fn render<'a>(&self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
         (&mut *tmpl) << html! {
