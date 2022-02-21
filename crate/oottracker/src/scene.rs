@@ -350,9 +350,9 @@ scene_flags! {
                 "Graveyard Shield Grave Chest" = 0x0000_0001,
             },
         },
-        0x41: "Graveyard Composers Grave" {
+        0x41: "Graveyard Royal Familys Tomb" {
             chests: {
-                "Graveyard Composers Grave Chest" = 0x0000_0001,
+                "Graveyard Royal Familys Tomb Chest" = 0x0000_0001,
             },
         },
         0x48: "Windmill and Dampes Grave" {

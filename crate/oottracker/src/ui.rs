@@ -1564,12 +1564,12 @@ cells! {
     },
     SunsSong: Song {
         song: QuestItems::SUNS_SONG,
-        check: "Song from Composers Grave",
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
+        check: "Song from Royal Familys Tomb",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB)),
     },
     SunsSongCheck: SongCheck {
-        check: "Song from Composers Grave",
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_COMPOSERS_GRAVE)),
+        check: "Song from Royal Familys Tomb",
+        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB)),
     },
     SongOfTime: Song {
         song: QuestItems::SONG_OF_TIME,

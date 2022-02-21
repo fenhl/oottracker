@@ -29,7 +29,7 @@ flags_list! {
         },
         5: {
             "Song from Windmill" = 0x0800,
-            "Song from Composers Grave" = 0x0400,
+            "Song from Royal Familys Tomb" = 0x0400,
             "Song from Impa" = 0x0200,
             "Song from Malon" = 0x0100,
             "Song from Saria" = 0x0080,
