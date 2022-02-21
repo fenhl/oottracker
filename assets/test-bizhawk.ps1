@@ -7,7 +7,8 @@ function ThrowOnNativeFailure {
 
 $env:PYO3_PYTHON = "python"
 
-#TODO make sure BizHawk is up to date
+cargo run --package=oottracker-utils --bin=oottracker-check-bizhawk-version
+ThrowOnNativeFailure
 
 cargo build --package=oottracker-csharp
 ThrowOnNativeFailure

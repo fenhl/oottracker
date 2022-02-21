@@ -5,6 +5,10 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [[bin]]
+name = "oottracker-check-bizhawk-version"
+path = "src/check_bizhawk_version.rs"
+
+[[bin]]
 name = "oottracker-format-ram"
 path = "src/format_ram.rs"
 

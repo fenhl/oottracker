@@ -25,20 +25,13 @@ use {
             SeekFrom,
             Write as _,
         },
-        iter,
-        num::ParseIntError,
         path::Path,
         process::Stdio,
-        str::FromStr as _,
         sync::Arc,
         time::Duration,
     },
     async_proto::ReadError,
     async_trait::async_trait,
-    graphql_client::{
-        GraphQLQuery,
-        Response,
-    },
     gres::{
         Progress,
         Task,
@@ -70,7 +63,7 @@ use {
         Release,
         Repo,
     },
-    crate::version::version,
+    oottracker_utils::version,
 };
 #[cfg(target_os = "macos")] use {
     directories::BaseDirs,
@@ -86,19 +79,18 @@ use {
     wheel::traits::IoResultExt as _,
 };
 
-#[cfg(windows)] mod version;
-
 #[cfg(windows)] const MACOS_ADDR: &str = "192.168.178.63";
 
 #[derive(Debug, Error)]
 enum Error {
+    #[cfg(windows)] #[error(transparent)] BizHawkVersionCheck(#[from] version::BizHawkError),
     #[cfg(windows)] #[error(transparent)] BroadcastRecv(#[from] broadcast::error::RecvError),
     #[error(transparent)] DirLock(#[from] dir_lock::Error),
     #[cfg(target_os = "macos")] #[error(transparent)] Env(#[from] env::VarError),
     #[cfg(target_os = "macos")] #[error(transparent)] Git(#[from] git2::Error),
     #[cfg(windows)] #[error(transparent)] InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error(transparent)] Io(#[from] io::Error),
-    #[cfg(windows)] #[error(transparent)] ParseInt(#[from] ParseIntError),
+    #[cfg(windows)] #[error(transparent)] ParseInt(#[from] std::num::ParseIntError),
     #[cfg(windows)] #[error(transparent)] Read(#[from] ReadError),
     #[cfg(windows)] #[error(transparent)] ReleaseSend(#[from] broadcast::error::SendError<Release>),
     #[cfg(windows)] #[error(transparent)] Reqwest(#[from] reqwest::Error),
@@ -120,26 +112,14 @@ enum Error {
     #[error("aborting due to empty release notes")]
     EmptyReleaseNotes,
     #[cfg(windows)]
-    #[error("no info returned in BizHawk version query response")]
-    EmptyBizHawkVersionResponse,
-    #[cfg(windows)]
-    #[error("no BizHawk repo info returned")]
-    MissingBizHawkRepo,
-    #[cfg(windows)]
     #[error("missing environment variable: {0}")]
     MissingEnvar(&'static str),
-    #[cfg(windows)]
-    #[error("no releases in BizHawk GitHub repo")]
-    NoBizHawkReleases,
     #[cfg(windows)]
     #[error("Project64 plugin uses the wrong protocol version")]
     ProtocolVersionMismatch,
     #[cfg(windows)]
     #[error("there is already a release with this version number")]
     SameVersion,
-    #[cfg(windows)]
-    #[error("the latest GitHub release has no name")]
-    UnnamedRelease,
     #[cfg(windows)]
     #[error("the latest GitHub release has a newer version than the local crate version")]
     VersionRegression,
@@ -211,7 +191,7 @@ impl Task<Result<(reqwest::Client, Repo, Version), Error>> for Setup {
                 let repo = Repo::new("fenhl", "oottracker");
                 if let Some(latest_release) = repo.latest_release(&client).await? {
                     let remote_version = latest_release.version()?;
-                    match version().await.cmp(&remote_version) {
+                    match version::version().await.cmp(&remote_version) {
                         Less => return Err(Error::VersionRegression),
                         Equal => return Err(Error::SameVersion),
                         Greater => {}
@@ -222,18 +202,7 @@ impl Task<Result<(reqwest::Client, Repo, Version), Error>> for Setup {
             Self::CheckBizHawkVersion(client, repo) => gres::transpose(async move {
                 let [major, minor, patch, _] = oottracker_bizhawk::bizhawk_version();
                 let local_version = Version::new(major.into(), minor.into(), patch.into());
-                let remote_version_string = client.post("https://api.github.com/graphql")
-                    .bearer_auth(include_str!("../../../assets/release-token"))
-                    .json(&BizHawkVersionQuery::build_query(biz_hawk_version_query::Variables {}))
-                    .send().await?
-                    .error_for_status()?
-                    .json::<Response<biz_hawk_version_query::ResponseData>>().await?
-                    .data.ok_or(Error::EmptyBizHawkVersionResponse)?
-                    .repository.ok_or(Error::MissingBizHawkRepo)?
-                    .latest_release.ok_or(Error::NoBizHawkReleases)?
-                    .name.ok_or(Error::UnnamedRelease)?;
-                let (major, minor, patch) = remote_version_string.split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_tuple().expect("iter::repeat produces an infinite iterator");
-                let remote_version = Version::new(major?, minor?, patch?);
+                let remote_version = version::bizhawk_latest(&client).await?;
                 match local_version.cmp(&remote_version) {
                     Less => return Err(Error::BizHawkOutdated { local: local_version, latest: remote_version }),
                     Equal => {}
@@ -254,14 +223,6 @@ impl Task<Result<(reqwest::Client, Repo, Version), Error>> for Setup {
         }
     }
 }
-
-#[cfg(windows)]
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "../../assets/graphql/github-schema.graphql",
-    query_path = "../../assets/graphql/github-bizhawk-version.graphql",
-)]
-struct BizHawkVersionQuery;
 
 #[cfg(windows)]
 enum BuildBizHawk {
@@ -747,7 +708,7 @@ impl Task<Result<Release, Error>> for CreateRelease {
                 Ok(Err(Self::Create(repo, client, tx, notes)))
             }).await,
             Self::Create(repo, client, tx, notes) => gres::transpose(async move {
-                let release = repo.create_release(&client, format!("OoT Tracker {}", version().await), format!("v{}", version().await), notes).await?;
+                let release = repo.create_release(&client, format!("OoT Tracker {}", version::version().await), format!("v{}", version::version().await), notes).await?;
                 tx.send(release.clone())?;
                 Ok(Ok(release))
             }).await,

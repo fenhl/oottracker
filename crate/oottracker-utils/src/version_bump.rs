@@ -13,10 +13,8 @@ use {
         io,
     },
     toml_edit::TomlError,
-    crate::version::version,
+    oottracker_utils::version,
 };
-
-mod version;
 
 #[derive(clap::Parser)]
 #[clap(version)]
@@ -68,9 +66,9 @@ fn increment_major(v: &mut Version) {
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
     let version = match args {
-        Args::Major => { let mut version = version().await; increment_major(&mut version); version }
-        Args::Minor => { let mut version = version().await; increment_minor(&mut version); version }
-        Args::Patch => { let mut version = version().await; increment_patch(&mut version); version }
+        Args::Major => { let mut version = version::version().await; increment_major(&mut version); version }
+        Args::Minor => { let mut version = version::version().await; increment_minor(&mut version); version }
+        Args::Patch => { let mut version = version::version().await; increment_patch(&mut version); version }
         Args::Exact { version } => version,
     };
     println!("new version: {}", version);
