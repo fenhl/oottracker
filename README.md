@@ -3,7 +3,7 @@
 This is [Fenhl](https://github.com/fenhl)'s tracker for [the *Ocarina of Time* Item Randomizer](https://ootrandomizer.com/). Current features include:
 
 * Runs on Windows and macOS, also available as [a web app](https://oottracker.fenhl.net/)
-* Support for auto-tracking with [BizHawk](http://tasvideos.org/BizHawk.html), [Project64](https://www.pj64-emu.com/), or [RetroArch](https://retroarch.com/)
+* Support for auto-tracking with [BizHawk](https://tasvideos.org/BizHawk), [Project64](https://www.pj64-emu.com/), or [RetroArch](https://retroarch.com/)
 * Can connect to the networked trackers <https://oot-tracker.web.app/>, <https://ootr-tracker.web.app/>, and <https://ootr-random-settings-tracker.web.app/>
 
 # Download
@@ -26,4 +26,4 @@ If you run into any problems, you can:
 
 * Big Poe image created for this project by [Maplestar](https://github.com/Maplesstar).
 * Other item images by [Xopar](https://github.com/matthewkirby), used with permission.
-* Some game data sourced from [the CloudModding wiki](https://wiki.cloudmodding.com/oot) and [RiptideSage's completed checks script](https://github.com/RiptideSage/OoT-CompletedChecks). For my own research, I use [BizHawk](http://tasvideos.org/BizHawk.html) and [the practice rom](https://www.practicerom.com/).
+* Some game data sourced from [the CloudModding wiki](https://wiki.cloudmodding.com/oot) and [RiptideSage's completed checks script](https://github.com/RiptideSage/OoT-CompletedChecks). For my own research, I use [BizHawk](https://tasvideos.org/BizHawk) and [the practice rom](https://www.practicerom.com/).
