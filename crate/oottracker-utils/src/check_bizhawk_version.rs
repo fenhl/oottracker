@@ -17,12 +17,12 @@ enum Error {
     #[error(transparent)] InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error(transparent)] Io(#[from] std::io::Error),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
-    #[error("BizHawk is outdated ({local} installed, {latest} available)")]
+    #[error("crate/oottracker-bizhawk/OotAutoTracker/BizHawk-latest is outdated ({local} installed, {latest} available)")]
     BizHawkOutdated {
         latest: Version,
         local: Version,
     },
-    #[error("locally installed BizHawk is newer than latest release")]
+    #[error("crate/oottracker-bizhawk/OotAutoTracker/BizHawk-latest is newer than latest release")]
     BizHawkVersionRegression,
 }
 
