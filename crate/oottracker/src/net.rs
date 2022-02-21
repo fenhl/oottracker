@@ -308,6 +308,7 @@ impl Connection for RetroArchConnection {
 /// <https://github.com/eadmaster/console_hiscore/blob/master/tools/retroarchpythonapi.py>
 async fn retroarch_read_ram(sock: &UdpSocket) -> Result<Ram, Error> {
     let ranges = stream::iter(ram::RANGES.iter().copied().tuples()).then(|(start, len)| async move {
+        let start = 0x8000_0000 + start; // ram::RANGES uses RDRAM addresses but READ_CORE_MEMORY uses system bus addresses
         // make sure we're word-aligned on both ends
         let offset_in_word = start & 0x3;
         let mut aligned_start = (start - offset_in_word) as usize;
@@ -318,11 +319,16 @@ async fn retroarch_read_ram(sock: &UdpSocket) -> Result<Ram, Error> {
         let mut prefix = Vec::with_capacity(21);
         let mut msg = Vec::with_capacity(26);
         while aligned_len > 0 {
-            let count = aligned_len.min(1356);
+            // make sure the hex-encoded response fits into the 4096-byte buffer RetroArch uses
+            // each encoded byte requires 3 bytes of buffer space (the whitespace plus the 2-character hex encoding)
+            const MAX_ENCODED_BYTES_PER_BUFFER: u32 = (4_096 - "READ_CORE_MEMORY ffffffff 9999\n".len() as u32) / 3;
+
+            // using READ_CORE_MEMORY instead of READ_CORE_RAM as suggested in https://github.com/libretro/RetroArch/blob/0357b6c/command.h#L430-L437
+            let count = aligned_len.min(MAX_ENCODED_BYTES_PER_BUFFER);
             prefix.clear();
-            write!(&mut prefix, "READ_CORE_RAM {:x} ", aligned_start).expect("failed to compose packet");
+            write!(&mut prefix, "READ_CORE_MEMORY {:x} ", aligned_start).expect("failed to compose packet");
             msg.clear();
-            write!(&mut msg, "READ_CORE_RAM {:x} ", aligned_start).expect("failed to compose packet");
+            write!(&mut msg, "READ_CORE_MEMORY {:x} ", aligned_start).expect("failed to compose packet");
             writeln!(&mut msg, "{}", count).expect("failed to compose packet");
             sock.send(&msg).await?;
             let packet_len = sock.recv(&mut packet_buf).await?;
