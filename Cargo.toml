@@ -8,3 +8,4 @@ branch = "dependencies_versions"
 
 [profile.release]
 lto = "fat"
+strip = true
