@@ -122,13 +122,13 @@ pub type DebugResult<T> = Result<T, DebugError>;
 trait DebugResultExt {
     type T;
 
-    fn unwrap(self) -> Self::T;
+    fn debug_unwrap(self) -> Self::T;
 }
 
 impl<T> DebugResultExt for DebugResult<T> {
     type T = T;
 
-    fn unwrap(self) -> T {
+    fn debug_unwrap(self) -> T {
         match self {
             Ok(x) => x,
             Err(e) => panic!("{}", e),
@@ -188,7 +188,7 @@ pub fn version() -> Version {
 ///
 /// `bool_res` must point at a valid `DebugResult<bool>`. This function takes ownership of the `DebugResult`.
 #[no_mangle] pub unsafe extern "C" fn bool_result_unwrap(bool_res: HandleOwned<DebugResult<bool>>) -> FfiBool {
-    bool_res.into_box().unwrap().into()
+    bool_res.into_box().debug_unwrap().into()
 }
 
 /// # Safety
@@ -251,7 +251,7 @@ pub fn version() -> Version {
 ///
 /// `opt_cfg_res` must point at a valid `DebugResult<Option<Config>>`. This function takes ownership of the `DebugResult`.
 #[no_mangle] pub unsafe extern "C" fn opt_config_result_unwrap_unwrap_or_default(opt_cfg_res: HandleOwned<DebugResult<Option<Config>>>) -> HandleOwned<Config> {
-    HandleOwned::new(opt_cfg_res.into_box().unwrap().unwrap_or_default())
+    HandleOwned::new(opt_cfg_res.into_box().debug_unwrap().unwrap_or_default())
 }
 
 /// # Safety
@@ -397,7 +397,7 @@ pub fn version() -> Version {
 ///
 /// `tcp_stream_res` must point at a valid `DebugResult<TcpStream>`. This function takes ownership of the `DebugResult`.
 #[no_mangle] pub unsafe extern "C" fn tcp_stream_result_unwrap(tcp_stream_res: HandleOwned<DebugResult<TcpStream>>) -> HandleOwned<TcpStream> {
-    HandleOwned::new(tcp_stream_res.into_box().unwrap())
+    HandleOwned::new(tcp_stream_res.into_box().debug_unwrap())
 }
 
 /// # Safety
@@ -477,7 +477,7 @@ pub fn version() -> Version {
 ///
 /// `save_res` must point at a valid `DebugResult<Save>`. This function takes ownership of the `DebugResult`.
 #[no_mangle] pub unsafe extern "C" fn save_result_unwrap(save_res: HandleOwned<DebugResult<Save>>) -> HandleOwned<Save> {
-    HandleOwned::new(save_res.into_box().unwrap())
+    HandleOwned::new(save_res.into_box().debug_unwrap())
 }
 
 #[no_mangle] pub extern "C" fn save_default() -> HandleOwned<Save> {
@@ -615,7 +615,7 @@ pub fn version() -> Version {
 ///
 /// `ram_res` must point at a valid `DebugResult<Ram>`. This function takes ownership of the `DebugResult`.
 #[no_mangle] pub unsafe extern "C" fn ram_result_unwrap(ram_res: HandleOwned<DebugResult<Ram>>) -> HandleOwned<Ram> {
-    HandleOwned::new(ram_res.into_box().unwrap())
+    HandleOwned::new(ram_res.into_box().debug_unwrap())
 }
 
 /// # Safety

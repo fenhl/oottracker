@@ -3453,7 +3453,7 @@ checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
 name = "ootr"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-proto 0.10.0",
  "derivative",
@@ -3466,7 +3466,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-dynamic"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "derive_more",
  "itertools 0.10.3",
@@ -3481,7 +3481,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "once_cell",
  "ootr",
@@ -3491,7 +3491,7 @@ dependencies = [
 
 [[package]]
 name = "ootr-static-derive"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "convert_case",
  "derive_more",
@@ -3512,7 +3512,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-proto 0.10.0",
  "async-stream",
@@ -3547,7 +3547,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-bizhawk"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "semver 1.0.5",
  "wheel",
@@ -3556,7 +3556,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-csharp"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-proto 0.10.0",
  "itertools 0.10.3",
@@ -3569,7 +3569,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-derive"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "convert_case",
  "itertools 0.10.3",
@@ -3580,7 +3580,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-gui"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-proto 0.10.0",
  "clap",
@@ -3607,7 +3607,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-updater"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "clap",
  "iced",
@@ -3623,7 +3623,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-updater-bizhawk"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async_zip",
  "bytes",
@@ -3646,7 +3646,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-utils"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-proto 0.12.2",
  "async-trait",
@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "oottracker-web"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-proto 0.10.0",
  "derive_more",
