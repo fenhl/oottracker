@@ -1,6 +1,6 @@
 [package]
 name = "ootr-dynamic"
-version = "0.7.2"
+version = "0.7.3"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
