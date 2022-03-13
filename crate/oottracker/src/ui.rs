@@ -506,7 +506,7 @@ impl TrackerCellKind {
             TrackerCellKind::SmallKeys { get, .. } => {
                 let num_small_keys = get(&state.ram.save.small_keys);
                 CellRender {
-                    img: ImageInfo::extra("small-key"),
+                    img: ImageInfo::extra("small_key"),
                     style: if num_small_keys > 0 { CellStyle::Normal } else { CellStyle::Dimmed },
                     overlay: if num_small_keys > 0 {
                         CellOverlay::Count {
