@@ -6,17 +6,18 @@ body {
     justify-content: center;
     align-items: center;
     font-family: 'DejaVu Sans', sans-serif;
+    background-color: black;
+    color: white;
 }
 
 a {
-    color: #6600ff;
+    color: #00bb44;
 }
 
 .items {
     display: grid;
     gap: 10px;
     padding: 5px;
-    background-color: rgba(0, 0, 0, 0.65);
 }
 
 /* 3-column layouts */
@@ -140,13 +141,23 @@ footer {
     margin-top: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
+    html,
     body {
-        background-color: black;
-        color: #bbb;
+        background-color: white;
+        color: black;
     }
 
     a {
-        color: #00bb44;
+        color: #6600ff;
+    }
+
+    .items img {
+        filter: drop-shadow(1px 1px 0 black);
+    }
+
+    .count {
+        color: black;
+        background-color: rgba(255, 255, 255, 0.65);
     }
 }
