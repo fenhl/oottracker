@@ -162,6 +162,9 @@ impl<'p> ExprExtPrivate<'p> for Expr<Rando<'p>> {
             } else if name == "has_stones" {
                 let (count,) = expr.getattr("args")?.iter()?.collect_tuple().ok_or(ParseError::HelperNumArgs { name, expected: 1, found: expr.getattr("args")?.len()? })?;
                 Expr::HasStones(Box::new(Expr::parse_inner(rando, ctx, helpers, seq, ast, count?, args)?))
+            } else if name == "region_has_shortcuts" {
+                let (_region_name, _fallback_dungeon) = expr.getattr("args")?.iter()?.collect_tuple().ok_or(ParseError::HelperNumArgs { name, expected: 2, found: expr.getattr("args")?.len()? })?;
+                Expr::Not(Box::new(Expr::True)) //TODO adjust after https://github.com/TestRunnerSRL/OoT-Randomizer/pull/1566 is merged
             }
             else {
                 unimplemented!("converting call expression with name {} into Expr", name)

@@ -26,7 +26,7 @@ pub(crate) struct RawRegion {
 }
 
 pub(crate) fn parse_dungeon_info(mut s: &str) -> Result<Option<(Dungeon, Mq)>, RandoErr> {
-    Ok(if s == "Overworld" {
+    Ok(if let "Overworld" | "Bosses" = s {
         None
     } else {
         let mq = if let Some(prefix) = s.strip_suffix(" MQ") {
