@@ -1856,6 +1856,7 @@ pub enum TrackerLayout {
     RslLeft,
     RslRight,
     RslEdit,
+    Rsl3Player,
 }
 
 pub struct CellLayout {
@@ -1968,6 +1969,7 @@ impl TrackerLayout {
             TrackerLayout::RslEdit => {
                 let mut cells = TrackerLayout::MultiworldEdit.cells();
                 cells[23].id = GoMode; // unlike multiworld, RSL doesn't track BK mode
+                cells[28].id = MagicLens; // lens is not necessarily a starting item in RSL
                 let num_cells_mw = cells.len();
                 cells.extend(vec![
                     ForestMq, FireMq, WaterMq, SpiritMq, ShadowMq, GanonMq,
@@ -1978,6 +1980,14 @@ impl TrackerLayout {
                 ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx: idx + num_cells_mw, id, pos: [idx as u16 % 6 * 60 + 5, idx as u16 / 6 * 60 + 5], size: [50, 50] }));
                 cells
             }
+            TrackerLayout::Rsl3Player => columns!(10, [
+                ZeldasLullaby, Minuet, Slingshot, Bottle, MagicLens, Hammer, FreeReward, Blank, DekuMq, GoMode,
+                EponasSong, Bolero, Bombs, Strength, Spells, SwordCard, ForestMq, ForestKeys, DcMq, Triforce,
+                SariasSong, Serenade, Boomerang, Scale, Arrows, Ocarina, FireMq, FireKeys, JabuMq, Skulltula,
+                SunsSong, Requiem, Hookshot, ChildTrade, MirrorShield, AdultTrade, WaterMq, WaterKeys, WellMq, WellSmallKeys,
+                SongOfTime, Nocturne, Bow, Beans, Boots, Tunics, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
+                SongOfStorms, Prelude, IceMq, Blank, GanonMq, GanonKeys, SpiritMq, SpiritKeys, GtgMq, GtgSmallKeys,
+            ]),
         }
     }
 }
@@ -2014,6 +2024,7 @@ impl fmt::Display for TrackerLayout {
             TrackerLayout::RslLeft => write!(f, "rsl-left"),
             TrackerLayout::RslRight => write!(f, "rsl-right"),
             TrackerLayout::RslEdit => write!(f, "rsl-edit"),
+            TrackerLayout::Rsl3Player => write!(f, "rsl-3player"),
         }
     }
 }
@@ -2032,6 +2043,7 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "rsl-left" => TrackerLayout::RslLeft,
             "rsl-right" => TrackerLayout::RslRight,
             "rsl-edit" => TrackerLayout::RslEdit,
+            "rsl-3player" => TrackerLayout::Rsl3Player,
             _ => return Err(()),
         })
     }

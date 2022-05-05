@@ -45,6 +45,9 @@ function makeLayoutBuf(layoutString) {
         case 'rsl-edit':
             new DataView(buf).setUint8(0, 6);
             return buf;
+        case 'rsl-3player':
+            new DataView(buf).setUint8(0, 6);
+            return buf;
         default:
             throw 'unknown layout';
     }
