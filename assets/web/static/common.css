@@ -44,7 +44,8 @@ a {
 }
 
 /* 10-column layouts */
-.items.mw-collapsed {
+.items.mw-collapsed,
+.items.rsl-3player {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 
