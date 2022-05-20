@@ -13,13 +13,10 @@ git = "https://github.com/fenhl/winver"
 branch = "main"
 
 [dependencies]
+async-proto = "0.14"
 itertools = "0.10"
 libc = "0.2"
 semver = "1"
-
-[dependencies.async-proto]
-version = "0.10"
-features = ["write-sync"]
 
 [dependencies.oottracker]
 path = "../oottracker"

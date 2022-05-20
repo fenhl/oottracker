@@ -5,13 +5,15 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [dependencies]
-async_zip = "0.0.3"
+async_zip = "0.0.7"
 bytes = "1"
 futures = "0.3"
-image = "0.23"
+iced_native = "0.5"
+image = "0.24"
 itertools = "0.10"
 open = "2"
 semver = "1"
+winapi = "0.3"
 
 [dependencies.clap]
 version = "3"
@@ -28,7 +30,7 @@ default-features = false
 features = ["process"]
 
 [dependencies.iced]
-version = "0.3"
+version = "0.4"
 features = ["image", "tokio"]
 
 [dependencies.oottracker]
@@ -44,13 +46,9 @@ version = "1"
 features = ["time"]
 
 [dependencies.tokio-util]
-version = "0.6"
+version = "0.7"
 features = ["io"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
-
-[dependencies.windows]
-version = "0.28"
-features = ["Win32_Foundation", "Win32_Storage_FileSystem", "std"]

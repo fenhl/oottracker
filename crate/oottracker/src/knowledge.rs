@@ -382,6 +382,24 @@ impl Protocol for Knowledge {
         })
     }
 
+    fn read_sync(stream: &mut impl Read) -> Result<Self, ReadError> {
+        Ok(match u8::read_sync(stream)? {
+            0 => Knowledge {
+                bool_settings: HashMap::read_sync(stream)?,
+                tricks: Some(HashMap::read_sync(stream)?),
+                dungeon_reward_locations: HashMap::read_sync(stream)?,
+                mq: HashMap::read_sync(stream)?,
+                exits: Some(HashMap::read_sync(stream)?),
+                active_trials: HashMap::read_sync(stream)?,
+                string_settings: HashMap::read_sync(stream)?,
+                progression_mode: ProgressionMode::read_sync(stream)?,
+            },
+            1 => Knowledge::default(),
+            2 => Knowledge::vanilla(),
+            n => return Err(ReadError::UnknownVariant8(n)),
+        })
+    }
+
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         if *self == Knowledge::default() {
             1u8.write_sync(sink)?;

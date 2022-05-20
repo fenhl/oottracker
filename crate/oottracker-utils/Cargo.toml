@@ -21,7 +21,7 @@ name = "oottracker-version-bump"
 path = "src/version_bump.rs"
 
 [dependencies]
-async-proto = "0.12"
+async-proto = "0.14"
 thiserror = "1"
 
 [dependencies.clap]
@@ -54,8 +54,8 @@ lazy-regex = "2"
 plist = "1"
 serde_json = "1"
 tempfile = "3"
-toml_edit = "0.8"
-zip = "0.5"
+toml_edit = "0.14"
+zip = "0.6"
 
 [target.'cfg(windows)'.dependencies.ootr]
 path = "../ootr"
@@ -90,4 +90,4 @@ features = ["derive"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 directories = "4"
-git2 = "0.13"
+git2 = "0.14"

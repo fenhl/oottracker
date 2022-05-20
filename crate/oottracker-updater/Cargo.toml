@@ -5,7 +5,9 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [dependencies]
-image = "0.23"
+futures = "0.3"
+iced_native = "0.5"
+image = "0.24"
 itertools = "0.10"
 open = "2"
 tokio-stream = "0.1"
@@ -15,7 +17,7 @@ version = "3"
 features = ["derive"]
 
 [dependencies.iced]
-version = "0.3"
+version = "0.4"
 features = ["image", "tokio"]
 
 [dependencies.oottracker]

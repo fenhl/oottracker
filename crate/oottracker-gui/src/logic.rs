@@ -10,7 +10,7 @@ use {
         Command,
         Element,
         Length,
-        VerticalAlignment,
+        alignment,
         widget::{
             Column,
             Row,
@@ -186,7 +186,7 @@ impl<R: Rando + 'static> State<R> {
                 .push(Text::new("External knowledge:"))
                 //TODO randomizer version (support latest release, latest Dev, latest Dev-R, and any version currently used in a major tournament or the RSL)
                 .push(Row::new()
-                    .push(Text::new("Settings:").height(Length::Units(30)).vertical_alignment(VerticalAlignment::Center))
+                    .push(Text::new("Settings:").height(Length::Units(30)).vertical_alignment(alignment::Vertical::Center))
                     .push(PickList::new(&mut self.settings_pick, SettingsInfoKind::into_enum_iter().collect_vec(), Some(self.settings_info.kind()), Message::PickSettingsInfo))
                     .push(match self.settings_info {
                         SettingsInfo::String(ref s) => TextInput::new(&mut self.settings_text, "Enter settings string", s, Message::EditSettingsString).padding(5).style(TextInputStyle),

@@ -50,17 +50,20 @@ use {
         save::*,
     },
 };
-#[cfg(feature = "horrorshow")] use horrorshow::{
-    html,
-    prelude::*,
-};
-#[cfg(feature = "rocket")] use rocket::{
-    http::uri::fmt::{
-        Formatter,
-        Path,
-        UriDisplay,
+#[cfg(feature = "rocket")] use {
+    rocket::{
+        http::uri::fmt::{
+            Formatter,
+            Path,
+            UriDisplay,
+        },
+        request::FromParam,
+        response::content::RawHtml,
     },
-    request::FromParam,
+    rocket_util::{
+        ToHtml,
+        html,
+    },
 };
 
 const VERSION: u8 = 0;
@@ -670,7 +673,7 @@ impl TrackerCellKind {
 
     /// Returns `true` if the menu should be opened.
     #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
-        #[cfg(target_os = "macos")] if keyboard_modifiers.control {
+        #[cfg(target_os = "macos")] if keyboard_modifiers.control() {
             return self.right_click(can_change_state, keyboard_modifiers, state)
         }
         if can_change_state {
@@ -683,7 +686,7 @@ impl TrackerCellKind {
                 },
                 Count { get, set, max, step, .. } => {
                     let current = get(state);
-                    set(state, if current == *max { 0 } else { current.saturating_add(step * if keyboard_modifiers.shift && *max >= 10 { 10 } else { 1 }).min(*max) });
+                    set(state, if current == *max { 0 } else { current.saturating_add(step * if keyboard_modifiers.shift() && *max >= 10 { 10 } else { 1 }).min(*max) });
                 }
                 GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
                     ProgressionMode::Normal => ProgressionMode::Go,
@@ -691,13 +694,13 @@ impl TrackerCellKind {
                     ProgressionMode::Bk => ProgressionMode::Done,
                     ProgressionMode::Done => ProgressionMode::Bk,
                 },
-                MagicLens => state.ram.save.magic = match (keyboard_modifiers.shift, state.ram.save.magic) {
+                MagicLens => state.ram.save.magic = match (keyboard_modifiers.shift(), state.ram.save.magic) {
                     (true, MagicCapacity::Large) => MagicCapacity::Small,
                     (true, _) => MagicCapacity::Large,
                     (false, MagicCapacity::None) => MagicCapacity::Small,
                     (false, _) => MagicCapacity::None,
                 },
-                Spells => if keyboard_modifiers.shift {
+                Spells => if keyboard_modifiers.shift() {
                     state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love;
                 } else {
                     state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
@@ -726,7 +729,7 @@ impl TrackerCellKind {
                 },
                 Count { get, set, max, step, .. } => {
                     let current = get(state);
-                    set(state, if current == 0 { *max } else { current.saturating_sub(step * if keyboard_modifiers.shift && *max >= 10 { 10 } else { 1 }) });
+                    set(state, if current == 0 { *max } else { current.saturating_sub(step * if keyboard_modifiers.shift() && *max >= 10 { 10 } else { 1 }) });
                 }
                 GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
                     ProgressionMode::Normal => ProgressionMode::Bk,
@@ -2114,7 +2117,7 @@ pub enum CellStyle {
     RightDimmed,
 }
 
-#[cfg(feature = "horrorshow")]
+#[cfg(feature = "rocket")]
 impl CellStyle {
     fn css_class(&self) -> &'static str {
         match self {
@@ -2147,7 +2150,7 @@ pub enum LocationStyle {
     Mq,
 }
 
-#[cfg(feature = "horrorshow")]
+#[cfg(feature = "rocket")]
 impl LocationStyle {
     fn css_classes(&self) -> &'static str {
         match self {
@@ -2165,37 +2168,17 @@ pub struct CellRender {
     pub overlay: CellOverlay,
 }
 
-#[cfg(feature = "horrorshow")]
-impl RenderOnce for CellRender {
-    fn render_once<'a>(self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
-        self.render(tmpl);
-    }
-}
-
-#[cfg(feature = "horrorshow")]
-impl RenderMut for CellRender {
-    fn render_mut<'a>(&mut self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
-        self.render(tmpl);
-    }
-}
-
-#[cfg(feature = "horrorshow")]
-impl Render for CellRender {
-    fn render<'a>(&self, tmpl: &mut horrorshow::TemplateBuffer<'a>) {
-        (&mut *tmpl) << html! {
-            img(class = self.style.css_class(), src = format_args!("/static/img/{}.png", self.img.to_string('/', ImageDirContext::Normal)));
-        };
-        match self.overlay {
-            CellOverlay::None => {}
-            CellOverlay::Count { count, .. } => tmpl << html! {
-                span(class = "count") : count;
-            },
-            CellOverlay::Image(ref overlay) => tmpl << html! {
-                img(src = format_args!("/static/img/{}.png", overlay.to_string('/', ImageDirContext::OverlayOnly)));
-            },
-            CellOverlay::Location { ref loc, style } => tmpl << html! {
-                img(class = style.css_classes(), src = format_args!("/static/img/{}.png", loc.to_string('/', ImageDirContext::Normal)));
-            },
+#[cfg(feature = "rocket")]
+impl ToHtml for CellRender {
+    fn to_html(&self) -> RawHtml<String> {
+        html! {
+            img(class = self.style.css_class(), src = format!("/static/img/{}.png", self.img.to_string('/', ImageDirContext::Normal)));
+            @match self.overlay {
+                CellOverlay::None => ;
+                CellOverlay::Count { count, .. } => span(class = "count") : count;
+                CellOverlay::Image(ref overlay) => img(src = format!("/static/img/{}.png", overlay.to_string('/', ImageDirContext::OverlayOnly)));
+                CellOverlay::Location { ref loc, style } => img(class = style.css_classes(), src = format!("/static/img/{}.png", loc.to_string('/', ImageDirContext::Normal)));
+            }
         }
     }
 }
@@ -2310,7 +2293,7 @@ pub trait FromEmbeddedImage {
 
 impl FromEmbeddedImage for iced::widget::Image {
     fn from_embedded_image(contents: &'static [u8]) -> iced::widget::Image {
-        iced::widget::Image::new(iced::image::Handle::from_memory(contents.to_vec()))
+        iced::widget::Image::new(iced::widget::image::Handle::from_memory(contents.to_vec()))
     }
 }
 

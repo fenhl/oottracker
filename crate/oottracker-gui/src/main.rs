@@ -15,16 +15,16 @@ use {
     derivative::Derivative,
     derive_more::From,
     enum_iterator::IntoEnumIterator,
+    futures::future::FutureExt as _,
     iced::{
         Application,
         Background,
-        Clipboard,
         Color,
         Command,
         Element,
-        HorizontalAlignment,
         Length,
         Settings,
+        alignment,
         widget::{
             Column,
             Image,
@@ -54,7 +54,10 @@ use {
         },
     },
     iced_futures::Subscription,
-    iced_native::keyboard::Modifiers as KeyboardModifiers,
+    iced_native::{
+        command::Action,
+        keyboard::Modifiers as KeyboardModifiers,
+    },
     image::DynamicImage,
     itertools::Itertools as _,
     semver::Version,
@@ -354,12 +357,12 @@ impl<R: Rando + 'static> State<R> {
     fn save_config(&self) -> Command<Message<R>> {
         if let Some(ref config) = self.config {
             let config = config.clone();
-            async move {
+            Command::single(Action::Future(async move {
                 match config.save().await {
                     Ok(()) => Message::Nop,
                     Err(e) => Message::ConfigError(e),
                 }
-            }.into()
+            }.boxed()))
         } else {
             Command::none()
         }
@@ -421,13 +424,13 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
     type Flags = Args;
 
     fn new(flags: Args) -> (State<ootr_static::Rando>, Command<Message<ootr_static::Rando>>) {
-        (State::from(flags), async {
+        (State::from(flags), Command::single(Action::Future(async {
             match Config::new().await {
                 Ok(Some(config)) => Message::LoadConfig(config),
                 Ok(None) => Message::Nop,
                 Err(e) => Message::ConfigError(e),
             }
-        }.into())
+        }.boxed())))
     }
 
     fn title(&self) -> String {
@@ -438,7 +441,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
         }
     }
 
-    fn update(&mut self, message: Message<ootr_static::Rando>, _: &mut Clipboard) -> Command<Message<ootr_static::Rando>> {
+    fn update(&mut self, message: Message<ootr_static::Rando>) -> Command<Message<ootr_static::Rando>> {
         match message {
             Message::CheckStatusErrorStatic(_) => return self.notify(message),
             Message::ClientDisconnected => if self.notification.as_ref().map_or(true, |&(is_temp, _)| is_temp) { // don't override an existing, probably more descriptive error message
@@ -452,12 +455,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 if let Some(ref menu_state) = self.menu_state {
                     let params = menu_state.connection_params.clone();
                     let model = self.model.clone();
-                    return async move {
+                    return Command::single(Action::Future(async move {
                         match connect(params, model).await {
                             Ok(connection) => Message::SetConnection(connection),
                             Err(e) => Message::ConnectionError(e),
                         }
-                    }.into()
+                    }.boxed()))
                 }
             },
             Message::ConnectionError(_) => return self.notify(message),
@@ -469,12 +472,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             Message::InstallUpdate => {
                 self.update_check = UpdateCheckState::Installing;
                 let client = self.http_client.clone();
-                return async move {
+                return Command::single(Action::Future(async move {
                     match run_updater(&client).await {
                         Ok(never) => match never {},
                         Err(e) => Message::UpdateCheckError(e),
                     }
-                }.into()
+                }.boxed()))
             }
             Message::KeyboardModifiers(modifiers) => self.keyboard_modifiers = modifiers,
             Message::LeftClick(cell) => if cell.kind().left_click(self.connection.as_ref().map_or(true, |connection| connection.can_change_state()), self.keyboard_modifiers, &mut self.model) {
@@ -482,12 +485,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             } else if let Some(ref connection) = self.connection {
                 if connection.can_change_state() {
                     let send_fut = connection.set_state(&self.model);
-                    return async move {
+                    return Command::single(Action::Future(async move {
                         match send_fut.await {
                             Ok(()) => Message::Nop,
                             Err(e) => Message::ConnectionError(e.into()),
                         }
-                    }.into()
+                    }.boxed()))
                 }
             },
             Message::LoadConfig(config) => match config.version {
@@ -495,7 +498,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                     let auto_update_check = config.auto_update_check;
                     self.config = Some(config);
                     if auto_update_check == Some(true) {
-                        return async { Message::UpdateCheck }.into()
+                        return Command::single(Action::Future(async { Message::UpdateCheck }.boxed()))
                     }
                 }
                 v => unimplemented!("config version from the future: {}", v),
@@ -536,12 +539,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 if self.flags.show_available_checks {
                     let rando = self.rando.clone();
                     let model = self.model.clone();
-                    return async move {
+                    return Command::single(Action::Future(async move {
                         tokio::task::spawn_blocking(move || match checks::status(&*rando, &model) {
                             Ok(status) => Message::UpdateAvailableChecks(status),
                             Err(e) => Message::CheckStatusErrorStatic(e),
                         }).await.expect("status checks task panicked")
-                    }.into()
+                    }.boxed()))
                 }
             }
             Message::ResetUpdateState => self.update_check = UpdateCheckState::Unknown(button::State::default()),
@@ -553,12 +556,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                         } else if let Some(ref connection) = self.connection {
                             if connection.can_change_state() {
                                 let send_fut = connection.set_state(&self.model);
-                                return async move {
+                                return Command::single(Action::Future(async move {
                                     match send_fut.await {
                                         Ok(()) => Message::Nop,
                                         Err(e) => Message::ConnectionError(e.into()),
                                     }
-                                }.into()
+                                }.boxed()))
                             }
                         }
                     }
@@ -595,12 +598,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             Message::UpdateCheck => {
                 self.update_check = UpdateCheckState::Checking;
                 let client = self.http_client.clone();
-                return async move {
+                return Command::single(Action::Future(async move {
                     match check_for_updates(&client).await {
                         Ok(update_available) => Message::UpdateCheckComplete(update_available),
                         Err(e) => Message::UpdateCheckError(e),
                     }
-                }.into()
+                }.boxed()))
             }
             Message::UpdateCheckComplete(Some(new_ver)) => self.update_check = UpdateCheckState::UpdateAvailable {
                 new_ver,
@@ -633,12 +636,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                     .push(Space::with_width(Length::Fill))
                     .push(self.update_check.view())
                 )
-                .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 .push(Text::new("Medallion order:"))
                 .push(PickList::new(&mut menu_state.med_order, ElementOrder::into_enum_iter().collect_vec(), self.config.as_ref().map(|cfg| cfg.med_order), Message::SetMedOrder))
                 .push(Text::new("Warp song order:"))
                 .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), self.config.as_ref().map(|cfg| cfg.warp_song_order), Message::SetWarpSongOrder))
-                .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 //TODO replace connection options with “current connection” info when connected
                 .push(PickList::new(&mut menu_state.connection_kind, ConnectionKind::into_enum_iter().collect_vec(), Some(menu_state.connection_params.kind()), Message::SetConnectionKind))
                 .push(menu_state.connection_params.view())
@@ -671,7 +674,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 view.push(Text::new(format!("OoT Tracker {} is available — you have {}", new_ver, env!("CARGO_PKG_VERSION")))
                     .color([1.0, 1.0, 1.0])
                     .width(Length::Fill)
-                    .horizontal_alignment(HorizontalAlignment::Center)
+                    .horizontal_alignment(alignment::Horizontal::Center)
                 )
                 .push(Row::new()
                     .push(Button::new(update_btn, Text::new("Update")).on_press(Message::InstallUpdate))
@@ -736,7 +739,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 view.push(Text::new("Check for updates on startup?")
                     .color([1.0, 1.0, 1.0])
                     .width(Length::Fill)
-                    .horizontal_alignment(HorizontalAlignment::Center)
+                    .horizontal_alignment(alignment::Horizontal::Center)
                 )
                 .push(Row::new()
                     .push(Button::new(&mut self.enable_update_checks_button, Text::new("Yes")).on_press(Message::SetAutoUpdateCheck(true)))
@@ -748,7 +751,7 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             view.push(Text::new("Welcome to the OoT tracker!\nTo change settings, right-click a Medallion.")
                     .color([1.0, 1.0, 1.0])
                     .width(Length::Fill)
-                    .horizontal_alignment(HorizontalAlignment::Center)
+                    .horizontal_alignment(alignment::Horizontal::Center)
                 )
                 .push(Button::new(&mut self.dismiss_welcome_screen_button, Text::new("OK")).on_press(Message::DismissWelcomeScreen))
         };

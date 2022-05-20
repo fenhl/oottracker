@@ -1263,7 +1263,7 @@ impl Protocol for Save {
         Box::pin(async move {
             let mut buf = vec![0; SIZE];
             stream.read_exact(&mut buf).await?;
-            Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {:?}", e)))?)
+            Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {e:?}")))?)
         })
     }
 
@@ -1274,6 +1274,12 @@ impl Protocol for Save {
             sink.write_all(&buf).await?;
             Ok(())
         })
+    }
+
+    fn read_sync(stream: &mut impl Read) -> Result<Self, ReadError> {
+        let mut buf = vec![0; SIZE];
+        stream.read_exact(&mut buf)?;
+        Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {e:?}")))?)
     }
 
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {

@@ -8,12 +8,12 @@ edition = "2021"
 winres = "0.1"
 
 [dependencies]
-async-proto = "0.10"
+async-proto = "0.14"
 derivative = "2"
 futures = "0.3"
-iced_futures = "0.3"
-iced_native = "0.4"
-image = "0.23"
+iced_futures = "0.4"
+iced_native = "0.5"
+image = "0.24"
 itertools = "0.10"
 num-traits = "0.2"
 semver = "1"
@@ -33,7 +33,7 @@ git = "https://github.com/dasgefolge/enum-iterator"
 branch = "fields"
 
 [dependencies.iced]
-version = "0.3"
+version = "0.4"
 features = ["image", "tokio"]
 
 [dependencies.ootr]

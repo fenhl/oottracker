@@ -2,7 +2,7 @@ use {
     std::{
         collections::HashMap,
         future::Future,
-        io::Write,
+        io::prelude::*,
         marker::Unpin,
         pin::Pin,
     },
@@ -178,6 +178,20 @@ impl Protocol for TrackerCtx {
         Box::pin(async move {
             sink.write_all(&self.serialize()).await?;
             Ok(())
+        })
+    }
+
+    fn read_sync(stream: &mut impl Read) -> Result<Self, ReadError> {
+        let version = u32::read_sync(stream)?;
+        Ok(if let Some(len) = version_buf_len(version) {
+            let mut buf = vec![0; 4 + len];
+            buf.splice(0..4, version.to_be_bytes().into_iter());
+            stream.read_exact(&mut buf[4..])?;
+            Self::new(&buf)
+        } else if version == 0 {
+            Self::default()
+        } else {
+            return Err(ReadError::UnknownVariant32(version))
         })
     }
 

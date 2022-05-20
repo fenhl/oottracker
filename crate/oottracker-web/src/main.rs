@@ -121,7 +121,6 @@ async fn edit_room(pool: &PgPool, rooms: &Rooms, name: String, f: impl FnOnce(&m
 #[derive(Debug, From)]
 enum Error {
     CellId,
-    Horrorshow(horrorshow::Error),
     Json(serde_json::Error),
     RamDecode(oottracker::ram::DecodeError),
     Read(ReadError),
@@ -136,15 +135,14 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CellId => write!(f, "no such cell"),
-            Self::Horrorshow(e) => write!(f, "error rendering HTML: {}", e),
-            Self::Json(e) => write!(f, "JSON error: {}", e),
-            Self::RamDecode(e) => write!(f, "error decoding RAM: {}", e),
-            Self::Read(e) => write!(f, "read error: {}", e),
-            Self::Rocket(e) => write!(f, "rocket error: {}", e),
+            Self::Json(e) => write!(f, "JSON error: {e}"),
+            Self::RamDecode(e) => write!(f, "error decoding RAM: {e}"),
+            Self::Read(e) => write!(f, "read error: {e}"),
+            Self::Rocket(e) => write!(f, "rocket error: {e}"),
             Self::RoomName => write!(f, "invalid room name"),
-            Self::Sql(e) => write!(f, "database error: {}", e),
-            Self::Task(e) => write!(f, "task error: {}", e),
-            Self::Write(e) => write!(f, "write error: {}", e),
+            Self::Sql(e) => write!(f, "database error: {e}"),
+            Self::Task(e) => write!(f, "task error: {e}"),
+            Self::Write(e) => write!(f, "write error: {e}"),
         }
     }
 }
@@ -153,7 +151,6 @@ impl<'r> rocket::response::Responder<'r, 'static> for Error {
     fn respond_to(self, _: &rocket::Request<'_>) -> rocket::response::Result<'static> {
         match self {
             Self::CellId => Err(Status::NotFound),
-            Self::Horrorshow(_) => Err(Status::InternalServerError),
             Self::Json(_) => Err(Status::InternalServerError),
             Self::RamDecode(_) => Err(Status::InternalServerError),
             Self::Read(_) => Err(Status::InternalServerError),
@@ -198,7 +195,7 @@ async fn main() -> Result<(), Error> {
         tokio::spawn(warp::serve(handler).run(([127, 0, 0, 1], 24808))).err_into()
     };
     let rocket_task = tokio::spawn(http::rocket(pool, rooms, restreams).launch()).map(|res| match res {
-        Ok(Ok(())) => Ok(()),
+        Ok(Ok(_)) => Ok(()),
         Ok(Err(e)) => Err(Error::from(e)),
         Err(e) => Err(Error::from(e)),
     });

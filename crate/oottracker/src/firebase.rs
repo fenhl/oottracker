@@ -16,12 +16,13 @@ use {
     },
     async_stream::try_stream,
     collect_mac::collect,
-    futures::{
-        pin_mut,
-        stream::{
-            Stream,
-            TryStreamExt as _,
-        },
+    eventsource_client::{
+        Client as _,
+        SSE,
+    },
+    futures::stream::{
+        Stream,
+        TryStreamExt as _,
     },
     serde::{
         Deserialize,
@@ -87,7 +88,6 @@ pub enum Error {
     EventSource(String),
     #[from_arc]
     Json(Arc<serde_json::Error>),
-    MissingData,
     PathPrefix,
     #[from_arc]
     Reqwest(Arc<reqwest::Error>),
@@ -95,9 +95,9 @@ pub enum Error {
     UnknownEvent(String),
 }
 
-impl From<eventsource_client::Error> for Error {
+impl From<eventsource_client::Error> for Error { //TODO why no regular wrapping?
     fn from(e: eventsource_client::Error) -> Error {
-        Error::EventSource(format!("{:?}", e))
+        Error::EventSource(format!("{e:?}"))
     }
 }
 
@@ -108,7 +108,6 @@ impl fmt::Display for Error {
             Error::CellId => write!(f, "received data for unknown cell"),
             Error::EventSource(debug) => write!(f, "error in event source: {}", debug),
             Error::Json(e) => write!(f, "JSON error: {}", e),
-            Error::MissingData => write!(f, "event source did not send any data"),
             Error::PathPrefix => write!(f, "event source sent an incorrect path"),
             Error::Reqwest(e) => if let Some(url) = e.url() {
                 write!(f, "HTTP error at {}: {}", url, e)
@@ -660,43 +659,45 @@ impl DynRoom {
                     let session = session.lock().await;
                     format!("{}/games/{}/items.json?auth={}", session.app.base_url(), name, session.id_token)
                 };
-                let events = eventsource_client::Client::for_url(&url)?
+                let mut events = eventsource_client::ClientBuilder::for_url(&url)?
                     .header("Accept", "text/event-stream")?
                     .build()
                     .stream();
-                pin_mut!(events);
                 while let Some(event) = events.try_next().await? {
-                    match &*event.event_type {
-                        "put" => {
-                            let PutData { path, data } = serde_json::from_slice(event.field("data").ok_or(Error::MissingData)?)?;
-                            let session = session.lock().await;
-                            if path == "/" {
-                                for (item, value) in serde_json::from_value::<BTreeMap<String, Json>>(data)? {
+                    match event {
+                        SSE::Event(event) => match &*event.event_type {
+                            "put" => {
+                                let PutData { path, data } = serde_json::from_str(&event.data)?;
+                                let session = session.lock().await;
+                                if path == "/" {
+                                    for (item, value) in serde_json::from_value::<BTreeMap<String, Json>>(data)? {
+                                        let cell_id = session.app.cell_id(&item).ok_or(Error::CellId)?;
+                                        yield (cell_id, value);
+                                    }
+                                } else {
+                                    let item = path.strip_prefix('/').ok_or(Error::PathPrefix)?;
+                                    let cell_id = session.app.cell_id(item).ok_or(Error::CellId)?;
+                                    yield (cell_id, data);
+                                }
+                            }
+                            "patch" => {
+                                let PatchData { path, data } = serde_json::from_str(&event.data)?;
+                                if path != "/" { unimplemented!("patch for path {}", path) }
+                                let session = session.lock().await;
+                                for (item, value) in data {
                                     let cell_id = session.app.cell_id(&item).ok_or(Error::CellId)?;
                                     yield (cell_id, value);
                                 }
-                            } else {
-                                let item = path.strip_prefix('/').ok_or(Error::PathPrefix)?;
-                                let cell_id = session.app.cell_id(item).ok_or(Error::CellId)?;
-                                yield (cell_id, data);
                             }
-                        }
-                        "patch" => {
-                            let PatchData { path, data } = serde_json::from_slice(event.field("data").ok_or(Error::MissingData)?)?;
-                            if path != "/" { unimplemented!("patch for path {}", path) }
-                            let session = session.lock().await;
-                            for (item, value) in data {
-                                let cell_id = session.app.cell_id(&item).ok_or(Error::CellId)?;
-                                yield (cell_id, value);
+                            "keep-alive" => {}
+                            "cancel" => { Err(Error::Cancelled)?; }
+                            "auth_revoked" => {
+                                session.lock().await.base_auth().await?;
+                                continue 'reauth_loop
                             }
+                            _ => { Err(Error::UnknownEvent(event.event_type))?; }
                         }
-                        "keep-alive" => {}
-                        "cancel" => { Err(Error::Cancelled)?; }
-                        "auth_revoked" => {
-                            session.lock().await.base_auth().await?;
-                            continue 'reauth_loop
-                        }
-                        _ => { Err(Error::UnknownEvent(event.event_type))?; }
+                        SSE::Comment(_) => {}
                     }
                 }
                 Err(Error::UnexpectedEndOfStream)?;

@@ -11,14 +11,14 @@ use {
         sync::Arc,
         time::Duration,
     },
+    futures::future::FutureExt as _,
     iced::{
         Application,
-        Clipboard,
         Command,
         Element,
-        HorizontalAlignment,
         Length,
         Settings,
+        alignment,
         widget::{
             button::{
                 self,
@@ -33,6 +33,7 @@ use {
             Icon,
         },
     },
+    iced_native::command::Action,
     image::DynamicImage,
     itertools::Itertools as _,
     open::that as open,
@@ -115,7 +116,7 @@ impl Application for App {
             discord_invite_btn: button::State::default(),
             discord_channel_btn: button::State::default(),
             new_issue_btn: button::State::default(),
-        }, async {
+        }, Command::single(Action::Future(async {
             let client = reqwest::Client::builder()
                 .user_agent(concat!("oottracker-updater/", env!("CARGO_PKG_VERSION")))
                 .build()?;
@@ -124,52 +125,52 @@ impl Application for App {
                 .filter(|asset| asset.name.ends_with(PLATFORM_SUFFIX))
                 .collect_tuple().ok_or(Error::MissingAsset)?;
             Ok(Message::ReleaseAsset(client, asset))
-        }.into())
+        }.boxed())))
     }
 
     fn title(&self) -> String { format!("updating the OoT tracker…") }
 
-    fn update(&mut self, msg: Result<Message, Error>, _: &mut Clipboard) -> Command<Result<Message, Error>> {
+    fn update(&mut self, msg: Result<Message, Error>) -> Command<Result<Message, Error>> {
         match msg {
             Ok(Message::ReleaseAsset(client, asset)) => {
                 self.state = State::WaitExit;
-                async {
+                Command::single(Action::Future(async {
                     sleep(Duration::from_secs(1)).await;
                     Ok(Message::WaitedExit(client, asset))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::WaitedExit(client, asset)) => {
                 self.state = State::Download;
-                async move {
+                Command::single(Action::Future(async move {
                     Ok(Message::Response(client.get(asset.browser_download_url).send().await?.error_for_status()?))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::Response(response)) => {
                 self.state = State::Replace;
                 let path = self.path.clone();
-                async move {
+                Command::single(Action::Future(async move {
                     let mut data = response.bytes_stream();
                     let mut exe_file = File::create(path).await?;
                     while let Some(chunk) = data.try_next().await? {
                         exe_file.write_all(chunk.as_ref()).await?;
                     }
                     Ok(Message::Downloaded(exe_file))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::Downloaded(exe_file)) => {
                 self.state = State::WaitDownload;
-                async move {
+                Command::single(Action::Future(async move {
                     exe_file.sync_all().await?;
                     Ok(Message::WaitedDownload)
-                }.into()
+                }.boxed()))
             }
             Ok(Message::WaitedDownload) => {
                 self.state = State::Launch;
                 let path = self.path.clone();
-                async move {
+                Command::single(Action::Future(async move {
                     std::process::Command::new(path).spawn()?;
                     Ok(Message::Done)
-                }.into()
+                }.boxed()))
             }
             Ok(Message::Done) => {
                 self.state = State::Done;
@@ -214,10 +215,10 @@ impl Application for App {
             State::Launch => Text::new("Starting new version…").into(),
             State::Done => Text::new("Closing updater…").into(),
             State::Error(ref e) => Column::new()
-                .push(Text::new("Error").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("Error").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 .push(Text::new(e.to_string()))
                 .push(Text::new(format!("debug info: {:?}", e)))
-                .push(Text::new("Support").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("Support").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 .push(Text::new("• Ask in #setup-support on the OoT Randomizer Discord. Feel free to ping @Fenhl#4813."))
                 .push(Row::new()
                     .push(Button::new(&mut self.discord_invite_btn, Text::new("invite link")).on_press(Ok(Message::DiscordInvite)))

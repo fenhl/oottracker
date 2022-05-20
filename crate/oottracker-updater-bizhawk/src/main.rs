@@ -7,7 +7,11 @@ use {
         cmp::Ordering::*,
         ffi::OsString,
         fmt,
-        os::windows::ffi::OsStringExt as _,
+        iter,
+        os::windows::ffi::{
+            OsStrExt as _,
+            OsStringExt as _,
+        },
         path::PathBuf,
         ptr::null_mut,
         sync::Arc,
@@ -16,16 +20,18 @@ use {
     async_zip::error::ZipError,
     bytes::Bytes,
     derive_more::From,
-    futures::stream::TryStreamExt as _,
+    futures::{
+        future::FutureExt as _,
+        stream::TryStreamExt as _,
+    },
     heim::process::pid_exists,
     iced::{
         Application,
-        Clipboard,
         Command,
         Element,
-        HorizontalAlignment,
         Length,
         Settings,
+        alignment,
         widget::{
             button::{
                 self,
@@ -40,6 +46,7 @@ use {
             Icon,
         },
     },
+    iced_native::command::Action,
     image::DynamicImage,
     itertools::Itertools as _,
     open::that as open,
@@ -56,14 +63,7 @@ use {
             File,
         },
     },
-    windows::Win32::{
-        Foundation::{
-            GetLastError,
-            PWSTR,
-            WIN32_ERROR,
-        },
-        Storage::FileSystem::GetFullPathNameW,
-    },
+    winapi::um::fileapi::GetFullPathNameW,
     oottracker::{
         github::{
             ReleaseAsset,
@@ -134,12 +134,12 @@ impl Application for App {
     type Flags = Args;
 
     fn new(args: Args) -> (Self, Command<Result<Message, Error>>) {
-        let cmd = async move {
+        let cmd = Command::single(Action::Future(async move {
             while pid_exists(args.pid).await? {
                 sleep(Duration::from_secs(1)).await;
             }
             Ok(Message::Exited)
-        }.into();
+        }.boxed()));
         (App {
             args,
             state: State::WaitExit,
@@ -151,11 +151,11 @@ impl Application for App {
 
     fn title(&self) -> String { format!("updating the OoT auto-tracker…") }
 
-    fn update(&mut self, msg: Result<Message, Error>, _: &mut Clipboard) -> Command<Result<Message, Error>> {
+    fn update(&mut self, msg: Result<Message, Error>) -> Command<Result<Message, Error>> {
         match msg {
             Ok(Message::Exited) => {
                 self.state = State::GetTrackerRelease;
-                async {
+                Command::single(Action::Future(async {
                     let client = reqwest::Client::builder()
                         .user_agent(concat!("oottracker-updater-bizhawk/", env!("CARGO_PKG_VERSION")))
                         .build()?;
@@ -164,19 +164,19 @@ impl Application for App {
                         .filter(|asset| asset.name.ends_with(TRACKER_PLATFORM_SUFFIX))
                         .collect_tuple().ok_or(Error::MissingAsset)?;
                     Ok(Message::TrackerReleaseAsset(client, asset))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::TrackerReleaseAsset(client, asset)) => {
                 self.state = State::DownloadTracker;
-                async move {
+                Command::single(Action::Future(async move {
                     Ok(Message::TrackerResponse(client.clone(), client.get(asset.browser_download_url).send().await?.error_for_status()?))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::TrackerResponse(client, response)) => {
                 self.state = State::ExtractTracker;
                 let path = self.args.path.clone();
                 let local_bizhawk_version = self.args.local_bizhawk_version.clone();
-                async move {
+                Command::single(Action::Future(async move {
                     let mut zip_file = StreamReader::new(response.bytes_stream().map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
                     let mut zip_file = async_zip::read::stream::ZipFileReader::new(&mut zip_file);
                     let mut required_bizhawk_version = None;
@@ -210,11 +210,11 @@ impl Application for App {
                         Equal => Ok(Message::Launch),
                         Greater => Err(Error::BizHawkVersionRegression),
                     }
-                }.into()
+                }.boxed()))
             }
             Ok(Message::UpdateBizHawk(client, required_version)) => {
                 self.state = State::GetBizHawkRelease;
-                async move {
+                Command::single(Action::Future(async move {
                     //TODO also update prereqs
                     let version_str = required_version.to_string();
                     let version_str = version_str.trim_end_matches(".0");
@@ -223,24 +223,24 @@ impl Application for App {
                         .filter(|asset| asset.name.ends_with(BIZHAWK_PLATFORM_SUFFIX))
                         .collect_tuple().ok_or(Error::MissingAsset)?;
                     Ok(Message::BizHawkReleaseAsset(client, asset))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::BizHawkReleaseAsset(client, asset)) => {
                 self.state = State::StartDownloadBizHawk;
-                async move {
+                Command::single(Action::Future(async move {
                     Ok(Message::BizHawkResponse(client.get(asset.browser_download_url).send().await?.error_for_status()?))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::BizHawkResponse(response)) => {
                 self.state = State::DownloadBizHawk;
-                async move {
+                Command::single(Action::Future(async move {
                     Ok(Message::BizHawkZip(response.bytes().await?))
-                }.into()
+                }.boxed()))
             }
             Ok(Message::BizHawkZip(mut response)) => {
                 self.state = State::ExtractBizHawk;
                 let path = self.args.path.clone();
-                async move {
+                Command::single(Action::Future(async move {
                     let mut zip_file = async_zip::read::mem::ZipFileReader::new(&mut response).await?;
                     let entries = zip_file.entries().iter().enumerate().map(|(idx, entry)| (idx, entry.dir(), path.join(entry.name()))).collect_vec();
                     for (idx, is_dir, path) in entries {
@@ -254,34 +254,38 @@ impl Application for App {
                         }
                     }
                     Ok(Message::Launch)
-                }.into()
+                }.boxed()))
             }
             Ok(Message::Launch) => {
                 self.state = State::Launch;
                 let path = self.args.path.clone();
-                async move {
+                let path_wide = path.as_os_str().encode_wide().chain(iter::once(0)).collect_vec();
+                Command::single(Action::Future(async move {
                     let path = unsafe {
                         let mut buf = vec![0; 260];
-                        let result = GetFullPathNameW(path.as_os_str(), buf.len().try_into().expect("buffer too large"), PWSTR(buf.as_mut_ptr()), null_mut());
+                        let result = GetFullPathNameW(path_wide.as_ptr(), buf.len().try_into().expect("buffer too large"), buf.as_mut_ptr(), null_mut());
                         PathBuf::from(if result == 0 {
-                            return Err(Error::Windows(GetLastError()))
+                            drop(path_wide);
+                            return Err(Error::Io(Arc::new(io::Error::last_os_error())))
                         } else if result > u32::try_from(buf.len()).expect("buffer too large") {
                             buf = vec![0; result.try_into().expect("path too long")];
-                            let result = GetFullPathNameW(path.as_os_str(), buf.len().try_into().expect("buffer too large"), PWSTR(buf.as_mut_ptr()), null_mut());
+                            let result = GetFullPathNameW(path_wide.as_ptr(), buf.len().try_into().expect("buffer too large"), buf.as_mut_ptr(), null_mut());
+                            drop(path_wide);
                             if result == 0 {
-                                return Err(Error::Windows(GetLastError()))
+                                return Err(Error::Io(Arc::new(io::Error::last_os_error())))
                             } else if result > u32::try_from(buf.len()).expect("buffer too large") {
                                 panic!("path too long")
                             } else {
                                 OsString::from_wide(&buf[0..result.try_into().expect("path too long")])
                             }
                         } else {
+                            drop(path_wide);
                             OsString::from_wide(&buf[0..result.try_into().expect("path too long")])
                         })
                     };
                     std::process::Command::new(path.join("EmuHawk.exe")).arg("--open-ext-tool-dll=OotAutoTracker").current_dir(path).spawn()?;
                     Ok(Message::Done)
-                }.into()
+                }.boxed()))
             }
             Ok(Message::Done) => {
                 self.state = State::Done;
@@ -332,10 +336,10 @@ impl Application for App {
             State::Launch => Text::new("Starting new version…").into(),
             State::Done => Text::new("Closing updater…").into(),
             State::Error(ref e) => Column::new()
-                .push(Text::new("Error").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("Error").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 .push(Text::new(e.to_string()))
                 .push(Text::new(format!("debug info: {:?}", e)))
-                .push(Text::new("Support").size(24).width(Length::Fill).horizontal_alignment(HorizontalAlignment::Center))
+                .push(Text::new("Support").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 .push(Text::new("• Ask in #setup-support on the OoT Randomizer Discord. Feel free to ping @Fenhl#4813."))
                 .push(Row::new()
                     .push(Button::new(&mut self.discord_invite_btn, Text::new("invite link")).on_press(Ok(Message::DiscordInvite)))
@@ -381,8 +385,6 @@ enum Error {
     UnexpectedZipEntry,
     #[from_arc]
     Wheel(Arc<wheel::Error>),
-    #[from]
-    Windows(WIN32_ERROR),
     #[from_arc]
     Zip(Arc<ZipError>),
 }
@@ -392,22 +394,21 @@ impl fmt::Display for Error {
         match self {
             Self::BizHawkVersionRegression => write!(f, "The update requires an older version of BizHawk. Update manually at your own risk, or ask Fenhl to release a new version."),
             Self::Cloned => write!(f, "clone of unexpected message kind"),
-            Self::Io(e) => write!(f, "I/O error: {}", e),
+            Self::Io(e) => write!(f, "I/O error: {e}"),
             Self::MissingAsset => write!(f, "release does not have a download for this platform"),
             Self::MissingReadme => write!(f, "the file README.md is missing from the download"),
             Self::NoReleases => write!(f, "there are no released versions"),
             Self::Process(e) => e.fmt(f),
             Self::ReadmeFormat => write!(f, "could not find expected BizHawk version in README.md"),
             Self::Reqwest(e) => if let Some(url) = e.url() {
-                write!(f, "HTTP error at {}: {}", url, e)
+                write!(f, "HTTP error at {url}: {e}")
             } else {
-                write!(f, "HTTP error: {}", e)
+                write!(f, "HTTP error: {e}")
             },
-            Self::SemVer(e) => write!(f, "failed to parse expected BizHawk version: {}", e),
+            Self::SemVer(e) => write!(f, "failed to parse expected BizHawk version: {e}"),
             Self::UnexpectedZipEntry => write!(f, "unexpected file in zip archive"),
             Self::Wheel(e) => e.fmt(f),
-            Self::Windows(e) => write!(f, "Windows error: {:?}", e),
-            Self::Zip(e) => write!(f, "error reading zip file: {}", e.description()),
+            Self::Zip(e) => write!(f, "error reading zip file: {e}"),
         }
     }
 }

@@ -8,7 +8,7 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-convert_case = "0.4"
+convert_case = "0.5"
 directories = "4"
 graphql_client = "0.10"
 itertools = "0.10"
@@ -16,7 +16,7 @@ proc-macro2 = "1"
 quote = "1"
 serde = "1"
 syn = "1"
-zip = "0.5"
+zip = "0.6"
 
 [dependencies.derive_more]
 version = "0.99"
@@ -30,7 +30,7 @@ path = "../ootr"
 path = "../ootr-dynamic"
 
 [dependencies.pyo3]
-version = "0.15"
+version = "0.16"
 features = ["auto-initialize"]
 
 [dependencies.quote-value]
