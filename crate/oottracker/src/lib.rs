@@ -71,8 +71,13 @@ impl ModelState {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
         // immediate knowledge
         // read dungeon reward info if the player is looking at the dungeon info screen in the pause menu
-        if self.tracker_ctx.cfg_dungeon_info_enable && self.ram.pause_state == 6 && self.ram.pause_screen_idx == 0 && !self.ram.pause_changing && self.ram.input_p1_raw_pad.contains(Pad::A) && self.tracker_ctx.cfg_dungeon_info_reward_enable {
-            for (dungeon, reward) in &self.tracker_ctx.cfg_dungeon_rewards {
+        let button_pressed = match self.tracker_ctx.cfg_dungeon_info_enable {
+            0 => false,
+            1 => self.ram.input_p1_raw_pad.contains(Pad::A),
+            2.. => self.ram.input_p1_raw_pad.contains(Pad::D_DOWN),
+        };
+        if button_pressed && self.ram.pause_state == 6 && self.ram.pause_screen_idx == 0 && !self.ram.pause_changing && self.tracker_ctx.cfg_dungeon_info_reward_enable {
+            for (&location, &reward) in &self.tracker_ctx.cfg_dungeon_rewards {
                 let mut known = true;
                 if self.tracker_ctx.cfg_dungeon_info_reward_need_altar {
                     known &= match reward {
@@ -81,10 +86,13 @@ impl ModelState {
                     };
                 }
                 if self.tracker_ctx.cfg_dungeon_info_reward_need_compass {
-                    known &= self.ram.save.dungeon_items.get(Dungeon::Main(*dungeon)).contains(DungeonItems::COMPASS);
+                    match location {
+                        DungeonRewardLocation::Dungeon(dungeon) => known &= self.ram.save.dungeon_items.get(Dungeon::Main(dungeon)).contains(DungeonItems::COMPASS),
+                        DungeonRewardLocation::LinksPocket => {}
+                    }
                 }
                 if known {
-                    self.knowledge.dungeon_reward_locations.insert(*reward, DungeonRewardLocation::Dungeon(*dungeon));
+                    self.knowledge.dungeon_reward_locations.insert(reward, location);
                 }
             }
         }

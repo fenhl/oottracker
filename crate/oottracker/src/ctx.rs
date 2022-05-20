@@ -27,22 +27,39 @@ use {
     },
     ootr::model::{
         DungeonReward,
+        DungeonRewardLocation,
         MainDungeon,
         Medallion,
         Stone,
     },
 };
 
-const DUNGEON_POSITIONS: [(MainDungeon, usize); 8] = [
-    (MainDungeon::DekuTree, 0x1c),
-    (MainDungeon::DodongosCavern, 0x1d),
-    (MainDungeon::JabuJabu, 0x1e),
-    (MainDungeon::ForestTemple, 0x1f),
-    (MainDungeon::FireTemple, 0x20),
-    (MainDungeon::WaterTemple, 0x21),
-    (MainDungeon::SpiritTemple, 0x22),
-    (MainDungeon::ShadowTemple, 0x23),
-];
+fn dungeon_positions(cfg_dungeon_info_enable: u32) -> Vec<(DungeonRewardLocation, usize)> {
+    match cfg_dungeon_info_enable {
+        0 => Vec::default(),
+        1 => vec![
+            (DungeonRewardLocation::Dungeon(MainDungeon::DekuTree), 0x1c),
+            (DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern), 0x1d),
+            (DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu), 0x1e),
+            (DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple), 0x1f),
+            (DungeonRewardLocation::Dungeon(MainDungeon::FireTemple), 0x20),
+            (DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple), 0x21),
+            (DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple), 0x22),
+            (DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple), 0x23),
+        ],
+        2.. => vec![
+            (DungeonRewardLocation::Dungeon(MainDungeon::DekuTree), 0x1c),
+            (DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern), 0x1d),
+            (DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu), 0x1e),
+            (DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple), 0x1f),
+            (DungeonRewardLocation::Dungeon(MainDungeon::FireTemple), 0x20),
+            (DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple), 0x21),
+            (DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple), 0x22),
+            (DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple), 0x23),
+            (DungeonRewardLocation::LinksPocket, 0x24),
+        ],
+    }
+}
 
 fn version_buf_len(version: u32) -> Option<usize> {
     Some(match version {
@@ -55,11 +72,11 @@ fn version_buf_len(version: u32) -> Option<usize> {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TrackerCtx {
-    pub cfg_dungeon_info_enable: bool,
+    pub cfg_dungeon_info_enable: u32,
     pub cfg_dungeon_info_reward_enable: bool,
     pub cfg_dungeon_info_reward_need_compass: bool,
     pub cfg_dungeon_info_reward_need_altar: bool,
-    pub cfg_dungeon_rewards: HashMap<MainDungeon, DungeonReward>,
+    pub cfg_dungeon_rewards: HashMap<DungeonRewardLocation, DungeonReward>,
 }
 
 impl TrackerCtx {
@@ -67,29 +84,32 @@ impl TrackerCtx {
         let version = BigEndian::read_u32(data);
         match version {
             0 => Self::default(),
-            1 => Self {
-                cfg_dungeon_info_enable: BigEndian::read_u32(&data[0x04..0x08]) != 0,
-                cfg_dungeon_info_reward_enable: BigEndian::read_u32(&data[0x10..0x14]) != 0,
-                cfg_dungeon_info_reward_need_compass: BigEndian::read_u32(&data[0x14..0x18]) != 0,
-                cfg_dungeon_info_reward_need_altar: BigEndian::read_u32(&data[0x18..0x1c]) != 0,
-                cfg_dungeon_rewards: {
-                    let mut map = HashMap::with_capacity(8);
-                    for (dungeon, pos) in &DUNGEON_POSITIONS {
-                        map.insert(*dungeon, match data[*pos] {
-                            0 => DungeonReward::Stone(Stone::KokiriEmerald),
-                            1 => DungeonReward::Stone(Stone::GoronRuby),
-                            2 => DungeonReward::Stone(Stone::ZoraSapphire),
-                            3 => DungeonReward::Medallion(Medallion::Forest),
-                            4 => DungeonReward::Medallion(Medallion::Fire),
-                            5 => DungeonReward::Medallion(Medallion::Water),
-                            6 => DungeonReward::Medallion(Medallion::Spirit),
-                            7 => DungeonReward::Medallion(Medallion::Shadow),
-                            8 => DungeonReward::Medallion(Medallion::Light),
-                            n => unimplemented!("unknown boss reward index: {}", n),
-                        });
+            1 => {
+                let cfg_dungeon_info_enable = BigEndian::read_u32(&data[0x04..0x08]);
+                Self {
+                    cfg_dungeon_info_enable,
+                    cfg_dungeon_info_reward_enable: BigEndian::read_u32(&data[0x10..0x14]) != 0,
+                    cfg_dungeon_info_reward_need_compass: BigEndian::read_u32(&data[0x14..0x18]) != 0,
+                    cfg_dungeon_info_reward_need_altar: BigEndian::read_u32(&data[0x18..0x1c]) != 0,
+                    cfg_dungeon_rewards: {
+                        let mut map = HashMap::with_capacity(8);
+                        for (location, pos) in dungeon_positions(cfg_dungeon_info_enable) {
+                            map.insert(location, match data[pos] {
+                                0 => DungeonReward::Stone(Stone::KokiriEmerald),
+                                1 => DungeonReward::Stone(Stone::GoronRuby),
+                                2 => DungeonReward::Stone(Stone::ZoraSapphire),
+                                3 => DungeonReward::Medallion(Medallion::Forest),
+                                4 => DungeonReward::Medallion(Medallion::Fire),
+                                5 => DungeonReward::Medallion(Medallion::Water),
+                                6 => DungeonReward::Medallion(Medallion::Spirit),
+                                7 => DungeonReward::Medallion(Medallion::Shadow),
+                                8 => DungeonReward::Medallion(Medallion::Light),
+                                n => unimplemented!("unknown boss reward index: {n}"),
+                            });
+                        }
+                        map
                     }
-                    map
-                },
+                }
             },
             _ => unimplemented!("auto-tracker context version {} not supported", version),
         }
@@ -100,12 +120,12 @@ impl TrackerCtx {
         let current_version = 1;
         let mut buf = vec![0; version_buf_len(current_version).expect("missing auto-tracker context length for current version")];
         buf.splice(0x00..0x04, current_version.to_be_bytes().into_iter());
-        buf.splice(0x04..0x08, if cfg_dungeon_info_enable { 1u32 } else { 0 }.to_be_bytes().into_iter());
+        buf.splice(0x04..0x08, cfg_dungeon_info_enable.to_be_bytes().into_iter());
         buf.splice(0x10..0x14, if cfg_dungeon_info_reward_enable { 1u32 } else { 0 }.to_be_bytes().into_iter());
         buf.splice(0x14..0x18, if cfg_dungeon_info_reward_need_compass { 1u32 } else { 0 }.to_be_bytes().into_iter());
         buf.splice(0x18..0x1c, if cfg_dungeon_info_reward_need_altar { 1u32 } else { 0 }.to_be_bytes().into_iter());
-        for (dungeon, pos) in &DUNGEON_POSITIONS {
-            buf[*pos] = if let Some(reward) = cfg_dungeon_rewards.get(dungeon) {
+        for (location, pos) in dungeon_positions(cfg_dungeon_info_enable) {
+            buf[pos] = if let Some(reward) = cfg_dungeon_rewards.get(&location) {
                 match reward {
                     DungeonReward::Stone(Stone::KokiriEmerald) => 0,
                     DungeonReward::Stone(Stone::GoronRuby) => 1,
@@ -128,7 +148,7 @@ impl TrackerCtx {
 impl Default for TrackerCtx {
     fn default() -> Self {
         Self {
-            cfg_dungeon_info_enable: false,
+            cfg_dungeon_info_enable: 0,
             cfg_dungeon_info_reward_enable: false,
             cfg_dungeon_info_reward_need_compass: true,
             cfg_dungeon_info_reward_need_altar: true,

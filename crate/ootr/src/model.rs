@@ -114,7 +114,7 @@ impl From<DungeonReward> for Item {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Protocol)]
 pub enum DungeonRewardLocation {
     LinksPocket,
     Dungeon(MainDungeon),
@@ -140,6 +140,15 @@ impl FromStr for DungeonRewardLocation {
         })
     }
 }
+
+impl fmt::Display for DungeonRewardLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+derive_deserialize_from_fromstr!(DungeonRewardLocation, "dungeon reward location");
+derive_serialize_from_display!(DungeonRewardLocation);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
 pub enum MainDungeon {
