@@ -1,6 +1,6 @@
 [package]
 name = "ootr-static-derive"
-version = "0.7.3"
+version = "0.7.4"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
