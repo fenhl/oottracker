@@ -1,6 +1,6 @@
 use {
     std::{
-        collections::HashMap,
+        collections::HashSet,
         fmt,
         hash::{
             Hash,
@@ -15,7 +15,6 @@ use {
     },
     crate::{
         Rando,
-        access,
         model::Dungeon,
     },
 };
@@ -44,9 +43,9 @@ pub struct Region<R: Rando> {
     pub scene: Option<String>, //TODO use Scene type from oottracker?
     pub hint: Option<String>,
     pub time_passes: bool,
-    pub events: HashMap<String, access::Expr<R>>,
-    pub locations: HashMap<String, access::Expr<R>>,
-    pub exits: HashMap<R::RegionName, access::Expr<R>>,
+    pub events: HashSet<String>,
+    pub locations: HashSet<String>,
+    pub exits: HashSet<R::RegionName>,
 }
 
 impl<R: Rando> PartialEq for Region<R> {

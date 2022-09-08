@@ -3,22 +3,9 @@
 //! The entry points are the types [`SceneFlags`] and [`GoldSkulltulas`]. All other types appear in their fields.
 
 use {
-    std::{
-        fmt,
-        sync::Arc,
-    },
-    ootr::{
-        Rando,
-        region::Region,
-    },
+    std::fmt,
     oottracker_derive::scene_flags,
-    crate::{
-        Ram,
-        region::{
-            RegionExt as _,
-            RegionLookupError,
-        },
-    },
+    crate::Ram,
 };
 
 pub(crate) struct Scene(pub(crate) &'static str);
@@ -502,7 +489,8 @@ impl Scene {
         Scene::from_id(ram.current_scene_id).ok_or(ram.current_scene_id)
     }
 
-    pub(crate) fn regions<'a, R: Rando>(&self, rando: &'a R) -> Result<Vec<Arc<Region<R>>>, RegionLookupError<R>> {
+    /*
+    fn regions<'a, R: Rando>(&self, rando: &'a R) -> Result<Vec<Arc<Region<R>>>, RegionLookupError<R>> {
         let name = self.0;
         Ok(
             Region::all(rando)?
@@ -512,6 +500,7 @@ impl Scene {
                 .collect()
         )
     }
+    */
 }
 
 impl fmt::Display for Scene {

@@ -1,36 +1,19 @@
 use {
     std::{
-        collections::{
-            HashMap,
-            HashSet,
-        },
         fmt,
         io,
         sync::Arc,
     },
-    collect_mac::collect,
     derivative::Derivative,
     derive_more::From,
-    itertools::{
-        EitherOrBoth,
-        Itertools as _,
-    },
     ootr::{
         Rando,
-        access,
-        region::{
-            Mq,
-            Region,
-        },
+        region::Mq,
     },
     crate::{
         Check,
         ModelState,
-        region::{
-            RegionExt as _,
-            RegionLookup,
-            RegionLookupError,
-        },
+        region::RegionLookupError,
     },
 };
 
@@ -770,95 +753,5 @@ impl<R: Rando> fmt::Display for CheckStatusError<R> {
             CheckStatusError::Io(e) => write!(f, "I/O error: {}", e),
             CheckStatusError::RegionLookup(e) => e.fmt(f),
         }
-    }
-}
-
-pub fn status<R: Rando>(rando: &R, model: &ModelState) -> Result<HashMap<Check<R>, CheckStatus>, CheckStatusError<R>> {
-    let mut map = HashMap::default();
-    let all_regions = Region::all(rando)?;
-    let mut reachable_regions = collect![as HashSet<_>: Region::root(rando)?];
-    let mut unhandled_reachable_checks = Vec::default();
-    match model.ram.current_region(rando)? {
-        //TODO run separate logic check using knowledge only and not considering current region
-        RegionLookup::Overworld(region)
-        | RegionLookup::Dungeon(EitherOrBoth::Left(region))
-        | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => { reachable_regions.insert(region); }
-        //TODO move checks to appropriate spots
-        RegionLookup::Dungeon(EitherOrBoth::Both(vanilla, _)) => unhandled_reachable_checks.push((Check::Mq(vanilla.dungeon.expect("MQ-ambiguous non-dungeon region").0), access::Expr::True)),
-    }
-    let mut unhandled_reachable_regions = reachable_regions.iter().cloned().collect_vec();
-    let mut unhandled_unreachable_regions = all_regions.iter().filter(|region_info| !reachable_regions.contains(*region_info)).collect::<HashSet<_>>();
-    let mut unhandled_unreachable_checks = Vec::<(_, access::Expr<R>)>::default();
-    loop {
-        if let Some(region) = unhandled_reachable_regions.pop() {
-            for (exit, rule) in &region.exits {
-                unhandled_reachable_checks.push((Check::Exit { from_mq: region.dungeon.map(|(_, mq)| mq), from: region.name.clone(), to: exit.clone() }, rule.clone()));
-            }
-            //TODO events, locations, setting checks
-        } else if let Some((check, rule)) = unhandled_reachable_checks.pop() {
-            let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
-                if let Check::Exit { ref to, .. } = check {
-                    let region_behind_exit = to; //TODO entrance rando support (look up exit knowledge)
-                    if !reachable_regions.iter().any(|region| region.name == *region_behind_exit) {
-                        if model.can_access(rando, &rule) == Ok(true) {
-                            // exit is checked (i.e. we know what's behind it) and reachable (i.e. we can actually use it), so the region behind it becomes reachable
-                            let region_info = match Region::new(rando, region_behind_exit)? {
-                                RegionLookup::Overworld(region)
-                                | RegionLookup::Dungeon(EitherOrBoth::Left(region))
-                                | RegionLookup::Dungeon(EitherOrBoth::Right(region)) => region,
-                                RegionLookup::Dungeon(EitherOrBoth::Both(_, _)) => unimplemented!(), //TODO disambiguate MQ-ness based on knowledge, add MQ-ness check if unknown
-                            };
-                            unhandled_unreachable_regions.remove(&region_info);
-                            reachable_regions.insert(Arc::clone(&region_info));
-                            unhandled_reachable_regions.push(region_info);
-                        }
-                    }
-                }
-                CheckStatus::Checked
-            } else {
-                match model.can_access(rando, &rule) {
-                    Ok(true) => CheckStatus::Reachable,
-                    Ok(false) => CheckStatus::NotYetReachable,
-                    Err(deps) => {
-                        map.extend(deps.into_iter().map(|dep| (dep, CheckStatus::Reachable))); //TODO check reachability of dependency
-                        CheckStatus::NotYetReachable
-                    }
-                }
-            };
-            map.insert(check, status);
-        } else if !unhandled_unreachable_regions.is_empty() {
-            for region in unhandled_unreachable_regions.drain() {
-                for (exit, cond) in &region.exits {
-                    unhandled_unreachable_checks.push((Check::Exit { from_mq: region.dungeon.map(|(_, mq)| mq), from: region.name.clone(), to: exit.clone() }, cond.to_owned()));
-                }
-                //TODO events, locations, setting checks
-            }
-        } else if let Some((check, rule)) = unhandled_unreachable_checks.pop() {
-            let status = if check.checked(model).expect(&format!("checked unimplemented for {}", check)) {
-                CheckStatus::Checked
-            } else {
-                match model.can_access(rando, &rule) {
-                    Ok(_) => CheckStatus::NotYetReachable,
-                    Err(deps) => {
-                        map.extend(deps.into_iter().map(|dep| (dep, CheckStatus::NotYetReachable))); //TODO check reachability of dependency
-                        CheckStatus::NotYetReachable
-                    }
-                }
-            };
-            map.insert(check, status);
-        } else {
-            break
-        }
-    }
-    Ok(map)
-}
-
-#[cfg(not(test))] use ootr_static as _; // used below
-
-#[test]
-fn default_status() {
-    if let Err(e) = status(&ootr_static::Rando, &ModelState::default()) {
-        eprintln!("{:?}", e);
-        panic!("{}", e) // for better error message
     }
 }

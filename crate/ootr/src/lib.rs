@@ -22,7 +22,6 @@ use {
     },
 };
 
-pub mod access;
 pub mod check;
 pub mod item;
 pub mod model;
@@ -38,7 +37,6 @@ pub trait Rando: Sized {
 
     fn escaped_items(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
     fn item_table(&self) -> Result<Arc<HashMap<String, Item>>, Self::Err>;
-    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, access::Expr<Self>)>>, Self::Err>;
     fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, Self::Err>;
     fn regions(&self) -> Result<Arc<Vec<Arc<Region<Self>>>>, Self::Err>;
     fn root() -> Self::RegionName;

@@ -822,22 +822,6 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         let name_lit = name.to_lit();
         quote!(#idx => #name_lit)
     });
-    let region_arms = scenes.iter().filter_map(|Scene { name, data, .. }| data.iter().filter_map(|data| {
-        if let SceneData::RegionName(region_name) = data {
-            let scene_name = name.to_lit();
-            Some(match region_name {
-                RegionName::One(region_name) => quote!(#scene_name => Ok(Region::new(rando, &#region_name)?)),
-                RegionName::Multiple(f) => quote! {
-                    #scene_name => {
-                        let f: Box<dyn Fn(&Ram) -> &str + Send + Sync> = Box::new(#f);
-                        Ok(Region::new(rando, &f(ram))?)
-                    }
-                },
-            })
-        } else {
-            None
-        }
-    }).next());
     TokenStream::from(quote! {
         use itertools::Itertools as _;
         use crate::region::RegionLookup;
@@ -908,13 +892,6 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
                     #(#from_id_arms,)*
                     _ => return None,
                 }))
-            }
-
-            pub(crate) fn region<R: ootr::Rando>(&self, rando: &R, ram: &Ram) -> Result<RegionLookup<R>, RegionLookupError<R>> {
-                match self.0 {
-                    #(#region_arms,)*
-                    _ => RegionLookup::new(self.regions(rando)?),
-                }
             }
         }
 

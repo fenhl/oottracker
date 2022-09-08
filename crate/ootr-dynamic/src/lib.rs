@@ -5,7 +5,6 @@ use {
     std::{
         cell::RefCell,
         collections::{
-            BTreeMap,
             HashMap,
             HashSet,
         },
@@ -25,27 +24,21 @@ use {
         },
         sync::Arc,
     },
-    derive_more::From,
     itertools::Itertools as _,
     pyo3::prelude::*,
     semver::Version,
     serde::de::DeserializeOwned,
     wheel::FromArc,
     ootr::{
-        check::Check,
         item::Item,
         region::Region,
     },
-    crate::{
-        access::ExprExt as _,
-        region::{
-            RawRegion,
-            parse_dungeon_info,
-        },
+    crate::region::{
+        RawRegion,
+        parse_dungeon_info,
     },
 };
 
-mod access;
 mod region;
 
 pub struct Rando<'p> {
@@ -53,7 +46,6 @@ pub struct Rando<'p> {
     path: PathBuf,
     escaped_items: RefCell<Option<Arc<HashMap<String, Item>>>>,
     item_table: RefCell<Option<Arc<HashMap<String, Item>>>>,
-    logic_helpers: RefCell<Option<Arc<HashMap<String, (Vec<String>, ootr::access::Expr<Rando<'p>>)>>>>,
     logic_tricks: RefCell<Option<Arc<HashSet<String>>>>,
     regions: RefCell<Option<Arc<Vec<Arc<Region<Self>>>>>>, //TODO glitched support
     setting_infos: RefCell<Option<Arc<HashSet<String>>>>,
@@ -66,7 +58,6 @@ impl<'p> Rando<'p> {
             path: path.as_ref().to_owned(),
             escaped_items: RefCell::default(),
             item_table: RefCell::default(),
-            logic_helpers: RefCell::default(),
             logic_tricks: RefCell::default(),
             regions: RefCell::default(),
             setting_infos: RefCell::default(),
@@ -90,10 +81,8 @@ impl<'p> fmt::Debug for Rando<'p> {
     }
 }
 
-#[derive(Debug, From, FromArc, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum RandoErr {
-    #[from]
-    AccessExprParse(access::ParseError),
     #[from_arc]
     Io(Arc<io::Error>),
     InvalidLogicHelper,
@@ -108,7 +97,6 @@ pub enum RandoErr {
 impl fmt::Display for RandoErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RandoErr::AccessExprParse(e) => e.fmt(f),
             RandoErr::Io(e) => write!(f, "I/O error: {}", e),
             RandoErr::InvalidLogicHelper => write!(f, "multiple ( found in logic helper"),
             RandoErr::ItemNotFound => write!(f, "no such item"),
@@ -178,36 +166,6 @@ impl<'p> ootr::Rando for Rando<'p> {
         Ok(Arc::clone(self.item_table.borrow().as_ref().expect("just inserted")))
     }
 
-    fn logic_helpers(&self) -> Result<Arc<HashMap<String, (Vec<String>, ootr::access::Expr<Rando<'p>>)>>, RandoErr> {
-        if self.logic_helpers.borrow().is_none() {
-            let f = File::open(self.path.join("data").join("LogicHelpers.json"))?;
-            let raw_helpers = read_json_lenient_sync::<_, BTreeMap<String, String>>(BufReader::new(f))?;
-            let mut helper_headers = HashMap::new();
-            for (fn_def, fn_body) in &raw_helpers {
-                let (fn_name, fn_params) = if fn_def.contains('(') {
-                    fn_def[..fn_def.len() - 1].split('(').collect_tuple().ok_or(RandoErr::InvalidLogicHelper)?
-                } else {
-                    (&**fn_def, "")
-                };
-                let fn_params = if fn_params.is_empty() {
-                    Vec::default()
-                } else {
-                    fn_params.split(',').map(str::to_owned).collect_vec()
-                };
-                helper_headers.insert(fn_name.to_owned(), (fn_params, fn_body));
-            }
-            let arities = helper_headers.iter().map(|(fn_name, (fn_params, _))| (&**fn_name, fn_params.len())).collect();
-            let mut helpers = HashMap::default();
-            for (fn_name, (fn_params, fn_body)) in &helper_headers {
-                let ctx = Check::LogicHelper(fn_name.to_owned());
-                let expr = ootr::access::Expr::parse_helper(self, &ctx, &arities, &fn_params, &fn_body)?;
-                helpers.insert(fn_name.to_owned(), (fn_params.clone(), expr));
-            }
-            *self.logic_helpers.borrow_mut() = Some(Arc::new(helpers));
-        }
-        Ok(Arc::clone(self.logic_helpers.borrow().as_ref().expect("just inserted")))
-    }
-
     fn logic_tricks(&self) -> Result<Arc<HashSet<String>>, RandoErr> {
         if self.logic_tricks.borrow().is_none() {
             let mut tricks = HashSet::default();
@@ -237,9 +195,9 @@ impl<'p> ootr::Rando for Rando<'p> {
                         scene: raw_region.scene,
                         hint: raw_region.hint,
                         time_passes: raw_region.time_passes,
-                        events: raw_region.events.into_iter().map(|(event_name, rule_str)| Ok::<_, RandoErr>((event_name.clone(), ootr::access::Expr::parse(self, &Check::Event(event_name), rule_str.trim())?))).try_collect()?,
-                        locations: raw_region.locations.into_iter().map(|(loc_name, rule_str)| Ok::<_, RandoErr>((loc_name.clone(), ootr::access::Expr::parse(self, &Check::Location(loc_name), rule_str.trim())?))).try_collect()?,
-                        exits: raw_region.exits.into_iter().map(|(to, rule_str)| Ok::<_, RandoErr>((to.clone(), ootr::access::Expr::parse(self, &Check::Exit { to, from: name.clone(), from_mq: dungeon.map(|(_, mq)| mq) }, rule_str.trim())?))).try_collect()?,
+                        events: raw_region.events.into_keys().collect(),
+                        locations: raw_region.locations.into_keys().collect(),
+                        exits: raw_region.exits.into_keys().collect(),
                         name,
                     }));
                 }

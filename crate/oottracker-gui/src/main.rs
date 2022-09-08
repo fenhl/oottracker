@@ -5,7 +5,6 @@
 
 use {
     std::{
-        collections::HashMap,
         convert::Infallible as Never,
         env,
         fmt,
@@ -64,17 +63,9 @@ use {
     tokio::fs,
     url::Url,
     wheel::FromArc,
-    ootr::{
-        Rando,
-        check::Check,
-    },
+    ootr::Rando,
     oottracker::{
         ModelState,
-        checks::{
-            self,
-            CheckStatus,
-            CheckStatusError,
-        },
         firebase,
         github::Repo,
         net::{
@@ -99,7 +90,6 @@ use {
     },
 };
 
-mod lang;
 mod logic;
 mod subscriptions;
 
@@ -178,7 +168,6 @@ impl TrackerLayoutExt for TrackerLayout {
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""), Clone(bound = ""))]
 enum Message<R: Rando> {
-    CheckStatusErrorStatic(CheckStatusError<R>),
     ClientDisconnected,
     CloseMenu,
     ConfigError(ui::Error),
@@ -204,7 +193,6 @@ enum Message<R: Rando> {
     SetPort(String),
     SetUrl(String),
     SetWarpSongOrder(ElementOrder),
-    UpdateAvailableChecks(HashMap<Check<R>, CheckStatus>),
     UpdateCheck,
     UpdateCheckComplete(Option<Version>),
     UpdateCheckError(UpdateCheckError),
@@ -213,7 +201,6 @@ enum Message<R: Rando> {
 impl<R: Rando> fmt::Display for Message<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Message::CheckStatusErrorStatic(e) => write!(f, "error calculating checks: {}", e),
             Message::ClientDisconnected => write!(f, "connection lost"),
             Message::ConfigError(e) => write!(f, "error loading/saving preferences: {}", e),
             Message::ConnectionError(e) => write!(f, "connection error: {}", e),
@@ -325,7 +312,6 @@ struct State<R: Rando + 'static> {
     cell_buttons: [button::State; 52],
     rando: Arc<R>,
     model: ModelState,
-    checks: HashMap<Check<R>, CheckStatus>,
     logic: logic::State<R>,
     notification: Option<(bool, Message<R>)>,
     dismiss_notification_button: button::State,
@@ -400,7 +386,6 @@ impl Default for State<ootr_static::Rando> {
             ],
             rando: Arc::new(ootr_static::Rando),
             model: ModelState::default(),
-            checks: HashMap::default(),
             logic: logic::State::default(),
             notification: None,
             dismiss_notification_button: button::State::default(),
@@ -443,7 +428,6 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
 
     fn update(&mut self, message: Message<ootr_static::Rando>) -> Command<Message<ootr_static::Rando>> {
         match message {
-            Message::CheckStatusErrorStatic(_) => return self.notify(message),
             Message::ClientDisconnected => if self.notification.as_ref().map_or(true, |&(is_temp, _)| is_temp) { // don't override an existing, probably more descriptive error message
                 return self.notify(message)
             },
@@ -536,16 +520,6 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                         self.model.update_knowledge();
                     }
                 }
-                if self.flags.show_available_checks {
-                    let rando = self.rando.clone();
-                    let model = self.model.clone();
-                    return Command::single(Action::Future(async move {
-                        tokio::task::spawn_blocking(move || match checks::status(&*rando, &model) {
-                            Ok(status) => Message::UpdateAvailableChecks(status),
-                            Err(e) => Message::CheckStatusErrorStatic(e),
-                        }).await.expect("status checks task panicked")
-                    }.boxed()))
-                }
             }
             Message::ResetUpdateState => self.update_check = UpdateCheckState::Unknown(button::State::default()),
             Message::RightClick => {
@@ -594,7 +568,6 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 self.config.as_mut().expect("config not yet loaded").warp_song_order = warp_song_order;
                 return self.save_config()
             }
-            Message::UpdateAvailableChecks(checks) => self.checks = checks,
             Message::UpdateCheck => {
                 self.update_check = UpdateCheckState::Checking;
                 let client = self.http_client.clone();
@@ -762,32 +735,16 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
             .width(Length::Fill)
             .style(ContainerStyle)
             .width(if self.flags.show_logic_tracker { Length::Units(WIDTH as u16 + 2) } else { Length::Fill })
-            .height(if self.flags.show_available_checks { Length::Units(HEIGHT as u16 + 2) } else { Length::Fill })
+            .height(Length::Fill)
             .into();
-        let left_column = if self.flags.show_available_checks {
-            let check_status_map = self.checks.iter().map(|(check, status)| (status, check)).into_group_map();
-            let mut col = Column::new()
-                .push(Text::new(format!("{} checked", lang::plural(check_status_map.get(&CheckStatus::Checked).map_or(0, Vec::len), "location"))))
-                .push(Text::new(format!("{} currently inaccessible", lang::plural(check_status_map.get(&CheckStatus::NotYetReachable).map_or(0, Vec::len), "location"))))
-                .push(Text::new(format!("{} accessible:", lang::plural(check_status_map.get(&CheckStatus::Reachable).map_or(0, Vec::len), "location"))));
-            for check in check_status_map.get(&CheckStatus::Reachable).into_iter().flatten() {
-                col = col.push(Text::new(format!("{}", check)));
-            }
-            Column::new()
-                .push(items_container)
-                .push(col)
-                .into()
-        } else {
-            items_container
-        };
         if self.flags.show_logic_tracker {
             Row::new()
-                .push(left_column)
+                .push(items_container)
                 .push(self.logic.view(&self.rando).map(Message::Logic))
                 .width(Length::Fill)
                 .into()
         } else {
-            left_column
+            items_container
         }
     }
 
@@ -1004,8 +961,6 @@ async fn run_updater(#[cfg_attr(windows, allow(unused))] client: &reqwest::Clien
 #[derive(Debug, Default, clap::Parser)]
 #[clap(version)]
 struct Args {
-    #[clap(long = "checks")]
-    show_available_checks: bool,
     #[clap(long = "logic")]
     show_logic_tracker: bool,
 }
@@ -1030,16 +985,14 @@ fn main(args: Args) -> Result<(), Error> {
     let icon = images::icon::<DynamicImage>().to_rgba8();
     State::run(Settings {
         window: window::Settings {
-            size: (WIDTH + if args.show_logic_tracker { 800 } else { 0 }, HEIGHT + if args.show_logic_tracker || args.show_available_checks { 400 } else { 0 }),
+            size: (WIDTH + if args.show_logic_tracker { 800 } else { 0 }, HEIGHT + if args.show_logic_tracker { 400 } else { 0 }),
             min_size: Some((WIDTH, HEIGHT)),
             max_size: if args.show_logic_tracker {
                 None
-            } else if args.show_available_checks {
-                Some((WIDTH, u32::MAX))
             } else {
                 Some((WIDTH, HEIGHT))
             },
-            resizable: args.show_logic_tracker || args.show_available_checks,
+            resizable: args.show_logic_tracker,
             icon: Some(Icon::from_rgba(icon.as_flat_samples().as_slice().to_owned(), icon.width(), icon.height())?),
             ..window::Settings::default()
         },

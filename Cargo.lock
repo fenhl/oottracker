@@ -3163,9 +3163,7 @@ dependencies = [
 name = "ootr-dynamic"
 version = "0.7.4"
 dependencies = [
- "derive_more",
  "itertools 0.10.3",
- "lazy-regex",
  "ootr",
  "pyo3",
  "semver",
@@ -3288,7 +3286,6 @@ dependencies = [
  "iced_native",
  "image 0.24.2",
  "itertools 0.10.3",
- "num-traits",
  "ootr",
  "ootr-static",
  "oottracker",

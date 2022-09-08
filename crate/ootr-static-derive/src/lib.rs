@@ -3,7 +3,7 @@
 
 use {
     std::{
-        collections::HashMap,
+        collections::HashSet,
         fs::{
             self,
             File,
@@ -72,61 +72,6 @@ enum Error {
     Zip(ZipError),
 }
 
-/// A wrapper type around `Expr<ootr_dynamic::Rando>` that's quoted as if it were an `Expr<ootr_static::Rando>`
-struct AccessExprWrapper<'a>(&'a ootr::access::Expr<ootr_dynamic::Rando<'a>>);
-
-impl<'a> QuoteValue for AccessExprWrapper<'a> {
-    fn quote(&self) -> proc_macro2::TokenStream {
-        match self.0 {
-            ootr::access::Expr::All(ref exprs) => {
-                let exprs = exprs.iter().map(AccessExprWrapper).collect_vec().quote();
-                quote!(::ootr::access::Expr::All(#exprs))
-            }
-            ootr::access::Expr::Any(ref exprs) => {
-                let exprs = exprs.iter().map(AccessExprWrapper).collect_vec().quote();
-                quote!(::ootr::access::Expr::Any(#exprs))
-            }
-            ootr::access::Expr::AnonymousEvent(ref at_check, id) => {
-                let at_check = CheckWrapper(at_check).quote();
-                let id = id.quote();
-                quote!(::ootr::access::Expr::AnonymousEvent(#at_check, #id))
-            }
-            ootr::access::Expr::Eq(ref lhs, ref rhs) => {
-                let lhs = Box::new(AccessExprWrapper(lhs)).quote();
-                let rhs = Box::new(AccessExprWrapper(rhs)).quote();
-                quote!(::ootr::access::Expr::Eq(#lhs, #rhs))
-            }
-            ootr::access::Expr::HasDungeonRewards(ref n) => {
-                let n = Box::new(AccessExprWrapper(n)).quote();
-                quote!(::ootr::access::Expr::HasDungeonRewards(#n))
-            }
-            ootr::access::Expr::HasMedallions(ref n) => {
-                let n = Box::new(AccessExprWrapper(n)).quote();
-                quote!(::ootr::access::Expr::HasMedallions(#n))
-            }
-            ootr::access::Expr::HasStones(ref n) => {
-                let n = Box::new(AccessExprWrapper(n)).quote();
-                quote!(::ootr::access::Expr::HasStones(#n))
-            }
-            ootr::access::Expr::Item(ref item, ref count) => {
-                let item = item.quote();
-                let count = Box::new(AccessExprWrapper(count)).quote();
-                quote!(::ootr::access::Expr::Item(#item, #count))
-            }
-            ootr::access::Expr::LogicHelper(ref helper_name, ref exprs) => {
-                let helper_name = helper_name.quote();
-                let exprs = exprs.iter().map(AccessExprWrapper).collect_vec().quote();
-                quote!(::ootr::access::Expr::LogicHelper(#helper_name, #exprs))
-            }
-            ootr::access::Expr::Not(ref expr) => {
-                let expr = Box::new(AccessExprWrapper(expr)).quote();
-                quote!(::ootr::access::Expr::Not(#expr))
-            }
-            _ => self.0.quote(),
-        }
-    }
-}
-
 /// A wrapper type around `Check<ootr_dynamic::Rando>` that's quoted as if it were a `Check<ootr_static::Rando>`
 struct CheckWrapper<'a>(&'a ootr::check::Check<ootr_dynamic::Rando<'a>>);
 
@@ -153,18 +98,6 @@ impl<'a> QuoteValue for CheckWrapper<'a> {
     }
 }
 
-/// A wrapper type around `(Vec<String>, Expr<ootr_dynamic::Rando>)` that's quoted as if it were a `(Vec<String>, Expr<ootr_static::Rando>)`
-struct LogicHelperWrapper<'a>(&'a (Vec<String>, ootr::access::Expr<ootr_dynamic::Rando<'a>>));
-
-impl<'a> QuoteValue for LogicHelperWrapper<'a> {
-    fn quote(&self) -> proc_macro2::TokenStream {
-        let (params, expr) = self.0;
-        let params = params.quote();
-        let expr = AccessExprWrapper(expr).quote();
-        quote! { (#params, #expr) }
-    }
-}
-
 /// A wrapper type around `Arc<Region<ootr_dynamic::Rando>>` that's quoted as if it were an `Arc<Region<ootr_static::Rando>>`
 struct RegionWrapper<'a>(&'a Arc<ootr::region::Region<ootr_dynamic::Rando<'a>>>);
 
@@ -176,9 +109,9 @@ impl<'a> QuoteValue for RegionWrapper<'a> {
         let scene = scene.quote();
         let hint = hint.quote();
         let time_passes = time_passes.quote();
-        let events = events.iter().map(|(name, rule)| (name.clone(), AccessExprWrapper(rule))).collect::<HashMap<_, _>>().quote();
-        let locations = locations.iter().map(|(name, rule)| (name.clone(), AccessExprWrapper(rule))).collect::<HashMap<_, _>>().quote();
-        let exits = exits.iter().map(|(name, rule)| (&name[..], AccessExprWrapper(rule))).collect::<HashMap<_, _>>().quote();
+        let events = events.quote();
+        let locations = locations.quote();
+        let exits = exits.iter().map(|name| &name[..]).collect::<HashSet<_>>().quote();
         quote! {
             ::std::sync::Arc::new(
                 ::ootr::region::Region {
@@ -249,7 +182,6 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         let data = vec![
             ("escaped_items", quote!(HashMap<String, Item>), rando.escaped_items()?.quote()),
             ("item_table", quote!(HashMap<String, Item>), rando.item_table()?.quote()),
-            ("logic_helpers", quote!(HashMap<String, (Vec<String>, Expr<#ty>)>), Arc::new(rando.logic_helpers()?.iter().map(|(k, v)| (k.clone(), LogicHelperWrapper(v))).collect::<HashMap<_, _>>()).quote()),
             ("logic_tricks", quote!(HashSet<String>), rando.logic_tricks()?.quote()),
             ("regions", quote!(Vec<Arc<Region<#ty>>>), Arc::new(rando.regions()?.iter().map(RegionWrapper).collect_vec()).quote()),
             ("setting_infos", quote!(HashSet<String>), rando.setting_infos()?.quote()),

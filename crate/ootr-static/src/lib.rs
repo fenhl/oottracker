@@ -13,17 +13,10 @@ use {
     once_cell::sync::Lazy,
     semver::Version,
     ootr::{
-        access::{
-            Expr,
-            ForAge,
-        },
-        check::Check,
         item::Item,
         model::{
             Dungeon,
             MainDungeon,
-            Medallion,
-            TimeRange,
         },
         region::{
             Mq,

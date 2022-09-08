@@ -27,21 +27,17 @@ use {
         AsyncWrite,
         AsyncWriteExt as _,
     },
-    ootr::{
-        item::Item,
-        model::{
-            Dungeon,
-            DungeonReward,
-            MainDungeon,
-            Medallion,
-            Stone,
-            TimeRange,
-        },
+    ootr::model::{
+        Dungeon,
+        DungeonReward,
+        MainDungeon,
+        Medallion,
+        Stone,
+        TimeRange,
     },
     crate::{
         info_tables::{
             EventChkInf,
-            EventChkInf3,
             InfTable,
             ItemGetInf,
         },
@@ -1198,63 +1194,6 @@ impl Save {
 
     pub fn set_triforce_pieces(&mut self, triforce_pieces: u8) {
         self.scene_flags.windmill_and_dampes_grave.unused = crate::scene::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
-    }
-
-    pub(crate) fn amount_of_item(&self, item: &Item) -> u8 {
-        match item.name() {
-            "Blue Fire" | "Buy Blue Fire" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::BlueFire).count().try_into().expect("more than u8::MAX bottles"),
-            "Bomb Bag" => match self.upgrades.bomb_bag() {
-                Upgrades::BOMB_BAG_40 => 3,
-                Upgrades::BOMB_BAG_30 => 2,
-                Upgrades::BOMB_BAG_20 => 1,
-                _ => 0,
-            },
-            "Bombchus" | "Bombchu Drop" | "Bombchus (5)" | "Bombchus (10)" | "Bombchus (20)" | "Buy Bombchu (5)" | "Buy Bombchu (10)" | "Buy Bombchu (20)" => self.inv_amounts.bombchus,
-            "Boomerang" => self.inv.boomerang.into(),
-            "Bow" => self.inv.bow.into(),
-            "Deku Nut Drop" | "Buy Deku Nut (5)" | "Buy Deku Nut (10)" => self.inv_amounts.deku_nuts,
-            "Buy Deku Shield" => self.equipment.contains(Equipment::DEKU_SHIELD).into(),
-            "Deku Stick Drop" | "Buy Deku Stick (1)" => self.inv_amounts.deku_sticks,
-            "Deliver Letter" => self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER).into(), //TODO only consider when known by settings knowledge or visual confirmation
-            "Dins Fire" => self.inv.dins_fire.into(),
-            "Fish" | "Buy Fish" => self.inv.bottles.iter().filter(|&&bottle| bottle == Bottle::Fish).count().try_into().expect("more than u8::MAX bottles"),
-            "Gerudo Membership Card" => self.quest_items.contains(QuestItems::GERUDO_CARD).into(),
-            "Hover Boots" => self.equipment.contains(Equipment::HOVER_BOOTS).into(),
-            "Buy Hylian Shield" => self.equipment.contains(Equipment::HYLIAN_SHIELD).into(),
-            "Kokiri Sword" => self.equipment.contains(Equipment::KOKIRI_SWORD).into(),
-            "Lens of Truth" => self.inv.lens.into(),
-            "Megaton Hammer" => self.inv.hammer.into(),
-            "Mirror Shield" => self.equipment.contains(Equipment::MIRROR_SHIELD).into(),
-            "Nayrus Love" => self.inv.nayrus_love.into(),
-            "Ocarina" => self.inv.ocarina.into(), //TODO return 2 with Ocarina of Time? (currently unused)
-            "Progressive Hookshot" => match self.inv.hookshot {
-                Hookshot::None => 0,
-                Hookshot::Hookshot => 1,
-                Hookshot::Longshot => 2,
-            },
-            "Progressive Scale" => match self.upgrades.scale() {
-                Upgrades::GOLD_SCALE => 2,
-                Upgrades::SILVER_SCALE => 1,
-                _ => 0,
-            },
-            "Progressive Strength Upgrade" => match self.upgrades.strength() {
-                Upgrades::GOLD_GAUNTLETS => 3,
-                Upgrades::SILVER_GAUNTLETS => 2,
-                Upgrades::GORON_BRACELET => 1,
-                _ => 0,
-            },
-            "Serenade of Water" => self.quest_items.contains(QuestItems::SERENADE_OF_WATER).into(),
-            "Shadow Medallion" => self.quest_items.contains(QuestItems::SHADOW_MEDALLION).into(),
-            "Slingshot" => self.inv.slingshot.into(),
-            //TODO add already opened doors (if Keysy is known or off)
-            "Small Key (Fire Temple)" => self.small_keys.fire_temple,
-            "Small Key (Forest Temple)" => self.small_keys.forest_temple,
-            "Small Key (Gerudo Training Ground)" => self.small_keys.gerudo_training_ground,
-            "Small Key (Spirit Temple)" => self.small_keys.spirit_temple,
-            "Small Key (Water Temple)" => self.small_keys.water_temple,
-            "Weird Egg" => (self.inv.child_trade_item != ChildTradeItem::None).into(),
-            name => unimplemented!("check for item {}", name), //TODO (make a list of all items)
-        }
     }
 }
 

@@ -6,15 +6,9 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.10"
-lazy-regex = "2"
 pyo3 = "0.16"
 semver = "1"
 serde_json = "1"
-
-[dependencies.derive_more]
-version = "0.99"
-default-features = false
-features = ["from"]
 
 [dependencies.ootr]
 path = "../ootr"
