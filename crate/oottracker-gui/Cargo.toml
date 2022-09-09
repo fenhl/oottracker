@@ -43,6 +43,7 @@ path = "../ootr-static"
 
 [dependencies.oottracker]
 path = "../oottracker"
+features = ["embed-images"]
 
 [dependencies.reqwest]
 version = "0.11"

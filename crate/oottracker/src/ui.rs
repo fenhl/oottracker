@@ -2233,6 +2233,7 @@ impl ImageInfo {
         ImageInfo { dir: ImageDir::Extra, name: name.into() }
     }
 
+    #[cfg(feature = "embed-images")]
     pub fn embedded<T: FromEmbeddedImage>(&self, ctx: ImageDirContext) -> T {
         match (self.dir, ctx) {
             (ImageDir::Xopar, ImageDirContext::Normal) => images::xopar_images(&self.name),
@@ -2266,6 +2267,7 @@ pub struct OverlayImageInfo {
 }
 
 impl OverlayImageInfo {
+    #[cfg(feature = "embed-images")]
     pub fn embedded<T: FromEmbeddedImage>(&self, main_active: bool) -> T {
         (match (self.dir, main_active) {
             (ImageDir::Xopar, false) => images::xopar_images_overlay_dimmed,
@@ -2303,6 +2305,7 @@ impl FromEmbeddedImage for DynamicImage {
     }
 }
 
+#[cfg(feature = "embed-images")]
 pub mod images {
     use super::FromEmbeddedImage;
 
