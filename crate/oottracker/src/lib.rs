@@ -7,7 +7,7 @@ use {
         Sub,
     },
     async_proto::Protocol,
-    enum_iterator::IntoEnumIterator as _,
+    enum_iterator::all,
     itertools::Itertools as _,
     semver::Version,
     serde::{
@@ -99,12 +99,12 @@ impl ModelState {
 
         // derived knowledge
         // dungeon reward shuffle doesn't exist yet, so if we have exactly 1 reward, it must have been on Links Pocket
-        if let Ok(reward) = DungeonReward::into_enum_iter().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
+        if let Ok(reward) = all().filter(|reward| self.ram.save.quest_items.has(reward)).exactly_one() {
             self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::LinksPocket);
         }
         // dungeon reward shuffle doesn't exist yet, so if we know the locations of all but 1 reward, the 9th can be determined by process of elimination
-        if let Some((reward,)) = DungeonReward::into_enum_iter().filter(|reward| !self.knowledge.dungeon_reward_locations.contains_key(reward)).collect_tuple() {
-            let (dungeon,) = MainDungeon::into_enum_iter().filter(|dungeon| !self.knowledge.dungeon_reward_locations.values().any(|&loc| loc == DungeonRewardLocation::Dungeon(*dungeon))).collect_tuple().expect("exactly one reward left but not exactly one reward location left");
+        if let Some((reward,)) = all().filter(|reward| !self.knowledge.dungeon_reward_locations.contains_key(reward)).collect_tuple() {
+            let (dungeon,) = all().filter(|dungeon| !self.knowledge.dungeon_reward_locations.values().any(|&loc| loc == DungeonRewardLocation::Dungeon(*dungeon))).collect_tuple().expect("exactly one reward left but not exactly one reward location left");
             self.knowledge.dungeon_reward_locations.insert(reward, DungeonRewardLocation::Dungeon(dungeon));
         }
     }

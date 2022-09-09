@@ -21,7 +21,7 @@ name = "oottracker-version-bump"
 path = "src/version_bump.rs"
 
 [dependencies]
-async-proto = "0.14"
+async-proto = "0.15"
 thiserror = "1"
 
 [dependencies.clap]

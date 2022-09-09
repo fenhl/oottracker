@@ -75,7 +75,8 @@ pub enum Error {
         debug: String,
         display: String,
     },
-    Write(async_proto::WriteError),
+    #[from_arc]
+    Write(Arc<async_proto::WriteError>),
 }
 
 impl fmt::Display for Error {
@@ -174,7 +175,7 @@ impl Connection for WebConnection {
                     Ok(websocket::ServerMessage::Init(_)) | Ok(websocket::ServerMessage::Update { .. }) => Some((Err(Error::UnexpectedWebsocketMessage), stream)),
                     Ok(websocket::ServerMessage::InitRaw(model)) => Some((Ok(Packet::ModelInit(model)), stream)),
                     Ok(websocket::ServerMessage::UpdateRaw(delta)) => Some((Ok(Packet::ModelDelta(delta)), stream)),
-                    Err(e) => Some((Err(Error::Protocol(proto::ReadError::Packet(e))), stream)),
+                    Err(e) => Some((Err(Error::Protocol(proto::ReadError::Packet(Arc::new(e)))), stream)),
                 };
             }
         }))

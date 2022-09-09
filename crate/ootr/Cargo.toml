@@ -5,14 +5,11 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [dependencies]
-async-proto = "0.14"
+async-proto = "0.15"
 derivative = "2"
+enum-iterator = "1"
 semver = "1"
 serde_plain = "1"
-
-[dependencies.enum-iterator]
-git = "https://github.com/dasgefolge/enum-iterator"
-branch = "fields"
 
 [dependencies.quote-value]
 git = "https://github.com/fenhl/quote-value" #TODO publish

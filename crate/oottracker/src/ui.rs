@@ -14,7 +14,6 @@ use {
     collect_mac::collect,
     derivative::Derivative,
     directories::ProjectDirs,
-    enum_iterator::IntoEnumIterator,
     iced::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
@@ -142,7 +141,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoEnumIterator, Deserialize, Serialize, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, enum_iterator::Sequence, Deserialize, Serialize, Protocol)]
 #[serde(rename_all = "camelCase")]
 pub enum ElementOrder {
     LightShadowSpirit,

@@ -3,16 +3,17 @@ use {
         cmp::Ordering::*,
         fmt,
         pin::Pin,
+        sync::Arc,
     },
     async_proto::Protocol,
     async_stream::try_stream,
-    derive_more::From,
     futures::{
         pin_mut,
         prelude::*,
     },
     serde_json::Value as Json,
     tokio::net::TcpStream,
+    wheel::FromArc,
     crate::{
         ModelDelta,
         ModelState,
@@ -38,10 +39,10 @@ pub enum Packet {
     ModelDelta(ModelDelta),
 }
 
-#[derive(Debug, From, Clone)]
+#[derive(Debug, FromArc, Clone)]
 pub enum ReadError {
-    #[from]
-    Packet(async_proto::ReadError),
+    #[from_arc]
+    Packet(Arc<async_proto::ReadError>),
     VersionMismatch {
         server: u8,
         client: u8,

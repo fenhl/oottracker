@@ -4,7 +4,10 @@ use {
         path::PathBuf,
     },
     derivative::Derivative,
-    enum_iterator::IntoEnumIterator,
+    enum_iterator::{
+        Sequence,
+        all,
+    },
     iced::{
         Color,
         Command,
@@ -61,7 +64,7 @@ impl SettingsInfo {
     }
 }
 
-#[derive(Derivative, Debug, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Sequence, Clone, Copy, PartialEq, Eq)]
 #[derivative(Default)]
 pub(crate) enum SettingsInfoKind {
     #[derivative(Default)]
@@ -187,7 +190,7 @@ impl<R: Rando + 'static> State<R> {
                 //TODO randomizer version (support latest release, latest Dev, latest Dev-R, and any version currently used in a major tournament or the RSL)
                 .push(Row::new()
                     .push(Text::new("Settings:").height(Length::Units(30)).vertical_alignment(alignment::Vertical::Center))
-                    .push(PickList::new(&mut self.settings_pick, SettingsInfoKind::into_enum_iter().collect_vec(), Some(self.settings_info.kind()), Message::PickSettingsInfo))
+                    .push(PickList::new(&mut self.settings_pick, all().collect_vec(), Some(self.settings_info.kind()), Message::PickSettingsInfo))
                     .push(match self.settings_info {
                         SettingsInfo::String(ref s) => TextInput::new(&mut self.settings_text, "Enter settings string", s, Message::EditSettingsString).padding(5).style(TextInputStyle),
                         SettingsInfo::Plando(ref path) => TextInput::new(&mut self.settings_text, "Path to plando file", &path.display().to_string(), Message::EditPlandoPath).padding(5).style(TextInputStyle), //TODO file select

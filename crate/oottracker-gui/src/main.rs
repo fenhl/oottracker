@@ -13,7 +13,10 @@ use {
     },
     derivative::Derivative,
     derive_more::From,
-    enum_iterator::IntoEnumIterator,
+    enum_iterator::{
+        Sequence,
+        all,
+    },
     futures::future::FutureExt as _,
     iced::{
         Application,
@@ -219,7 +222,7 @@ struct MenuState {
     connect_btn: button::State,
 }
 
-#[derive(Derivative, Debug, IntoEnumIterator, Clone, Copy, PartialEq, Eq)]
+#[derive(Derivative, Debug, Sequence, Clone, Copy, PartialEq, Eq)]
 #[derivative(Default)]
 enum ConnectionKind {
     TcpListener,
@@ -611,12 +614,12 @@ impl Application for State<ootr_static::Rando> { //TODO include Rando in flags a
                 )
                 .push(Text::new("Preferences").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 .push(Text::new("Medallion order:"))
-                .push(PickList::new(&mut menu_state.med_order, ElementOrder::into_enum_iter().collect_vec(), self.config.as_ref().map(|cfg| cfg.med_order), Message::SetMedOrder))
+                .push(PickList::new(&mut menu_state.med_order, all().collect_vec(), self.config.as_ref().map(|cfg| cfg.med_order), Message::SetMedOrder))
                 .push(Text::new("Warp song order:"))
-                .push(PickList::new(&mut menu_state.warp_song_order, ElementOrder::into_enum_iter().collect_vec(), self.config.as_ref().map(|cfg| cfg.warp_song_order), Message::SetWarpSongOrder))
+                .push(PickList::new(&mut menu_state.warp_song_order, all().collect_vec(), self.config.as_ref().map(|cfg| cfg.warp_song_order), Message::SetWarpSongOrder))
                 .push(Text::new("Connect").size(24).width(Length::Fill).horizontal_alignment(alignment::Horizontal::Center))
                 //TODO replace connection options with “current connection” info when connected
-                .push(PickList::new(&mut menu_state.connection_kind, ConnectionKind::into_enum_iter().collect_vec(), Some(menu_state.connection_params.kind()), Message::SetConnectionKind))
+                .push(PickList::new(&mut menu_state.connection_kind, all().collect_vec(), Some(menu_state.connection_params.kind()), Message::SetConnectionKind))
                 .push(menu_state.connection_params.view())
                 .push(Button::new(&mut menu_state.connect_btn, Text::new(if self.connection.is_some() { "Disconnect" } else { "Connect" })).on_press(Message::Connect))
                 .padding(5)
@@ -773,8 +776,8 @@ enum ConnectionError {
     UnsupportedRoomKind(String),
     #[from]
     UrlParse(url::ParseError),
-    #[from]
-    Write(async_proto::WriteError),
+    #[from_arc]
+    Write(Arc<async_proto::WriteError>),
 }
 
 impl fmt::Display for ConnectionError {

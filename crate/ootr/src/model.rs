@@ -4,7 +4,7 @@ use {
         str::FromStr,
     },
     async_proto::Protocol,
-    enum_iterator::IntoEnumIterator,
+    enum_iterator::Sequence,
     quote_value::QuoteValue,
     serde::{
         Deserialize,
@@ -71,7 +71,7 @@ impl fmt::Display for Dungeon {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Sequence, Protocol)]
 pub enum DungeonReward {
     Medallion(Medallion),
     Stone(Stone),
@@ -150,7 +150,7 @@ impl fmt::Display for DungeonRewardLocation {
 derive_deserialize_from_fromstr!(DungeonRewardLocation, "dungeon reward location");
 derive_serialize_from_display!(DungeonRewardLocation);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Sequence, Protocol, QuoteValue)]
 pub enum MainDungeon {
     DekuTree,
     DodongosCavern,
@@ -227,7 +227,7 @@ impl fmt::Display for MainDungeon {
 derive_deserialize_from_fromstr!(MainDungeon, "main dungeon");
 derive_serialize_from_display!(MainDungeon);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol, Deserialize, Serialize, QuoteValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Sequence, Protocol, Deserialize, Serialize, QuoteValue)]
 pub enum Medallion {
     Light,
     Forest,
@@ -287,7 +287,7 @@ impl From<Medallion> for Item {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoEnumIterator, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Sequence, Protocol)]
 pub enum Stone {
     KokiriEmerald,
     GoronRuby,
