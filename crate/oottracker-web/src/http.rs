@@ -30,6 +30,7 @@ use {
     },
     crate::{
         Error,
+        MwRooms,
         Restreams,
         Rooms,
         edit_room,
@@ -175,7 +176,7 @@ async fn click(pool: &State<PgPool>, rooms: &State<Rooms>, name: String, cell_id
     Ok(Redirect::to(rocket::uri!(room(name))))
 }
 
-pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams) -> Rocket<rocket::Build> {
+pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms) -> Rocket<rocket::Build> {
     rocket::custom(rocket::Config {
         port: 24807,
         ..rocket::Config::default()
@@ -183,6 +184,7 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams) -> Rocket
     .manage(pool)
     .manage(rooms)
     .manage(restreams)
+    .manage(mw_rooms)
     .mount("/static", FileServer::new(relative!("../../assets/web/static"), rocket::fs::Options::None))
     .mount("/", rocket::routes![
         index,

@@ -46,13 +46,18 @@ use {
         Ram,
         TrackerCtx,
     },
-    crate::restream::RestreamState,
+    crate::{
+        mw::MwState,
+        restream::RestreamState,
+    },
 };
 
 mod http;
+mod mw;
 mod restream;
 mod websocket;
 
+type MwRooms = Arc<RwLock<HashMap<String, MwState>>>;
 type Restreams = Arc<RwLock<HashMap<String, RestreamState>>>;
 type Rooms = Arc<Mutex<HashMap<String, RoomState>>>;
 
@@ -168,7 +173,7 @@ async fn main() -> Result<(), Error> {
     let pool = PgPool::connect_with(PgConnectOptions::default().database("oottracker").application_name("oottracker-web")).await?;
     let rooms = {
         let mut rooms = HashMap::default();
-        let mut query = sqlx::query!(r#"SELECT name, knowledge as "knowledge: Json<Knowledge>", ram FROM rooms"#).fetch(&pool);
+        let mut query = sqlx::query!(r#"SELECT name, knowledge AS "knowledge: Json<Knowledge>", ram FROM rooms"#).fetch(&pool);
         while let Some(room) = query.try_next().await? {
             let state = RoomState::from_model(&room.name, ModelState { knowledge: room.knowledge.0, ram: Ram::from_range_bufs(room.ram)?, tracker_ctx: TrackerCtx::default() });
             rooms.insert(room.name, state);
@@ -187,14 +192,16 @@ async fn main() -> Result<(), Error> {
         map.insert(format!("fenhl"), RestreamState::new(multiworld_3v3));
         Restreams::new(RwLock::new(map))
     };
+    let mw_rooms = MwRooms::default();
     let websocket_task = {
         let pool = pool.clone();
         let rooms = Rooms::clone(&rooms);
         let restreams = Restreams::clone(&restreams);
-        let handler = warp::ws().and_then(move |ws| websocket::ws_handler(pool.clone(), Rooms::clone(&rooms), Restreams::clone(&restreams), ws));
+        let mw_rooms = MwRooms::clone(&mw_rooms);
+        let handler = warp::ws().and_then(move |ws| websocket::ws_handler(pool.clone(), Rooms::clone(&rooms), Restreams::clone(&restreams), MwRooms::clone(&mw_rooms), ws));
         tokio::spawn(warp::serve(handler).run(([127, 0, 0, 1], 24808))).err_into()
     };
-    let rocket_task = tokio::spawn(http::rocket(pool, rooms, restreams).launch()).map(|res| match res {
+    let rocket_task = tokio::spawn(http::rocket(pool, rooms, restreams, mw_rooms).launch()).map(|res| match res {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(e)) => Err(Error::from(e)),
         Err(e) => Err(Error::from(e)),

@@ -29,17 +29,19 @@ use {
     },
     crate::{
         Error,
+        MwRooms,
         Restreams,
         Rooms,
         edit_room,
         get_room,
+        mw::MwState,
         restream::render_double_cell,
     },
 };
 
 type WsSink = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
-async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
+async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms, mut stream: impl Stream<Item = Result<Message, warp::Error>> + Unpin + Send, sink: WsSink) -> Result<(), Error> {
     let ping_sink = WsSink::clone(&sink);
     tokio::spawn(async move {
         loop {
@@ -259,18 +261,50 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mut s
                     Ok(())
                 }).await?;
             }
+            ClientMessage::MwCreateRoom { room, worlds } => {
+                mw_rooms.write().await.insert(room, MwState::new(worlds));
+            }
+            ClientMessage::MwDeleteRoom { room } => {
+                mw_rooms.write().await.remove(&room);
+            }
+            ClientMessage::MwResetPlayer { room, world, save: new_save } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
+                if let Some((save, queue)) = room.world_mut(world) {
+                    for &item in &queue[save.inv_amounts.num_received_mw_items.into()..] {
+                        if let Err(()) = save.recv_mw_item(item) {
+                            let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        }
+                    }
+                    *save = new_save;
+                } else {
+                    let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                }
+            } else {
+                let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+            },
+            ClientMessage::MwGetItem { room, world, item } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
+                if let Some((save, queue)) = room.world_mut(world) {
+                    queue.push(item);
+                    if let Err(()) = save.recv_mw_item(item) {
+                        let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                    }
+                } else {
+                    let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                }
+            } else {
+                let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+            },
         }
     }
 }
 
-async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Restreams, ws: WebSocket) {
+async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms, ws: WebSocket) {
     let (ws_sink, ws_stream) = ws.split();
     let ws_sink = WsSink::new(Mutex::new(ws_sink));
-    if let Err(e) = client_session(&pool, rooms, restreams, ws_stream, WsSink::clone(&ws_sink)).await {
+    if let Err(e) = client_session(&pool, rooms, restreams, mw_rooms, ws_stream, WsSink::clone(&ws_sink)).await {
         let _ = ServerMessage::from_error(e).write_warp(&mut *ws_sink.lock().await).await;
     }
 }
 
-pub(crate) async fn ws_handler(pool: PgPool, rooms: Rooms, restreams: Restreams, ws: warp::ws::Ws) -> Result<impl Reply, Rejection> {
-    Ok(ws.on_upgrade(move |ws| client_connection(pool, rooms, restreams, ws)))
+pub(crate) async fn ws_handler(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms, ws: warp::ws::Ws) -> Result<impl Reply, Rejection> {
+    Ok(ws.on_upgrade(move |ws| client_connection(pool, rooms, restreams, mw_rooms, ws)))
 }

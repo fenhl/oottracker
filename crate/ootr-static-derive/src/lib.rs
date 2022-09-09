@@ -4,14 +4,10 @@
 use {
     std::{
         collections::HashSet,
-        fs::{
-            self,
-            File,
-        },
+        fs,
         io::{
             self,
             Cursor,
-            prelude::*,
         },
         sync::Arc,
     },
@@ -21,10 +17,7 @@ use {
     },
     derive_more::From,
     directories::ProjectDirs,
-    graphql_client::{
-        GraphQLQuery,
-        Response,
-    },
+    graphql_client::GraphQLQuery,
     itertools::Itertools as _,
     proc_macro::TokenStream,
     proc_macro2::Span,
@@ -61,12 +54,8 @@ struct DevRVersionQuery;
 
 #[derive(Debug, From)]
 enum Error {
-    EmptyResponse,
     Io(io::Error),
     MissingHomeDir,
-    MissingRepo,
-    MissingVersionPy,
-    MissingVersionText,
     Rando(ootr_dynamic::RandoErr),
     Reqwest(reqwest::Error),
     Zip(ZipError),
@@ -147,28 +136,7 @@ fn derive_rando_inner(ty: Ident) -> Result<proc_macro2::TokenStream, Error> {
         .use_rustls_tls()
         .https_only(true)
         .build()?;
-    // ensure the correct randomizer version is installed
-    let remote_version_string = match client.post("https://api.github.com/graphql")
-        .bearer_auth(include_str!("../../../assets/release-token"))
-        .json(&DevRVersionQuery::build_query(dev_r_version_query::Variables {}))
-        .send()?
-        .error_for_status()?
-        .json::<Response<dev_r_version_query::ResponseData>>()?
-        .data.ok_or(Error::EmptyResponse)?
-        .repository.ok_or(Error::MissingRepo)?
-        .object.ok_or(Error::MissingVersionPy)?
-    {
-        dev_r_version_query::DevRVersionQueryRepositoryObject::Blob(blob) => blob.text.ok_or(Error::MissingVersionText)?,
-        on => panic!("unexpected GraphQL interface: {:?}", on),
-    };
     let rando_path = cache_dir.join("ootr-latest");
-    if rando_path.join("version.py").exists() {
-        let mut local_version_string = String::default();
-        File::open(rando_path.join("version.py"))?.read_to_string(&mut local_version_string)?;
-        if remote_version_string.trim() != local_version_string.trim() {
-            fs::remove_dir_all(&rando_path)?;
-        }
-    }
     if !rando_path.exists() {
         let rando_download = client.get("https://github.com/Roman971/OoT-Randomizer/archive/Dev-R.zip")
             .send()?

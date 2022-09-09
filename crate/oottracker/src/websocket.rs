@@ -1,9 +1,13 @@
 use {
-    std::fmt,
+    std::{
+        fmt,
+        num::NonZeroU8,
+    },
     async_proto::Protocol,
     crate::{
         ModelDelta,
         ModelState,
+        Save,
         ui::{
             CellRender,
             TrackerLayout,
@@ -49,6 +53,23 @@ pub enum ClientMessage {
     SetRaw {
         room: String,
         state: ModelState,
+    },
+    MwCreateRoom {
+        room: String,
+        worlds: Vec<(Option<Save>, Vec<u16>)>,
+    },
+    MwDeleteRoom {
+        room: String,
+    },
+    MwResetPlayer {
+        room: String,
+        world: NonZeroU8,
+        save: Save,
+    },
+    MwGetItem {
+        room: String,
+        world: NonZeroU8,
+        item: u16,
     },
 }
 

@@ -40,4 +40,4 @@ branch = "main"
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["blocking", "json", "rustls-tls", "trust-dns"]
+features = ["blocking", "json", "rustls-tls"]
