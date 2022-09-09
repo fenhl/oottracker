@@ -71,6 +71,22 @@ pub enum ClientMessage {
         world: NonZeroU8,
         item: u16,
     },
+    ClickMw {
+        room: String,
+        world: NonZeroU8,
+        layout: TrackerLayout,
+        cell_id: u8,
+        right: bool,
+    },
+    SubscribeMw {
+        room: String,
+        world: NonZeroU8,
+        layout: TrackerLayout,
+    },
+    MwGetItemAll {
+        room: String,
+        item: u16,
+    },
 }
 
 #[derive(Protocol)]

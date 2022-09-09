@@ -18,7 +18,6 @@ use {
             CellStyle,
             ImageInfo,
             LocationStyle,
-            TrackerLayout,
         },
     },
 };
@@ -35,10 +34,6 @@ impl RestreamState {
                 (tx, rx, players.into_iter().map(|player| (player.to_owned(), ModelState::default())).collect())
             }).collect(),
         }
-    }
-
-    pub(crate) fn layout(&self) -> TrackerLayout {
-        TrackerLayout::default() //TODO allow restreamer to set different default layouts?
     }
 
     pub(crate) fn runner(&self, runner: &str) -> Option<(&Sender<()>, &Receiver<()>, &ModelState)> {

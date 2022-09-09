@@ -54,11 +54,26 @@ function makeLayoutBuf(layoutString) {
 }
 
 function sendClick(cellID, right) {
+    const mwRoomMatch = window.location.pathname.match(/^\/mw\/([0-9A-Za-z-]+)\/([0-9]+)\/([0-9A-Za-z-]+)\/?$/);
     const roomMatch = window.location.pathname.match(/^\/room\/([0-9A-Za-z-]+)\/?$/);
     const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
     let buf;
     let bufView;
-    if (roomMatch) {
+    if (mwRoomMatch) {
+        const clickMw = new ArrayBuffer(1);
+        new DataView(clickMw).setUint8(0, 12); // ClientMessage variant: ClickMw
+        const mwRoom = utf8encoder.encode(mwRoomMatch[1]);
+        const mwRoomLen = new ArrayBuffer(8);
+        new DataView(mwRoomLen).setBigUint64(0, BigInt(mwRoom.length));
+        const world = new ArrayBuffer(1);
+        new DataView(world).setUint8(0, parseInt(mwRoomMatch[2]));
+        const mwLayoutBuf = makeLayoutBuf(mwRoomMatch[3]);
+        buf = new ArrayBuffer(2);
+        bufView = new DataView(buf);
+        bufView.setUint8(0, cellID);
+        bufView.setUint8(1, right ? 1 : 0);
+        sock.send(new Blob([clickMw, mwRoomLen, mwRoom, world, mwLayoutBuf, buf]));
+    } else if (roomMatch) {
         const clickRoom = new ArrayBuffer(1);
         new DataView(clickRoom).setUint8(0, 5); // ClientMessage variant: ClickRoom
         const room = utf8encoder.encode(roomMatch[1]);
@@ -194,10 +209,21 @@ function updateCell(cellID, data, offset) {
 }
 
 sock.addEventListener('open', function(event) {
+    const mwRoomMatch = window.location.pathname.match(/^\/mw\/([0-9A-Za-z-]+)\/([0-9]+)\/([0-9A-Za-z-]+)\/?$/);
     const roomMatch = window.location.pathname.match(/^\/room\/([0-9A-Za-z-]+)\/?$/);
     const restreamMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/?$/);
     const restreamDoubleMatch = window.location.pathname.match(/^\/restream\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/([0-9A-Za-z-]+)\/with\/([0-9A-Za-z-]+)\/?$/);
-    if (roomMatch) {
+    if (mwRoomMatch) {
+        const mwSubscription = new ArrayBuffer(1);
+        new DataView(mwSubscription).setUint8(0, 13); // ClientMessage variant: SubscribeMw
+        const mwRoom = utf8encoder.encode(mwRoomMatch[1]);
+        const mwRoomLen = new ArrayBuffer(8);
+        new DataView(mwRoomLen).setBigUint64(0, BigInt(mwRoom.length));
+        const world = new ArrayBuffer(1);
+        new DataView(world).setUint8(0, parseInt(mwRoomMatch[2]));
+        const mwLayoutBuf = makeLayoutBuf(mwRoomMatch[3]);
+        sock.send(new Blob([mwSubscription, mwRoomLen, mwRoom, world, mwLayoutBuf]));
+    } else if (roomMatch) {
         const roomSubscription = new ArrayBuffer(1);
         new DataView(roomSubscription).setUint8(0, 4); // ClientMessage variant: SubscribeRoom
         const room = utf8encoder.encode(roomMatch[1]);

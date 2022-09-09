@@ -23,9 +23,12 @@ use {
             WebSocket,
         },
     },
-    oottracker::websocket::{
-        ClientMessage,
-        ServerMessage,
+    oottracker::{
+        ModelState,
+        websocket::{
+            ClientMessage,
+            ServerMessage,
+        },
     },
     crate::{
         Error,
@@ -268,13 +271,14 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 mw_rooms.write().await.remove(&room);
             }
             ClientMessage::MwResetPlayer { room, world, save: new_save } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
-                if let Some((save, queue)) = room.world_mut(world) {
+                if let Some((tx, _, save, queue)) = room.world_mut(world) {
                     for &item in &queue[save.inv_amounts.num_received_mw_items.into()..] {
                         if let Err(()) = save.recv_mw_item(item) {
                             let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         }
                     }
                     *save = new_save;
+                    tx.send(()).expect("failed to notify websockets about state change");
                 } else {
                     let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                 }
@@ -282,13 +286,109 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
             },
             ClientMessage::MwGetItem { room, world, item } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
-                if let Some((save, queue)) = room.world_mut(world) {
+                if let Some((tx, _, save, queue)) = room.world_mut(world) {
                     queue.push(item);
                     if let Err(()) = save.recv_mw_item(item) {
                         let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                     }
+                    tx.send(()).expect("failed to notify websockets about state change");
                 } else {
                     let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                }
+            } else {
+                let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+            },
+            ClientMessage::ClickMw { room, world, layout, cell_id, right } => {
+                let mut mw_rooms = mw_rooms.write().await;
+                let mw_room = match mw_rooms.get_mut(&room) {
+                    Some(mw_room) => mw_room,
+                    None => {
+                        let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                let (tx, save) = match mw_room.world_mut(world) {
+                    Some((tx, _, save, _)) => (tx, save),
+                    None => {
+                        let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                let mut model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
+                let cell = match layout.cells().get(usize::from(cell_id)) {
+                    Some(cell) => cell.id,
+                    None => {
+                        let _ = ServerMessage::from_error("no such cell").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                        return Ok(())
+                    }
+                };
+                if right {
+                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut model);
+                } else {
+                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut model);
+                }
+                *save = model.ram.save;
+                tx.send(()).expect("failed to notify websockets about state change");
+            }
+            ClientMessage::SubscribeMw { room, world, layout } => {
+                let mw_rooms = MwRooms::clone(&mw_rooms);
+                let sink = WsSink::clone(&sink);
+                tokio::spawn(async move {
+                    let (mut old_cells, mut rx) = {
+                        let mw_rooms = mw_rooms.read().await;
+                        let mw_room = match mw_rooms.get(&room) {
+                            Some(mw_room) => mw_room,
+                            None => {
+                                let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                return
+                            }
+                        };
+                        let (rx, save) = match mw_room.world(world) {
+                            Some((_, rx, save, _)) => (rx, save),
+                            None => {
+                                let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                return
+                            }
+                        };
+                        let model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
+                        let cells = layout.cells().into_iter()
+                            .map(|cell| cell.id.kind().render(&model))
+                            .collect::<Vec<_>>();
+                        if ServerMessage::Init(cells.clone()).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                        (cells, rx.clone())
+                    };
+                    while let Ok(()) = rx.changed().await { //TODO better error handling
+                        let new_cells = {
+                            let mw_rooms = mw_rooms.read().await;
+                            let mw_room = match mw_rooms.get(&room) {
+                                Some(mw_room) => mw_room,
+                                None => {
+                                    let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                    return
+                                }
+                            };
+                            let save = match mw_room.world(world) {
+                                Some((_, _, save, _)) => save,
+                                None => {
+                                    let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+                                    return
+                                }
+                            };
+                            let model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
+                            layout.cells().into_iter().map(|cell| cell.id.kind().render(&model)).collect::<Vec<_>>()
+                        };
+                        for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {
+                            if old_cell != new_cell {
+                                if (ServerMessage::Update { cell_id: i.try_into().expect("too many cells"), new_cell: new_cell.clone() }).write_warp(&mut *sink.lock().await).await.is_err() { return } //TODO better error handling
+                            }
+                        }
+                        old_cells = new_cells;
+                    }
+                });
+            }
+            ClientMessage::MwGetItemAll { room, item } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
+                if let Err(()) = room.push_all(item) {
+                    let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                 }
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling

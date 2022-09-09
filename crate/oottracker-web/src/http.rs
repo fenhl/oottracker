@@ -1,4 +1,5 @@
 use {
+    std::num::NonZeroU8,
     rocket::{
         FromForm,
         Rocket,
@@ -13,6 +14,7 @@ use {
             content::RawHtml,
             status::NotFound,
         },
+        uri,
     },
     rocket_util::{
         Doctype,
@@ -96,18 +98,42 @@ fn post_index(form: Form<GoRoomForm<'_>>) -> Redirect {
     Redirect::to(rocket::uri!(room(form.room.to_owned())))
 }
 
-#[rocket::get("/restream/<restreamer>/<runner>")]
-async fn restream_room_input(restreams: &State<Restreams>, restreamer: String, runner: String) -> Option<RawHtml<String>> {
-    let restreams = restreams.read().await;
-    let restream = restreams.get(&restreamer)?;
-    let layout = restream.layout();
-    let (_, _, model_state_view) = restream.runner(&runner)?;
-    let pseudo_name = format!("restream/{}/{}/{}", restreamer, runner, layout);
-    Some(tracker_page("default", html! {
+#[rocket::get("/mw/<room>/<world>")]
+async fn mw_room_input(room: String, world: NonZeroU8) -> Redirect {
+    Redirect::permanent(uri!(mw_room_view(room, world, TrackerLayout::default())))
+}
+
+#[rocket::get("/mw/<room>/<world>/<layout>")]
+async fn mw_room_view(mw_rooms: &State<MwRooms>, room: String, world: NonZeroU8, layout: TrackerLayout) -> Option<RawHtml<String>> {
+    let mw_rooms = mw_rooms.read().await;
+    let mw_room = mw_rooms.get(&room)?;
+    let (_, _, save, _) = mw_room.world(world)?;
+    let model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
+    let pseudo_name = format!("mw/{room}/{world}/{layout}");
+    Some(tracker_page(&layout.to_string(), html! {
         @for cell in layout.cells() {
-            : cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model_state_view, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
+            : cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
         }
     }))
+}
+
+#[rocket::get("/mw/<room>/<world>/<layout>/click/<cell_id>")]
+async fn mw_click(mw_rooms: &State<MwRooms>, room: String, world: NonZeroU8, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
+    {
+        let mut mw_rooms = mw_rooms.write().await;
+        let mw_room = mw_rooms.get_mut(&room).ok_or(NotFound("No such multiworld room"))?;
+        let (tx, _, save, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
+        let mut model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
+        layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(&mut model);
+        *save = model.ram.save;
+        tx.send(()).expect("failed to notify websockets about state change");
+    }
+    Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout))))
+}
+
+#[rocket::get("/restream/<restreamer>/<runner>")]
+async fn restream_room_input(restreamer: String, runner: String) -> Redirect {
+    Redirect::permanent(uri!(restream_room_view(restreamer, runner, TrackerLayout::default())))
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>")]
@@ -132,11 +158,7 @@ async fn restream_click(restreams: &State<Restreams>, restreamer: String, runner
         layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(model_state_view);
         tx.send(()).expect("failed to notify websockets about state change");
     }
-    Ok(Redirect::to(if layout == TrackerLayout::default() {
-        rocket::uri!(restream_room_input(restreamer, runner))
-    } else {
-        rocket::uri!(restream_room_view(restreamer, runner, layout))
-    }))
+    Ok(Redirect::to(rocket::uri!(restream_room_view(restreamer, runner, layout))))
 }
 
 #[rocket::get("/restream/<restreamer>/<runner1>/<layout>/with/<runner2>")]
@@ -158,7 +180,7 @@ async fn restream_double_room_layout(restreams: &State<Restreams>, restreamer: S
 async fn room(rooms: &State<Rooms>, name: String) -> Result<RawHtml<String>, Error> {
     Ok(get_room(rooms, name.clone(), |room| {
         let layout = TrackerLayout::default();
-        tracker_page("default", html! {
+        tracker_page(&layout.to_string(), html! {
             @for cell in layout.cells() {
                 : cell.id.view(&name, cell.idx.try_into().expect("too many cells"), &room.model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
             }
@@ -189,6 +211,9 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms:
     .mount("/", rocket::routes![
         index,
         post_index,
+        mw_room_input,
+        mw_room_view,
+        mw_click,
         restream_room_input,
         restream_room_view,
         restream_click,
