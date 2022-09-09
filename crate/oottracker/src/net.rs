@@ -48,7 +48,6 @@ use {
     wheel::FromArc,
     crate::{
         ModelState,
-        firebase,
         proto::{
             self,
             Packet,
@@ -61,10 +60,12 @@ use {
         websocket,
     },
 };
+#[cfg(feature = "firebase")] use crate::firebase;
 
 #[derive(Debug, From, FromArc, Clone)]
 pub enum Error {
     CannotChangeState,
+    #[cfg(feature = "firebase")]
     Firebase(firebase::Error),
     #[from_arc]
     Io(Arc<io::Error>),
@@ -83,6 +84,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::CannotChangeState => write!(f, "this type of connection is read-only"),
+            #[cfg(feature = "firebase")]
             Error::Firebase(e) => e.fmt(f),
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::Protocol(e) => e.fmt(f),
@@ -101,6 +103,7 @@ pub trait Connection: fmt::Debug + Send + Sync {
     fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>>;
     fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
 
+    #[cfg(feature = "firebase")]
     fn firebase_app(&self) -> Option<&dyn firebase::App> { None }
 }
 
@@ -194,12 +197,14 @@ impl Connection for WebConnection {
     }
 }
 
+#[cfg(feature = "firebase")]
 #[derive(Debug)]
 pub struct FirebaseConnection {
     app: Box<dyn firebase::App>,
     room: firebase::DynRoom,
 }
 
+#[cfg(feature = "firebase")]
 impl FirebaseConnection {
     pub fn new<A: firebase::App + Default + Clone + Send>(room: firebase::Room<A>) -> FirebaseConnection {
         FirebaseConnection {
@@ -209,6 +214,7 @@ impl FirebaseConnection {
     }
 }
 
+#[cfg(feature = "firebase")]
 impl Connection for FirebaseConnection {
     fn hash(&self) -> u64 {
         let mut state = DefaultHasher::default();
