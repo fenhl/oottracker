@@ -96,19 +96,6 @@ pub enum MagicCapacity {
     Large = 2,
 }
 
-impl TryFrom<u8> for MagicCapacity {
-    type Error = u8;
-
-    fn try_from(raw_data: u8) -> Result<MagicCapacity, u8> {
-        match raw_data {
-            0 => Ok(MagicCapacity::None),
-            1 => Ok(MagicCapacity::Small),
-            2 => Ok(MagicCapacity::Large),
-            _ => Err(raw_data),
-        }
-    }
-}
-
 impl<'a> From<&'a MagicCapacity> for u8 {
     fn from(magic: &MagicCapacity) -> u8 {
         match magic {
@@ -1072,10 +1059,6 @@ impl Save {
         }
 
         macro_rules! try_get_offset {
-            ($name:expr, $offset:expr) => {{
-                let raw = *save_data.get($offset).ok_or(DecodeError::Index($offset))?;
-                raw.try_into().map_err(|value| DecodeError::UnexpectedValue { value, offset: $offset, field: $name })?
-            }};
             ($name:expr, $offset:expr, $len:expr) => {{
                 let raw = save_data.get($offset..$offset + $len).ok_or(DecodeError::IndexRange { start: $offset, end: $offset + $len })?.to_vec();
                 raw.try_into().map_err(|value| DecodeError::UnexpectedValueRange { value, start: $offset, end: $offset + $len, field: $name })?
@@ -1104,17 +1087,15 @@ impl Save {
                 n => return Err(DecodeError::UnexpectedValueRange { start: 0x0004, end: 0x0008, field: "is_adult", value: n.to_be_bytes().into() }),
             },
             time_of_day: try_get_offset!("time_of_day", 0x000c, 0x2),
-            magic: {
-                let magic = try_get_offset!("magic", 0x0032);
-                try_eq!(0x003a, match magic {
-                    MagicCapacity::None => 0,
-                    MagicCapacity::Small | MagicCapacity::Large => 1,
-                });
-                try_eq!(0x003c, match magic {
-                    MagicCapacity::None | MagicCapacity::Small => 0,
-                    MagicCapacity::Large => 1,
-                });
-                magic
+            magic: if get_offset!("has single magic", 0x003a) == 0 {
+                try_eq!(0x003c, 0);
+                MagicCapacity::None
+            } else {
+                if get_offset!("has double magic", 0x003c) == 0 {
+                    MagicCapacity::Small
+                } else {
+                    MagicCapacity::Large
+                }
             },
             biggoron_sword: match get_offset!("biggoron_sword", 0x003e) {
                 0 => false,
