@@ -25,7 +25,7 @@ async-proto = "0.15"
 thiserror = "1"
 
 [dependencies.clap]
-version = "3"
+version = "4"
 features = ["derive"]
 
 [dependencies.dir-lock]
@@ -48,7 +48,7 @@ branch = "main"
 [target.'cfg(windows)'.dependencies]
 async-trait = "0.1"
 #dir-lock = "0.3" #TODO release new version once new heim version is released
-graphql_client = "0.10"
+graphql_client = "0.11"
 itertools = "0.10"
 lazy-regex = "2"
 plist = "1"
@@ -90,4 +90,4 @@ features = ["derive"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 directories = "4"
-git2 = "0.14"
+git2 = "0.15"

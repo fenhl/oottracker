@@ -33,7 +33,7 @@ git = "https://github.com/fenhl/rocket-util"
 branch = "main"
 
 [dependencies.sqlx]
-version = "0.5"
+version = "0.6"
 default-features = false
 features = ["json", "macros", "postgres", "runtime-tokio-rustls"]
 

@@ -240,7 +240,6 @@ impl Application for App {
 #[derive(clap::Parser)]
 #[clap(version)]
 struct Args {
-    #[clap(parse(from_os_str))]
     path: PathBuf,
 }
 

@@ -9,11 +9,11 @@ futures = "0.3"
 iced_native = "0.5"
 image = "0.24"
 itertools = "0.10"
-open = "2"
+open = "3"
 tokio-stream = "0.1"
 
 [dependencies.clap]
-version = "3"
+version = "4"
 features = ["derive"]
 
 [dependencies.iced]
