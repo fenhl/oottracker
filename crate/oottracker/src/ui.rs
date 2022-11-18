@@ -14,7 +14,6 @@ use {
     collect_mac::collect,
     derivative::Derivative,
     directories::ProjectDirs,
-    iced::keyboard::Modifiers as KeyboardModifiers,
     image::DynamicImage,
     itertools::Itertools as _,
     serde::{
@@ -49,6 +48,7 @@ use {
         save::*,
     },
 };
+#[cfg(feature = "iced")] use iced::keyboard::Modifiers as KeyboardModifiers;
 #[cfg(feature = "rocket")] use {
     rocket::{
         http::uri::fmt::{
@@ -670,6 +670,7 @@ impl TrackerCellKind {
         }
     }
 
+    #[cfg(feature = "iced")]
     /// Returns `true` if the menu should be opened.
     #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
         #[cfg(target_os = "macos")] if keyboard_modifiers.control() {
@@ -710,6 +711,7 @@ impl TrackerCellKind {
         false
     }
 
+    #[cfg(feature = "iced")]
     /// Returns `true` if the menu should be opened.
     #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
         if let Medallion(_) = self { return true }
@@ -2292,6 +2294,7 @@ pub trait FromEmbeddedImage {
     fn from_embedded_image(contents: &'static [u8]) -> Self;
 }
 
+#[cfg(feature = "iced")]
 impl FromEmbeddedImage for iced::widget::Image {
     fn from_embedded_image(contents: &'static [u8]) -> iced::widget::Image {
         iced::widget::Image::new(iced::widget::image::Handle::from_memory(contents.to_vec()))

@@ -39,6 +39,7 @@ optional = true
 [dependencies.iced]
 version = "0.4"
 features = ["image"]
+optional = true
 
 [dependencies.once_cell]
 version = "1"

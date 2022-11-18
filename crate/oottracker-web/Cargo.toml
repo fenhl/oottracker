@@ -26,7 +26,7 @@ path = "../ootr"
 
 [dependencies.oottracker]
 path = "../oottracker"
-features = ["rocket"]
+features = ["iced", "rocket"]
 
 [dependencies.rocket-util]
 git = "https://github.com/fenhl/rocket-util"

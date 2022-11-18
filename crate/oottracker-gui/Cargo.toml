@@ -40,7 +40,7 @@ path = "../ootr-static"
 
 [dependencies.oottracker]
 path = "../oottracker"
-features = ["embed-images", "firebase"]
+features = ["embed-images", "firebase", "iced"]
 
 [dependencies.reqwest]
 version = "0.11"
