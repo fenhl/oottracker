@@ -21,7 +21,7 @@ name = "oottracker-version-bump"
 path = "src/version_bump.rs"
 
 [dependencies]
-async-proto = "0.15"
+async-proto = "0.16"
 thiserror = "1"
 
 [dependencies.clap]
@@ -54,7 +54,7 @@ lazy-regex = "2"
 plist = "1"
 serde_json = "1"
 tempfile = "3"
-toml_edit = "0.14"
+toml_edit = "0.15"
 zip = "0.6"
 
 [target.'cfg(windows)'.dependencies.ootr]

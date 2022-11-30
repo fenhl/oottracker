@@ -13,7 +13,7 @@ git = "https://github.com/fenhl/winver"
 branch = "main"
 
 [dependencies]
-async-proto = "0.15"
+async-proto = "0.16"
 itertools = "0.10"
 libc = "0.2"
 semver = "1"
