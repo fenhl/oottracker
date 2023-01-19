@@ -48,13 +48,13 @@ branch = "main"
 [target.'cfg(windows)'.dependencies]
 async-trait = "0.1"
 #dir-lock = "0.3" #TODO release new version once new heim version is released
-graphql_client = "0.11"
+graphql_client = "0.12"
 itertools = "0.10"
 lazy-regex = "2"
 plist = "1"
 serde_json = "1"
 tempfile = "3"
-toml_edit = "0.15"
+toml_edit = "0.17"
 zip = "0.6"
 
 [target.'cfg(windows)'.dependencies.ootr]
@@ -90,4 +90,4 @@ features = ["derive"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 directories = "4"
-git2 = "0.15"
+git2 = "0.16"

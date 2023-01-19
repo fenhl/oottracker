@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.10"
-pyo3 = "0.17"
+pyo3 = "0.18"
 semver = "1"
 serde_json = "1"
 
