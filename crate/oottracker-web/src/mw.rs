@@ -1,11 +1,14 @@
 use {
     std::num::NonZeroU8,
     tokio::sync::watch::*,
-    oottracker::Save,
+    oottracker::{
+        ModelState,
+        Save,
+    },
 };
 
 pub(crate) struct MwState {
-    worlds: Vec<(Sender<()>, Receiver<()>, Save, Vec<u16>)>,
+    worlds: Vec<(Sender<()>, Receiver<()>, ModelState, Vec<u16>)>,
 }
 
 impl MwState {
@@ -13,23 +16,23 @@ impl MwState {
         Self {
             worlds: worlds.into_iter().map(|(save, queue)| {
                 let (tx, rx) = channel(());
-                (tx, rx, save.unwrap_or_default(), queue)
+                (tx, rx, ModelState { ram: save.unwrap_or_default().into(), knowledge: Default::default(), tracker_ctx: Default::default() }, queue)
             }).collect(),
         }
     }
 
-    pub(crate) fn world(&self, world: NonZeroU8) -> Option<(&Sender<()>, &Receiver<()>, &Save, &[u16])> {
-        self.worlds.get(usize::from(world.get() - 1)).map(|(tx, rx, save, queue)| (tx, rx, save, &**queue))
+    pub(crate) fn world(&self, world: NonZeroU8) -> Option<(&Sender<()>, &Receiver<()>, &ModelState, &[u16])> {
+        self.worlds.get(usize::from(world.get() - 1)).map(|(tx, rx, model, queue)| (tx, rx, model, &**queue))
     }
 
-    pub(crate) fn world_mut(&mut self, world: NonZeroU8) -> Option<(&Sender<()>, &Receiver<()>, &mut Save, &mut Vec<u16>)> {
-        self.worlds.get_mut(usize::from(world.get() - 1)).map(|(tx, rx, save, queue)| (&*tx, &*rx, save, &mut *queue))
+    pub(crate) fn world_mut(&mut self, world: NonZeroU8) -> Option<(&Sender<()>, &Receiver<()>, &mut ModelState, &mut Vec<u16>)> {
+        self.worlds.get_mut(usize::from(world.get() - 1)).map(|(tx, rx, model, queue)| (&*tx, &*rx, model, &mut *queue))
     }
 
     pub(crate) fn push_all(&mut self, item: u16) -> Result<(), ()> {
-        for (tx, _, save, queue) in &mut self.worlds {
+        for (tx, _, model, queue) in &mut self.worlds {
             queue.push(item);
-            save.recv_mw_item(item)?;
+            model.ram.save.recv_mw_item(item)?;
             tx.send(()).expect("failed to notify websockets about state change");
         }
         Ok(())

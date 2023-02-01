@@ -23,12 +23,9 @@ use {
             WebSocket,
         },
     },
-    oottracker::{
-        ModelState,
-        websocket::{
-            ClientMessage,
-            ServerMessage,
-        },
+    oottracker::websocket::{
+        ClientMessage,
+        ServerMessage,
     },
     crate::{
         Error,
@@ -271,13 +268,13 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 mw_rooms.write().await.remove(&room);
             }
             ClientMessage::MwResetPlayer { room, world, save: new_save } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
-                if let Some((tx, _, save, queue)) = room.world_mut(world) {
-                    for &item in &queue[save.inv_amounts.num_received_mw_items.into()..] {
-                        if let Err(()) = save.recv_mw_item(item) {
+                if let Some((tx, _, model, queue)) = room.world_mut(world) {
+                    model.ram.save = new_save;
+                    for &item in &queue[model.ram.save.inv_amounts.num_received_mw_items.into()..] {
+                        if let Err(()) = model.ram.save.recv_mw_item(item) {
                             let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         }
                     }
-                    *save = new_save;
                     tx.send(()).expect("failed to notify websockets about state change");
                 } else {
                     let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
@@ -286,9 +283,9 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
             },
             ClientMessage::MwGetItem { room, world, item } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
-                if let Some((tx, _, save, queue)) = room.world_mut(world) {
+                if let Some((tx, _, model, queue)) = room.world_mut(world) {
                     queue.push(item);
-                    if let Err(()) = save.recv_mw_item(item) {
+                    if let Err(()) = model.ram.save.recv_mw_item(item) {
                         let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                     }
                     tx.send(()).expect("failed to notify websockets about state change");
@@ -307,14 +304,13 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                         return Ok(())
                     }
                 };
-                let (tx, save) = match mw_room.world_mut(world) {
-                    Some((tx, _, save, _)) => (tx, save),
+                let (tx, model) = match mw_room.world_mut(world) {
+                    Some((tx, _, model, _)) => (tx, model),
                     None => {
                         let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())
                     }
                 };
-                let mut model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
                 let cell = match layout.cells().get(usize::from(cell_id)) {
                     Some(cell) => cell.id,
                     None => {
@@ -323,11 +319,10 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 };
                 if right {
-                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut model);
+                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), model);
                 } else {
-                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut model);
+                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), model);
                 }
-                *save = model.ram.save;
                 tx.send(()).expect("failed to notify websockets about state change");
             }
             ClientMessage::SubscribeMw { room, world, layout } => {
@@ -343,14 +338,13 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                                 return
                             }
                         };
-                        let (rx, save) = match mw_room.world(world) {
-                            Some((_, rx, save, _)) => (rx, save),
+                        let (rx, model) = match mw_room.world(world) {
+                            Some((_, rx, model, _)) => (rx, model),
                             None => {
                                 let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                                 return
                             }
                         };
-                        let model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
                         let cells = layout.cells().into_iter()
                             .map(|cell| cell.id.kind().render(&model))
                             .collect::<Vec<_>>();
@@ -367,14 +361,13 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                                     return
                                 }
                             };
-                            let save = match mw_room.world(world) {
-                                Some((_, _, save, _)) => save,
+                            let model = match mw_room.world(world) {
+                                Some((_, _, model, _)) => model,
                                 None => {
                                     let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                                     return
                                 }
                             };
-                            let model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
                             layout.cells().into_iter().map(|cell| cell.id.kind().render(&model)).collect::<Vec<_>>()
                         };
                         for (i, (old_cell, new_cell)) in old_cells.iter().zip(&new_cells).enumerate() {

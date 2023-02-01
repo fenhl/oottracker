@@ -107,12 +107,11 @@ async fn mw_room_input(room: String, world: NonZeroU8) -> Redirect {
 async fn mw_room_view(mw_rooms: &State<MwRooms>, room: String, world: NonZeroU8, layout: TrackerLayout) -> Option<RawHtml<String>> {
     let mw_rooms = mw_rooms.read().await;
     let mw_room = mw_rooms.get(&room)?;
-    let (_, _, save, _) = mw_room.world(world)?;
-    let model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
+    let (_, _, model, _) = mw_room.world(world)?;
     let pseudo_name = format!("mw/{room}/{world}/{layout}");
     Some(tracker_page(&layout.to_string(), html! {
         @for cell in layout.cells() {
-            : cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), &model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
+            : cell.id.view(&pseudo_name, cell.idx.try_into().expect("too many cells"), model, (cell.size[0] / 20 + 1) as u8, cell.size[1] < 30);
         }
     }))
 }
@@ -122,10 +121,8 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: String, world: NonZeroU8, lay
     {
         let mut mw_rooms = mw_rooms.write().await;
         let mw_room = mw_rooms.get_mut(&room).ok_or(NotFound("No such multiworld room"))?;
-        let (tx, _, save, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
-        let mut model = ModelState { ram: save.clone().into(), knowledge: Default::default(), tracker_ctx: Default::default() };
-        layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(&mut model);
-        *save = model.ram.save;
+        let (tx, _, model, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
+        layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(model);
         tx.send(()).expect("failed to notify websockets about state change");
     }
     Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout))))
