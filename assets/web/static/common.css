@@ -21,12 +21,14 @@ a {
 }
 
 /* 3-column layouts */
-.items.dungeon-rewards {
+.items.dungeon-rewards,
+.items.tsg-main-locs {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 
 /* 4-column layouts */
-.items.mw-expanded {
+.items.mw-expanded,
+.items.tsg-main-locs-edit {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 
