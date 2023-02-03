@@ -1,0 +1,26 @@
+html,
+body {
+    background-color: white;
+    color: black;
+}
+
+a {
+    color: #6600ff;
+}
+
+.items img {
+    filter: drop-shadow(1px 1px 0 black);
+}
+
+.items .loc {
+    filter: invert(1);
+}
+
+.items .mq {
+    filter: brightness(50%) sepia(100) saturate(100);
+}
+
+.count {
+    color: black;
+    background-color: rgba(255, 255, 255, 0.65);
+}
