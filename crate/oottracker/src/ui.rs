@@ -246,6 +246,7 @@ pub enum TrackerCellKind {
     MagicLens, // magic meter with a Lens of Truth overlay, but auto-trackers/shift-click also show a different icon for double magic
     Medallion(Medallion),
     MedallionLocation(Medallion),
+    MedallionWithLocation(Medallion),
     Mq(Dungeon),
     OptionalOverlay {
         main_img: ImageInfo,
@@ -290,6 +291,7 @@ pub enum TrackerCellKind {
     Spells, // composite Din's Fire & Farore's Wind, but auto-trackers/shift-click also toggle Nayru's Love
     Stone(Stone),
     StoneLocation(Stone),
+    StoneWithLocation(Stone),
 }
 
 impl TrackerCellKind {
@@ -443,6 +445,28 @@ impl TrackerCellKind {
                     overlay: CellOverlay::None,
                 }
             }
+            MedallionWithLocation(med) => {
+                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Medallion(*med));
+                CellRender {
+                    img: ImageInfo::new(format!("{}_medallion", med.element().to_ascii_lowercase())),
+                    style: if state.ram.save.quest_items.has(*med) { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::Location {
+                        loc: ImageInfo::new(match location {
+                            None => "unknown_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+                            Some(DungeonRewardLocation::LinksPocket) => "free_text",
+                        }),
+                        style: if location.is_some() { LocationStyle::Normal } else { LocationStyle::Dimmed },
+                    },
+                }
+            }
             Mq(dungeon) => {
                 let reward = if let Dungeon::Main(main_dungeon) = *dungeon {
                     state.knowledge.dungeon_reward_locations.iter()
@@ -593,6 +617,32 @@ impl TrackerCellKind {
                     overlay: CellOverlay::None,
                 }
             },
+            StoneWithLocation(stone) => {
+                let location = state.knowledge.dungeon_reward_locations.get(&DungeonReward::Stone(*stone));
+                CellRender {
+                    img: ImageInfo::new(match *stone {
+                        Stone::KokiriEmerald => "kokiri_emerald",
+                        Stone::GoronRuby => "goron_ruby",
+                        Stone::ZoraSapphire => "zora_sapphire",
+                    }),
+                    style: if state.ram.save.quest_items.has(*stone) { CellStyle::Normal } else { CellStyle::Dimmed },
+                    overlay: CellOverlay::Location {
+                        loc: ImageInfo::new(match location {
+                            None => "unknown_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::DekuTree)) => "deku_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::DodongosCavern)) => "dc_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::JabuJabu)) => "jabu_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::ForestTemple)) => "forest_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::FireTemple)) => "fire_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::WaterTemple)) => "water_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::ShadowTemple)) => "shadow_text",
+                            Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => "spirit_text",
+                            Some(DungeonRewardLocation::LinksPocket) => "free_text",
+                        }),
+                        style: if location.is_some() { LocationStyle::Normal } else { LocationStyle::Dimmed },
+                    },
+                }
+            }
         }
     }
 
@@ -644,6 +694,7 @@ impl TrackerCellKind {
             }
             Medallion(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
             MedallionLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
+            MedallionWithLocation(med) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Medallion(*med)),
             Mq(dungeon) => if state.knowledge.mq.get(dungeon) == Some(&Mq::Mq) {
                 state.knowledge.mq.remove(dungeon);
             } else {
@@ -665,6 +716,7 @@ impl TrackerCellKind {
             }
             Stone(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
+            StoneWithLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
             FreeReward => {}
             BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
         }
@@ -741,6 +793,7 @@ impl TrackerCellKind {
                 MagicLens => state.ram.save.inv.lens = !state.ram.save.inv.lens,
                 Medallion(_) => unreachable!("already handled above"),
                 MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
+                MedallionWithLocation(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
                 Sequence { decrement, .. } => decrement(state),
                 TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } => {
                     let num = get(&state.ram.save.small_keys);
@@ -753,6 +806,7 @@ impl TrackerCellKind {
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
                 Spells => state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind,
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
+                StoneWithLocation(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
                 FreeReward | FortressMq | Mq(_) | Simple { .. } | Stone(_) => {}
                 BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
             }
@@ -799,18 +853,24 @@ cells! {
         }),
     },
     GoBk: GoBk,
-    LightMedallionLocation: MedallionLocation(Medallion::Light),
-    ForestMedallionLocation: MedallionLocation(Medallion::Forest),
-    FireMedallionLocation: MedallionLocation(Medallion::Fire),
-    WaterMedallionLocation: MedallionLocation(Medallion::Water),
-    ShadowMedallionLocation: MedallionLocation(Medallion::Shadow),
-    SpiritMedallionLocation: MedallionLocation(Medallion::Spirit),
     LightMedallion: Medallion(Medallion::Light),
     ForestMedallion: Medallion(Medallion::Forest),
     FireMedallion: Medallion(Medallion::Fire),
     WaterMedallion: Medallion(Medallion::Water),
     ShadowMedallion: Medallion(Medallion::Shadow),
     SpiritMedallion: Medallion(Medallion::Spirit),
+    LightMedallionLocation: MedallionLocation(Medallion::Light),
+    ForestMedallionLocation: MedallionLocation(Medallion::Forest),
+    FireMedallionLocation: MedallionLocation(Medallion::Fire),
+    WaterMedallionLocation: MedallionLocation(Medallion::Water),
+    ShadowMedallionLocation: MedallionLocation(Medallion::Shadow),
+    SpiritMedallionLocation: MedallionLocation(Medallion::Spirit),
+    LightMedallionWithLocation: MedallionWithLocation(Medallion::Light),
+    ForestMedallionWithLocation: MedallionWithLocation(Medallion::Forest),
+    FireMedallionWithLocation: MedallionWithLocation(Medallion::Fire),
+    WaterMedallionWithLocation: MedallionWithLocation(Medallion::Water),
+    ShadowMedallionWithLocation: MedallionWithLocation(Medallion::Shadow),
+    SpiritMedallionWithLocation: MedallionWithLocation(Medallion::Spirit),
     AdultTrade: Sequence {
         idx: Box::new(|state| match state.ram.save.inv.adult_trade_item {
             AdultTradeItem::None => 0,
@@ -938,12 +998,15 @@ cells! {
         max: 50,
         step: 10,
     },
-    KokiriEmeraldLocation: StoneLocation(Stone::KokiriEmerald),
     KokiriEmerald: Stone(Stone::KokiriEmerald),
-    GoronRubyLocation: StoneLocation(Stone::GoronRuby),
     GoronRuby: Stone(Stone::GoronRuby),
-    ZoraSapphireLocation: StoneLocation(Stone::ZoraSapphire),
     ZoraSapphire: Stone(Stone::ZoraSapphire),
+    KokiriEmeraldLocation: StoneLocation(Stone::KokiriEmerald),
+    GoronRubyLocation: StoneLocation(Stone::GoronRuby),
+    ZoraSapphireLocation: StoneLocation(Stone::ZoraSapphire),
+    KokiriEmeraldWithLocation: StoneWithLocation(Stone::KokiriEmerald),
+    GoronRubyWithLocation: StoneWithLocation(Stone::GoronRuby),
+    ZoraSapphireWithLocation: StoneWithLocation(Stone::ZoraSapphire),
     Bottle: OptionalOverlay {
         main_img: ImageInfo::new("bottle"),
         overlay_img: ImageInfo::new("letter"),
@@ -1145,6 +1208,14 @@ cells! {
         img: ImageInfo::new("lens"),
         active: Box::new(|state| state.ram.save.inv.lens),
         toggle: Box::new(|state| state.ram.save.inv.lens = !state.ram.save.inv.lens),
+    },
+    DinsFarores: Composite {
+        left_img: ImageInfo::new("dins_fire"),
+        right_img: ImageInfo::new("farores_wind"),
+        both_img: ImageInfo::new("composite_magic"),
+        active: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
+        toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
+        toggle_right: Box::new(|state| state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind),
     },
     Spells: Spells,
     DinsFire: Simple {
@@ -1449,6 +1520,13 @@ cells! {
         active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.quest_items.contains(QuestItems::GERUDO_CARD))),
         toggle_left: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
         toggle_right: Box::new(|state| state.ram.save.quest_items.toggle(QuestItems::GERUDO_CARD)),
+    },
+    SwordShield: Overlay {
+        main_img: ImageInfo::new("kokiri_sword"),
+        overlay_img: ImageInfo::extra("deku_shield_badge"),
+        active: Box::new(|state| (state.ram.save.equipment.contains(Equipment::KOKIRI_SWORD), state.ram.save.equipment.contains(Equipment::DEKU_SHIELD))),
+        toggle_main: Box::new(|state| state.ram.save.equipment.toggle(Equipment::KOKIRI_SWORD)),
+        toggle_overlay: Box::new(|state| state.ram.save.equipment.toggle(Equipment::DEKU_SHIELD)),
     },
     KokiriSword: Simple {
         img: ImageInfo::new("kokiri_sword"),
@@ -1861,6 +1939,8 @@ pub enum TrackerLayout {
     RslRight,
     RslEdit,
     Rsl3Player,
+    TsgMainWithRewardLocations,
+    TsgMainWithRewardLocationsEdit,
 }
 
 pub struct CellLayout {
@@ -1897,7 +1977,7 @@ impl TrackerLayout {
         }
 
         match self {
-            TrackerLayout::Default { auto, meds, warp_songs } => {
+            Self::Default { auto, meds, warp_songs } => {
                 meds.into_iter().enumerate().map(|(idx, med)| CellLayout { idx, id: TrackerCellId::med_location(med), pos: [idx as u16 * 60 + 5, 5], size: [50, 18] })
                     .chain(meds.into_iter().enumerate().map(|(idx, med)| CellLayout { idx: idx + 6, id: TrackerCellId::from(med), pos: [idx as u16 * 60 + 5, 33], size: [50, 50] }))
                     .chain(vec![
@@ -1924,7 +2004,7 @@ impl TrackerLayout {
                     )
                     .collect()
             }
-            TrackerLayout::MultiworldExpanded => columns!(4, [
+            Self::MultiworldExpanded => columns!(4, [
                 SwordCard, Slingshot, Skulltula, GoBk,
                 Bombs, Bow, ZeldasLullaby, Minuet,
                 Boomerang, Hammer, EponasSong, Bolero,
@@ -1933,12 +2013,12 @@ impl TrackerLayout {
                 MirrorShield, Strength, SongOfTime, Nocturne,
                 Boots, Scale, SongOfStorms, Prelude,
             ]),
-            TrackerLayout::MultiworldCollapsed => columns!(10, [
+            Self::MultiworldCollapsed => columns!(10, [
                 SwordCard, Bottle, Skulltula, Strength, Scale, Spells, Slingshot, Bombs, Boomerang, GoBk,
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms, Hookshot, Bow, Hammer, Magic,
                 Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude, MirrorShield, Boots, Arrows, Tunics, //TODO replace tunics with wallets once images exist
             ]),
-            TrackerLayout::MultiworldEdit => vec![
+            Self::MultiworldEdit => vec![
                 KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, LightMedallionLocation, ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation,
             ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx, id, pos: [idx as u16 * 40 + 5, 5], size: [30, 10] }).chain(vec![
                 KokiriEmerald, GoronRuby, ZoraSapphire, LightMedallion, ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion,
@@ -1949,7 +2029,7 @@ impl TrackerLayout {
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
                 Minuet, Bolero, Serenade, Requiem, Nocturne, Prelude,
             ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx: idx + 18, id, pos: [idx as u16 % 6 * 60 + 5, idx as u16 / 6 * 60 + 65], size: [50, 50] })).collect(),
-            TrackerLayout::RslLeft => columns!(9, [
+            Self::RslLeft => columns!(9, [
                 Slingshot, Bombs, Boomerang, Skulltula, GoMode, GanonMq, GanonKeys, DekuMq, Blank,
                 Hookshot, Bow, Hammer, ZeldasLullaby, Minuet, ForestMq, ForestKeys, DcMq, Blank,
                 Bottle, Strength, Scale, EponasSong, Bolero, FireMq, FireKeys, JabuMq, Blank,
@@ -1958,7 +2038,7 @@ impl TrackerLayout {
                 MagicLens, Spells, Arrows, SongOfTime, Nocturne, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
                 MirrorShield, Boots, Ocarina, SongOfStorms, Prelude, FreeReward, Blank, GtgMq, GtgSmallKeys,
             ]),
-            TrackerLayout::RslRight => TrackerLayout::RslLeft.cells()
+            Self::RslRight => Self::RslLeft.cells()
                 .into_iter()
                 .chunks(9)
                 .into_iter()
@@ -1970,8 +2050,8 @@ impl TrackerLayout {
                     .map(move |(col_idx, CellLayout { id, size, .. })| CellLayout { idx: row_idx * 9 + col_idx, id, pos: [col_idx as u16 * 60 + 5, row_idx as u16 * 60 + 5], size })
                 )
                 .collect(),
-            TrackerLayout::RslEdit => {
-                let mut cells = TrackerLayout::MultiworldEdit.cells();
+            Self::RslEdit => {
+                let mut cells = Self::MultiworldEdit.cells();
                 cells[23].id = GoMode; // unlike multiworld, RSL doesn't track BK mode
                 cells[28].id = MagicLens; // lens is not necessarily a starting item in RSL
                 let num_cells_mw = cells.len();
@@ -1984,13 +2064,34 @@ impl TrackerLayout {
                 ].into_iter().enumerate().map(|(idx, id)| CellLayout { idx: idx + num_cells_mw, id, pos: [idx as u16 % 6 * 60 + 5, idx as u16 / 6 * 60 + 5], size: [50, 50] }));
                 cells
             }
-            TrackerLayout::Rsl3Player => columns!(10, [
+            Self::Rsl3Player => columns!(10, [
                 ZeldasLullaby, Minuet, Slingshot, Bottle, MagicLens, Hammer, FreeReward, Blank, DekuMq, GoMode,
                 EponasSong, Bolero, Bombs, Strength, Spells, SwordCard, ForestMq, ForestKeys, DcMq, Triforce,
                 SariasSong, Serenade, Boomerang, Scale, Arrows, Ocarina, FireMq, FireKeys, JabuMq, Skulltula,
                 SunsSong, Requiem, Hookshot, ChildTrade, MirrorShield, AdultTrade, WaterMq, WaterKeys, WellMq, WellSmallKeys,
                 SongOfTime, Nocturne, Bow, Beans, Boots, Tunics, ShadowMq, ShadowKeys, FortressMq, FortressSmallKeys,
                 SongOfStorms, Prelude, IceMq, Blank, GanonMq, GanonKeys, SpiritMq, SpiritKeys, GtgMq, GtgSmallKeys,
+            ]),
+            Self::TsgMainWithRewardLocations => columns!(3, [
+                SwordShield, Slingshot, GoBk,
+                Bombs, Bow, ForestMedallionWithLocation,
+                Boomerang, Hammer, FireMedallionWithLocation,
+                Hookshot, DinsFarores, WaterMedallionWithLocation,
+                Bottle, Arrows, ShadowMedallionWithLocation,
+                MirrorShield, Strength, SpiritMedallionWithLocation,
+                Boots, Scale, LightMedallionWithLocation,
+                KokiriEmeraldWithLocation, GoronRubyWithLocation, ZoraSapphireWithLocation,
+            ]),
+            Self::TsgMainWithRewardLocationsEdit => columns!(4, [
+                SwordShield, Slingshot, GoBk, Blank,
+                Bombs, Bow, ForestMedallion, ForestMedallionLocation,
+                Boomerang, Hammer, FireMedallion, FireMedallionLocation,
+                Hookshot, DinsFarores, WaterMedallion, WaterMedallionLocation,
+                Bottle, Arrows, ShadowMedallion, ShadowMedallionLocation,
+                MirrorShield, Strength, SpiritMedallion, SpiritMedallionLocation,
+                Boots, Scale, LightMedallion, LightMedallionLocation,
+                KokiriEmerald, GoronRuby, ZoraSapphire, Blank,
+                KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, Blank,
             ]),
         }
     }
@@ -2020,15 +2121,17 @@ impl<'a> From<&'a Option<Config>> for TrackerLayout {
 impl fmt::Display for TrackerLayout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TrackerLayout::Default { .. } if *self == TrackerLayout::default() => write!(f, "default"),
-            TrackerLayout::Default { .. } => unimplemented!(), //TODO
-            TrackerLayout::MultiworldExpanded => write!(f, "mw-expanded"),
-            TrackerLayout::MultiworldCollapsed => write!(f, "mw-collapsed"),
-            TrackerLayout::MultiworldEdit => write!(f, "mw-edit"),
-            TrackerLayout::RslLeft => write!(f, "rsl-left"),
-            TrackerLayout::RslRight => write!(f, "rsl-right"),
-            TrackerLayout::RslEdit => write!(f, "rsl-edit"),
-            TrackerLayout::Rsl3Player => write!(f, "rsl-3player"),
+            Self::Default { .. } if *self == TrackerLayout::default() => write!(f, "default"),
+            Self::Default { .. } => unimplemented!(), //TODO
+            Self::MultiworldExpanded => write!(f, "mw-expanded"),
+            Self::MultiworldCollapsed => write!(f, "mw-collapsed"),
+            Self::MultiworldEdit => write!(f, "mw-edit"),
+            Self::RslLeft => write!(f, "rsl-left"),
+            Self::RslRight => write!(f, "rsl-right"),
+            Self::RslEdit => write!(f, "rsl-edit"),
+            Self::Rsl3Player => write!(f, "rsl-3player"),
+            Self::TsgMainWithRewardLocations => write!(f, "tsg-main-locs"),
+            Self::TsgMainWithRewardLocationsEdit => write!(f, "tsg-main-locs-edit"),
         }
     }
 }
@@ -2048,6 +2151,8 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "rsl-right" => TrackerLayout::RslRight,
             "rsl-edit" => TrackerLayout::RslEdit,
             "rsl-3player" => TrackerLayout::Rsl3Player,
+            "tsg-main-locs" => TrackerLayout::TsgMainWithRewardLocations,
+            "tsg-main-locs-edit" => TrackerLayout::TsgMainWithRewardLocationsEdit,
             _ => return Err(()),
         })
     }

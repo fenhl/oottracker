@@ -239,7 +239,7 @@ pub trait App: fmt::Debug + Send + Sync + 'static {
                     _ => return Err(value),
                 };
             }
-            BigPoeTriforce | CompositeKeys { .. } | GoBk | FreeReward | MagicLens => unimplemented!(),
+            BigPoeTriforce | CompositeKeys { .. } | GoBk | FreeReward | MagicLens | MedallionWithLocation(_) | StoneWithLocation(_) => unimplemented!(),
         }
         Ok(())
     }
@@ -770,6 +770,6 @@ fn render_cell(cell_kind: TrackerCellKind, state: &ModelState) -> Json {
             Some(DungeonRewardLocation::Dungeon(MainDungeon::SpiritTemple)) => 8,
             Some(DungeonRewardLocation::LinksPocket) => 9,
         }),
-        BigPoeTriforce | CompositeKeys { .. } | FreeReward | GoBk | MagicLens => unimplemented!(),
+        BigPoeTriforce | CompositeKeys { .. } | FreeReward | GoBk | MagicLens | MedallionWithLocation(_) | StoneWithLocation(_) => unimplemented!(),
     }
 }

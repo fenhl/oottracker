@@ -5,6 +5,7 @@ use {
         FromFormField,
         Rocket,
         State,
+        UriDisplayQuery,
         form::Form,
         fs::{
             FileServer,
@@ -57,7 +58,7 @@ impl TrackerCellIdExt for TrackerCellId {
     }
 }
 
-#[derive(FromFormField)]
+#[derive(FromFormField, UriDisplayQuery)]
 enum Theme {
     Light,
     Dark,
@@ -110,9 +111,9 @@ fn post_index(form: Form<GoRoomForm<'_>>) -> Redirect {
     Redirect::to(rocket::uri!(room(form.room.to_owned(), _)))
 }
 
-#[rocket::get("/mw/<room>/<world>")]
-async fn mw_room_input(room: String, world: NonZeroU8) -> Redirect {
-    Redirect::permanent(uri!(mw_room_view(room, world, TrackerLayout::default(), _)))
+#[rocket::get("/mw/<room>/<world>?<theme>")]
+async fn mw_room_input(room: String, world: NonZeroU8, theme: Option<Theme>) -> Redirect {
+    Redirect::permanent(uri!(mw_room_view(room, world, TrackerLayout::default(), theme)))
 }
 
 #[rocket::get("/mw/<room>/<world>/<layout>?<theme>")]
@@ -140,9 +141,9 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: String, world: NonZeroU8, lay
     Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout, _))))
 }
 
-#[rocket::get("/restream/<restreamer>/<runner>")]
-async fn restream_room_input(restreamer: String, runner: String) -> Redirect {
-    Redirect::permanent(uri!(restream_room_view(restreamer, runner, TrackerLayout::default(), _)))
+#[rocket::get("/restream/<restreamer>/<runner>?<theme>")]
+async fn restream_room_input(restreamer: String, runner: String, theme: Option<Theme>) -> Redirect {
+    Redirect::permanent(uri!(restream_room_view(restreamer, runner, TrackerLayout::default(), theme)))
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>/<layout>?<theme>")]
