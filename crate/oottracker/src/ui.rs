@@ -1925,7 +1925,7 @@ impl From<Medallion> for TrackerCellId {
     }
 }
 
-#[derive(Debug, PartialEq, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Protocol)]
 pub enum TrackerLayout {
     Default {
         auto: bool,
