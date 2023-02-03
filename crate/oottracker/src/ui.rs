@@ -2098,12 +2098,12 @@ impl TrackerLayout {
 }
 
 impl Default for TrackerLayout {
-    fn default() -> TrackerLayout { TrackerLayout::from(&Config::default()) }
+    fn default() -> Self { Self::from(&Config::default()) }
 }
 
 impl<'a> From<&'a Config> for TrackerLayout {
-    fn from(config: &Config) -> TrackerLayout {
-        TrackerLayout::Default {
+    fn from(config: &Config) -> Self {
+        Self::Default {
             auto: false,
             meds: config.med_order,
             warp_songs: config.warp_song_order,
@@ -2112,8 +2112,8 @@ impl<'a> From<&'a Config> for TrackerLayout {
 }
 
 impl<'a> From<&'a Option<Config>> for TrackerLayout {
-    fn from(config: &Option<Config>) -> TrackerLayout {
-        config.as_ref().map(TrackerLayout::from).unwrap_or_default()
+    fn from(config: &Option<Config>) -> Self {
+        config.as_ref().map(Self::from).unwrap_or_default()
     }
 }
 
@@ -2140,19 +2140,19 @@ impl fmt::Display for TrackerLayout {
 impl<'a> FromParam<'a> for TrackerLayout {
     type Error = ();
 
-    fn from_param(param: &'a str) -> Result<TrackerLayout, ()> {
+    fn from_param(param: &'a str) -> Result<Self, ()> {
         Ok(match param {
-            "default" => TrackerLayout::default(),
+            "default" => Self::default(),
             //TODO parse Default variant with custom fields
-            "mw-expanded" => TrackerLayout::MultiworldExpanded,
-            "mw-collapsed" => TrackerLayout::MultiworldCollapsed,
-            "mw-edit" => TrackerLayout::MultiworldEdit,
-            "rsl-left" => TrackerLayout::RslLeft,
-            "rsl-right" => TrackerLayout::RslRight,
-            "rsl-edit" => TrackerLayout::RslEdit,
-            "rsl-3player" => TrackerLayout::Rsl3Player,
-            "tsg-main-locs" => TrackerLayout::TsgMainWithRewardLocations,
-            "tsg-main-locs-edit" => TrackerLayout::TsgMainWithRewardLocationsEdit,
+            "mw-expanded" => Self::MultiworldExpanded,
+            "mw-collapsed" => Self::MultiworldCollapsed,
+            "mw-edit" => Self::MultiworldEdit,
+            "rsl-left" => Self::RslLeft,
+            "rsl-right" => Self::RslRight,
+            "rsl-edit" => Self::RslEdit,
+            "rsl-3player" => Self::Rsl3Player,
+            "tsg-main-locs" => Self::TsgMainWithRewardLocations,
+            "tsg-main-locs-edit" => Self::TsgMainWithRewardLocationsEdit,
             _ => return Err(()),
         })
     }

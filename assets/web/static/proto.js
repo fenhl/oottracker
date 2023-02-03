@@ -48,6 +48,12 @@ function makeLayoutBuf(layoutString) {
         case 'rsl-3player':
             new DataView(buf).setUint8(0, 7);
             return buf;
+        case 'tsg-main-locs':
+            new DataView(buf).setUint8(0, 8);
+            return buf;
+        case 'tsg-main-locs-edit':
+            new DataView(buf).setUint8(0, 9);
+            return buf;
         default:
             throw 'unknown layout';
     }
