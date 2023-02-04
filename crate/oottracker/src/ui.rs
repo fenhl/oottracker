@@ -1941,6 +1941,7 @@ pub enum TrackerLayout {
     Rsl3Player,
     TsgMainWithRewardLocations,
     TsgMainWithRewardLocationsEdit,
+    TriforcePieces,
 }
 
 pub struct CellLayout {
@@ -2093,6 +2094,9 @@ impl TrackerLayout {
                 KokiriEmerald, GoronRuby, ZoraSapphire, Blank,
                 KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, Blank,
             ]),
+            Self::TriforcePieces => columns!(1, [
+                Triforce,
+            ]),
         }
     }
 }
@@ -2132,6 +2136,7 @@ impl fmt::Display for TrackerLayout {
             Self::Rsl3Player => write!(f, "rsl-3player"),
             Self::TsgMainWithRewardLocations => write!(f, "tsg-main-locs"),
             Self::TsgMainWithRewardLocationsEdit => write!(f, "tsg-main-locs-edit"),
+            Self::TriforcePieces => write!(f, "triforce-pieces"),
         }
     }
 }
@@ -2153,6 +2158,7 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "rsl-3player" => Self::Rsl3Player,
             "tsg-main-locs" => Self::TsgMainWithRewardLocations,
             "tsg-main-locs-edit" => Self::TsgMainWithRewardLocationsEdit,
+            "triforce-pieces" => Self::TriforcePieces,
             _ => return Err(()),
         })
     }

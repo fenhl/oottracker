@@ -20,6 +20,11 @@ a {
     padding: 5px;
 }
 
+/* 1-column layouts */
+.items.triforce-pieces {
+    grid-template-columns: 10px;
+}
+
 /* 3-column layouts */
 .items.dungeon-rewards,
 .items.tsg-main-locs {
