@@ -1211,7 +1211,7 @@ cells! {
     },
     DinsFarores: Composite {
         left_img: ImageInfo::new("dins_fire"),
-        right_img: ImageInfo::new("farores_wind"),
+        right_img: ImageInfo::new("faores_wind"),
         both_img: ImageInfo::new("composite_magic"),
         active: Box::new(|state| (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind)),
         toggle_left: Box::new(|state| state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire),
