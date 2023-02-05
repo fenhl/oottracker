@@ -16,6 +16,13 @@ use {
     },
 };
 
+#[derive(Debug, Clone, Copy, Protocol)]
+pub struct MwItem {
+    pub source: NonZeroU8,
+    pub key: u32,
+    pub kind: u16,
+}
+
 #[derive(Protocol)]
 pub enum ClientMessage {
     Pong,
@@ -56,7 +63,7 @@ pub enum ClientMessage {
     },
     MwCreateRoom {
         room: String,
-        worlds: Vec<(Option<Save>, Vec<u16>)>,
+        worlds: Vec<(Option<Save>, Vec<MwItem>)>,
     },
     MwDeleteRoom {
         room: String,
@@ -66,6 +73,7 @@ pub enum ClientMessage {
         world: NonZeroU8,
         save: Save,
     },
+    /// No longer supported. Use `MwQueueItem` instead.
     MwGetItem {
         room: String,
         world: NonZeroU8,
@@ -83,9 +91,17 @@ pub enum ClientMessage {
         world: NonZeroU8,
         layout: TrackerLayout,
     },
+    /// No longer supported. Use `MwQueueItem` instead.
     MwGetItemAll {
         room: String,
         item: u16,
+    },
+    MwQueueItem {
+        room: String,
+        source_world: NonZeroU8,
+        key: u32,
+        kind: u16,
+        target_world: NonZeroU8,
     },
 }
 

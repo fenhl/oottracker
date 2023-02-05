@@ -271,7 +271,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 if let Some((tx, _, model, queue)) = room.world_mut(world) {
                     model.ram.save = new_save;
                     for &item in &queue[model.ram.save.inv_amounts.num_received_mw_items.into()..] {
-                        if let Err(()) = model.ram.save.recv_mw_item(item) {
+                        if let Err(()) = model.ram.save.recv_mw_item(item.kind) {
                             let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         }
                     }
@@ -282,19 +282,9 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
             },
-            ClientMessage::MwGetItem { room, world, item } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
-                if let Some((tx, _, model, queue)) = room.world_mut(world) {
-                    queue.push(item);
-                    if let Err(()) = model.ram.save.recv_mw_item(item) {
-                        let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
-                    }
-                    tx.send(()).expect("failed to notify websockets about state change");
-                } else {
-                    let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
-                }
-            } else {
-                let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
-            },
+            ClientMessage::MwGetItem { .. } => {
+                let _ = ServerMessage::from_error("MwGetItem command is no longer supported, use MwQueueItem instead").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+            }
             ClientMessage::ClickMw { room, world, layout, cell_id, right } => {
                 let mut mw_rooms = mw_rooms.write().await;
                 let mw_room = match mw_rooms.get_mut(&room) {
@@ -379,9 +369,12 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 });
             }
-            ClientMessage::MwGetItemAll { room, item } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
-                if let Err(()) = room.push_all(item) {
-                    let _ = ServerMessage::from_error("unknown item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+            ClientMessage::MwGetItemAll { .. } => {
+                let _ = ServerMessage::from_error("MwGetItemAll command is no longer supported, use MwQueueItem instead").write_warp(&mut *sink.lock().await).await; //TODO better error handling
+            }
+            ClientMessage::MwQueueItem { room, source_world, key, kind, target_world } => if let Some(room) = mw_rooms.write().await.get_mut(&room) {
+                if let Err(()) = room.queue_item(source_world, key, kind, target_world) {
+                    let _ = ServerMessage::from_error("error queueing item").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                 }
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
