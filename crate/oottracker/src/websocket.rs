@@ -1,3 +1,5 @@
+#![allow(deprecated)] // avoid deprecation errors in the Protocol derivation for ClientMessage
+
 use {
     std::{
         fmt,
@@ -74,6 +76,7 @@ pub enum ClientMessage {
         save: Save,
     },
     /// No longer supported. Use `MwQueueItem` instead.
+    #[deprecated]
     MwGetItem {
         room: String,
         world: NonZeroU8,
@@ -92,6 +95,7 @@ pub enum ClientMessage {
         layout: TrackerLayout,
     },
     /// No longer supported. Use `MwQueueItem` instead.
+    #[deprecated]
     MwGetItemAll {
         room: String,
         item: u16,
@@ -124,7 +128,7 @@ pub enum ServerMessage {
 impl ServerMessage {
     pub fn from_error(e: impl fmt::Debug + fmt::Display) -> ServerMessage {
         ServerMessage::Error {
-            debug: format!("{:?}", e),
+            debug: format!("{e:?}"),
             display: e.to_string(),
         }
     }

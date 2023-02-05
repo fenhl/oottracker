@@ -282,6 +282,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_warp(&mut *sink.lock().await).await; //TODO better error handling
             },
+            #[allow(deprecated)]
             ClientMessage::MwGetItem { .. } => {
                 let _ = ServerMessage::from_error("MwGetItem command is no longer supported, use MwQueueItem instead").write_warp(&mut *sink.lock().await).await; //TODO better error handling
             }
@@ -369,6 +370,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 });
             }
+            #[allow(deprecated)]
             ClientMessage::MwGetItemAll { .. } => {
                 let _ = ServerMessage::from_error("MwGetItemAll command is no longer supported, use MwQueueItem instead").write_warp(&mut *sink.lock().await).await; //TODO better error handling
             }
