@@ -11,7 +11,7 @@ use {
 const TRIFORCE_PIECE: u16 = 0x00ca;
 
 pub(crate) struct MwState {
-    worlds: Vec<(Sender<()>, Receiver<()>, ModelState, Vec<MwItem>)>,
+    pub(crate) worlds: Vec<(Sender<()>, Receiver<()>, ModelState, Vec<MwItem>)>,
 }
 
 impl MwState {

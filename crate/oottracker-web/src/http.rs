@@ -32,6 +32,7 @@ use {
             TrackerCellId,
             TrackerLayout,
         },
+        websocket::MwItem,
     },
     crate::{
         Error,
@@ -142,6 +143,67 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layou
     Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout, _))))
 }
 
+fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
+    match world_id.get() {
+        0 => unreachable!(),
+        1 => Some("power"),
+        2 => Some("wisdom"),
+        3 => Some("courage"),
+        _ => None,
+    }
+}
+
+#[rocket::get("/mw-notes/<room>")]
+async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Option<RawHtml<String>> {
+    let mw_rooms = mw_rooms.read().await;
+    let mw_room = mw_rooms.get(room)?;
+    Some(html! {
+        : Doctype;
+        html {
+            head {
+                meta(charset = "utf-8");
+                title : "OoT Tracker";
+                meta(name = "author", content = "Fenhl");
+                meta(name = "viewport", content = "width=device-width, initial-scale=1");
+                link(rel = "icon", sizes = "512x512", type = "image/png", href = "/static/img/favicon.png");
+                link(rel = "stylesheet", href = "/static/common.css");
+                link(rel = "stylesheet", href = "/static/light.css", media = "(prefers-color-scheme: light)");
+            }
+            body {
+                @for (idx, (_, _, _, queue)) in mw_room.worlds.iter().enumerate() {
+                    @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
+                    h1(class? = world_class(world_id)) {
+                        : "For player ";
+                        : world_id.get();
+                    };
+                    table {
+                        thead {
+                            tr {
+                                th : "From world";
+                                th : "From location";
+                                th : "Item";
+                            }
+                        }
+                        tbody {
+                            @for MwItem { source, key, kind } in queue {
+                                tr {
+                                    td(class? = world_class(*source)) : source.get();
+                                    td(class? = world_class(*source)) : format!("0x{key:08x}");
+                                    td(class? = world_class(world_id)) : format!("0x{kind:04x}");
+                                }
+                            }
+                        }
+                    }
+                }
+                p : "live update not yet implemented (refresh to update)"; //TODO
+                footer {
+                    a(href = "https://fenhl.net/disc") : "disclaimer / Impressum";
+                }
+            }
+        }
+    })
+}
+
 #[rocket::get("/restream/<restreamer>/<runner>?<theme>")]
 async fn restream_room_input(restreamer: &str, runner: &str, theme: Option<Theme>) -> Redirect {
     Redirect::permanent(uri!(restream_room_view(restreamer, runner, TrackerLayout::default(), theme)))
@@ -226,6 +288,7 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms:
         mw_room_input,
         mw_room_view,
         mw_click,
+        mw_notes,
         restream_room_input,
         restream_room_view,
         restream_click,

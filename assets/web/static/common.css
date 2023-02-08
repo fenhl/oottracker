@@ -145,6 +145,18 @@ img.loc {
     right: 2px;
 }
 
+.power {
+    color: #ff4040;
+}
+
+.wisdom {
+    color: #6060ff;
+}
+
+.courage {
+    color: #20e020;
+}
+
 footer {
     margin-top: 1rem;
 }

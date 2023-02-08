@@ -7,6 +7,9 @@ function ThrowOnNativeFailure {
 
 $env:PYO3_PYTHON = "python"
 
+git push
+ThrowOnNativeFailure
+
 ssh mercredi 'cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only'
 ThrowOnNativeFailure
 
