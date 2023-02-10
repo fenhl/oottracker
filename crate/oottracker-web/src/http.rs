@@ -176,8 +176,8 @@ fn format_override_key(_modules: PyModules<'_>, key: u32) -> PyResult<String> {
 fn format_item_kind(modules: PyModules<'_>, kind: u16) -> PyResult<String> {
     let item_list = modules.py().import("ItemList")?;
     for (item_name, entry) in item_list.getattr("item_table")?.downcast::<PyDict>()?.iter() {
-        let (_, _, get_item_id, _) = entry.extract::<(&PyAny, &PyAny, u16, &PyAny)>()?;
-        if get_item_id == kind {
+        let (_, _, get_item_id, _) = entry.extract::<(&PyAny, &PyAny, Option<u16>, &PyAny)>()?;
+        if get_item_id == Some(kind) {
             return item_name.extract()
         }
     }
