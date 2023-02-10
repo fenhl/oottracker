@@ -1,5 +1,8 @@
 use {
-    std::num::NonZeroU8,
+    std::{
+        num::NonZeroU8,
+        time::Duration,
+    },
     rocket::{
         FromForm,
         FromFormField,
@@ -113,15 +116,19 @@ fn post_index(form: Form<GoRoomForm<'_>>) -> Redirect {
     Redirect::to(rocket::uri!(room(form.room.to_owned(), _)))
 }
 
-#[rocket::get("/mw/<room>/<world>?<theme>")]
-async fn mw_room_input(room: &str, world: NonZeroU8, theme: Option<Theme>) -> Redirect {
-    Redirect::permanent(uri!(mw_room_view(room, world, TrackerLayout::default(), theme)))
+#[rocket::get("/mw/<room>/<world>?<theme>&<delay>")]
+async fn mw_room_input(room: &str, world: NonZeroU8, theme: Option<Theme>, delay: Option<f64>) -> Redirect {
+    Redirect::permanent(uri!(mw_room_view(room, world, TrackerLayout::default(), theme, delay)))
 }
 
-#[rocket::get("/mw/<room>/<world>/<layout>?<theme>")]
-async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layout: TrackerLayout, theme: Option<Theme>) -> Option<RawHtml<String>> {
+#[rocket::get("/mw/<room>/<world>/<layout>?<theme>&<delay>")]
+async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layout: TrackerLayout, theme: Option<Theme>, delay: Option<f64>) -> Option<RawHtml<String>> {
     let mw_rooms = mw_rooms.read().await;
     let mw_room = mw_rooms.get(room)?;
+    if let Some(delay) = delay {
+        mw_room.write().await.autotracker_delay = Duration::try_from_secs_f64(delay).ok()?;
+    }
+    let mw_room = mw_room.read().await;
     let (_, _, model, _) = mw_room.world(world)?;
     Some(tracker_page(&layout.to_string(), theme, html! {
         @for cell in layout.cells() {
@@ -134,13 +141,14 @@ async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, l
 #[rocket::get("/mw/<room>/<world>/<layout>/click/<cell_id>")]
 async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
     {
-        let mut mw_rooms = mw_rooms.write().await;
-        let mw_room = mw_rooms.get_mut(room).ok_or(NotFound("No such multiworld room"))?;
+        let mw_rooms = mw_rooms.read().await;
+        let mw_room = mw_rooms.get(room).ok_or(NotFound("No such multiworld room"))?;
+        let mut mw_room = mw_room.write().await;
         let (tx, _, model, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
         layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(model);
         tx.send(()).expect("failed to notify websockets about state change");
     }
-    Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout, _))))
+    Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout, _, _))))
 }
 
 fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
@@ -157,6 +165,7 @@ fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
 async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Option<RawHtml<String>> {
     let mw_rooms = mw_rooms.read().await;
     let mw_room = mw_rooms.get(room)?;
+    let mw_room = mw_room.read().await;
     Some(html! {
         : Doctype;
         html {

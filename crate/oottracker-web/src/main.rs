@@ -57,7 +57,7 @@ mod mw;
 mod restream;
 mod websocket;
 
-type MwRooms = Arc<RwLock<HashMap<String, MwState>>>;
+type MwRooms = Arc<RwLock<HashMap<String, Arc<RwLock<MwState>>>>>;
 type Restreams = Arc<RwLock<HashMap<String, RestreamState>>>;
 type Rooms = Arc<Mutex<HashMap<String, RoomState>>>;
 
