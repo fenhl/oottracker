@@ -11,7 +11,7 @@ a {
 input[type="text"],
 button {
     background-color: white;
-    border-color: 1px solid black;
+    border-color: black;
 }
 
 button:hover {
