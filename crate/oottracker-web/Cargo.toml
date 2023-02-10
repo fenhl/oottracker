@@ -24,9 +24,18 @@ features = ["from"]
 [dependencies.ootr]
 path = "../ootr"
 
+[dependencies.ootr-utils]
+git = "https://github.com/midoshouse/rust-ootr-utils"
+branch = "main"
+features = ["pyo3"]
+
 [dependencies.oottracker]
 path = "../oottracker"
 features = ["iced", "rocket"]
+
+[dependencies.pyo3]
+version = "0.18"
+features = ["auto-initialize"]
 
 [dependencies.rocket-util]
 git = "https://github.com/fenhl/rocket-util"

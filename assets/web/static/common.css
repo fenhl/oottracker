@@ -32,6 +32,18 @@ button:hover {
     color: black;
 }
 
+.table-wrapper {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: start;
+    flex-wrap: wrap;
+}
+
+.table-wrapper h1 {
+    text-align: center;
+}
+
 table {
     margin: 8px;
 }

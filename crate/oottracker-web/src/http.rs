@@ -3,6 +3,14 @@ use {
         num::NonZeroU8,
         time::Duration,
     },
+    ootr_utils::{
+        PyModules,
+        Version,
+    },
+    pyo3::{
+        prelude::*,
+        types::PyDict,
+    },
     rocket::{
         FromForm,
         FromFormField,
@@ -161,55 +169,78 @@ fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
     }
 }
 
+fn format_override_key(_modules: PyModules<'_>, key: u32) -> PyResult<String> {
+    Ok(format!("0x{key:08x}")) //TODO look up location name using randomizer version
+}
+
+fn format_item_kind(modules: PyModules<'_>, kind: u16) -> PyResult<String> {
+    let item_list = modules.py().import("ItemList")?;
+    for (item_name, entry) in item_list.getattr("item_table")?.downcast::<PyDict>()?.iter() {
+        let (_, _, get_item_id, _) = entry.extract::<(&PyAny, &PyAny, u16, &PyAny)>()?;
+        if get_item_id == kind {
+            return item_name.extract()
+        }
+    }
+    Ok(format!("0x{kind:04x}"))
+}
+
 #[rocket::get("/mw-notes/<room>")]
 async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Option<RawHtml<String>> {
     let mw_rooms = mw_rooms.read().await;
     let mw_room = mw_rooms.get(room)?;
     let mw_room = mw_room.read().await;
-    Some(html! {
-        : Doctype;
-        html {
-            head {
-                meta(charset = "utf-8");
-                title : "OoT Tracker";
-                meta(name = "author", content = "Fenhl");
-                meta(name = "viewport", content = "width=device-width, initial-scale=1");
-                link(rel = "icon", sizes = "512x512", type = "image/png", href = "/static/img/favicon.png");
-                link(rel = "stylesheet", href = "/static/common.css");
-                link(rel = "stylesheet", href = "/static/light.css", media = "(prefers-color-scheme: light)");
-            }
-            body {
-                @for (idx, (_, _, _, queue)) in mw_room.worlds.iter().enumerate() {
-                    @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
-                    h1(class? = world_class(world_id)) {
-                        : "For player ";
-                        : world_id.get();
-                    };
-                    table {
-                        thead {
-                            tr {
-                                th : "From world";
-                                th : "From location";
-                                th : "Item";
-                            }
-                        }
-                        tbody {
-                            @for MwItem { source, key, kind } in queue {
-                                tr {
-                                    td(class? = world_class(*source)) : source.get();
-                                    td(class? = world_class(*source)) : format!("0x{key:08x}");
-                                    td(class? = world_class(world_id)) : format!("0x{kind:04x}");
+    let rando_version = Version::from_dev(6, 2, 205); //TODO don't hardcode
+    Python::with_gil(|py| {
+        let modules = rando_version.py_modules(py).ok()?;
+        Some(html! {
+            : Doctype;
+            html {
+                head {
+                    meta(charset = "utf-8");
+                    title : "OoT Tracker";
+                    meta(name = "author", content = "Fenhl");
+                    meta(name = "viewport", content = "width=device-width, initial-scale=1");
+                    link(rel = "icon", sizes = "512x512", type = "image/png", href = "/static/img/favicon.png");
+                    link(rel = "stylesheet", href = "/static/common.css");
+                    link(rel = "stylesheet", href = "/static/light.css", media = "(prefers-color-scheme: light)");
+                }
+                body {
+                    div(class = "table-wrapper") {
+                        @for (idx, (_, _, _, queue)) in mw_room.worlds.iter().enumerate() {
+                            @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
+                            div {
+                                h1(class? = world_class(world_id)) {
+                                    : "For player ";
+                                    : world_id.get();
+                                };
+                                table {
+                                    thead {
+                                        tr {
+                                            th : "From world";
+                                            th : "From location";
+                                            th : "Item";
+                                        }
+                                    }
+                                    tbody {
+                                        @for MwItem { source, key, kind } in queue {
+                                            tr {
+                                                td(class? = world_class(*source)) : source.get();
+                                                td(class? = world_class(*source)) : format_override_key(modules, *key).ok()?;
+                                                td(class? = world_class(world_id)) : format_item_kind(modules, *kind).ok()?;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                p : "live update not yet implemented (refresh to update)"; //TODO
-                footer {
-                    a(href = "https://fenhl.net/disc") : "disclaimer / Impressum";
+                    p : "live update not yet implemented (refresh to update)"; //TODO
+                    footer {
+                        a(href = "https://fenhl.net/disc") : "disclaimer / Impressum";
+                    }
                 }
             }
-        }
+        })
     })
 }
 
