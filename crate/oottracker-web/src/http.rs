@@ -169,8 +169,15 @@ fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
     }
 }
 
-fn format_override_key(_modules: PyModules<'_>, key: u32) -> PyResult<String> {
-    Ok(format!("0x{key:08x}")) //TODO look up location name using randomizer version
+fn format_override_key(modules: PyModules<'_>, key: u32, item_name: &str) -> PyResult<String> {
+    let location_list = modules.py().import("LocationList")?;
+    for location_name in location_list.getattr("location_table")?.iter()? {
+        let location_name = location_name?.extract::<String>()?;
+        if modules.override_key(&location_name, item_name)? == Some(key) {
+            return Ok(location_name)
+        }
+    }
+    Ok(format!("0x{key:08x}"))
 }
 
 fn format_item_kind(modules: PyModules<'_>, kind: u16) -> PyResult<String> {
@@ -229,9 +236,10 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
                                     tbody {
                                         @for MwItem { source, key, kind } in queue {
                                             tr {
+                                                @let item_name = format_item_kind(modules, *kind)?;
                                                 td(class? = world_class(*source)) : source.get();
-                                                td(class? = world_class(*source)) : format_override_key(modules, *key)?;
-                                                td(class? = world_class(world_id)) : format_item_kind(modules, *kind)?;
+                                                td(class? = world_class(*source)) : format_override_key(modules, *key, &item_name)?;
+                                                td(class? = world_class(world_id)) : item_name;
                                             }
                                         }
                                     }
