@@ -7,7 +7,6 @@ use {
     },
     futures::future::{
         Either,
-        FutureExt as _,
         pending,
     },
     tokio::{
@@ -63,8 +62,8 @@ impl MwState {
         tokio::spawn(async move {
             let mut delay_queue = VecDeque::default();
             loop {
-                let next_update = if let Some((due, update)) = delay_queue.pop_front() {
-                    Either::Left(sleep_until(due).map(move |()| update))
+                let next_update = if let Some((due, _)) = delay_queue.get(0) {
+                    Either::Left(sleep_until(*due))
                 } else {
                     Either::Right(pending())
                 };
@@ -78,7 +77,7 @@ impl MwState {
                         }
                         break
                     },
-                    update = next_update => this_clone.write().await.handle_auto_update(update).expect("failed to handle delayed room update"),
+                    () = next_update => this_clone.write().await.handle_auto_update(delay_queue.pop_front().unwrap().1).expect("failed to handle delayed room update"),
                 }
             }
         });
