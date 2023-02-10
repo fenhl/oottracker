@@ -8,6 +8,23 @@ a {
     color: #6600ff;
 }
 
+input[type="text"],
+button {
+    background-color: white;
+    border-color: 1px solid black;
+}
+
+button:hover {
+    background-color: black;
+    color: white;
+}
+
+table,
+table th,
+table td {
+    border-color: black;
+}
+
 .items img {
     filter: drop-shadow(1px 1px 0 black);
 }

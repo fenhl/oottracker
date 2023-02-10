@@ -1,17 +1,52 @@
 html,
 body {
+    color-scheme: light dark;
     display: flex;
     flex-direction: column;
     min-height: 100%;
     justify-content: center;
     align-items: center;
-    font-family: 'DejaVu Sans', sans-serif;
+    font-family: system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     background-color: black;
     color: white;
 }
 
 a {
     color: #00bb44;
+}
+
+input[type="text"],
+button {
+    background-color: black;
+    border: 1px solid white;
+    padding: 8px;
+}
+
+button {
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: white;
+    color: black;
+}
+
+table {
+    margin: 8px;
+}
+
+table,
+table th,
+table td {
+    border: 0.5px solid white;
+    border-spacing: 0;
+    text-align: center;
+}
+
+table th,
+table td {
+    padding: 8px;
 }
 
 .items {
@@ -62,7 +97,8 @@ a {
 }
 
 .items > div,
-.items > a {
+.items > a,
+a:hover {
     position: relative;
     text-decoration: none;
 }
@@ -159,4 +195,9 @@ img.loc {
 
 footer {
     margin-top: 1rem;
+}
+
+footer,
+footer a {
+    color: gray;
 }
