@@ -3455,6 +3455,7 @@ dependencies = [
  "rocket-util",
  "serde_json",
  "sqlx",
+ "thiserror",
  "tokio",
  "warp",
  "wheel",

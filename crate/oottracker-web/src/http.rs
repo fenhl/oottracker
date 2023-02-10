@@ -184,15 +184,20 @@ fn format_item_kind(modules: PyModules<'_>, kind: u16) -> PyResult<String> {
     Ok(format!("0x{kind:04x}"))
 }
 
+#[derive(Debug, thiserror::Error, rocket_util::Error)]
+enum NotesError {
+    #[error(transparent)] Python(#[from] PyErr),
+}
+
 #[rocket::get("/mw-notes/<room>")]
-async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Option<RawHtml<String>> {
+async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtml<String>>, NotesError> {
     let mw_rooms = mw_rooms.read().await;
-    let mw_room = mw_rooms.get(room)?;
+    let Some(mw_room) = mw_rooms.get(room) else { return Ok(None) };
     let mw_room = mw_room.read().await;
     let rando_version = Version::from_dev(6, 2, 205); //TODO don't hardcode
     Python::with_gil(|py| {
-        let modules = rando_version.py_modules(py).ok()?;
-        Some(html! {
+        let modules = rando_version.py_modules(py)?;
+        Ok(Some(html! {
             : Doctype;
             html {
                 head {
@@ -225,8 +230,8 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Option<RawHtml<Strin
                                         @for MwItem { source, key, kind } in queue {
                                             tr {
                                                 td(class? = world_class(*source)) : source.get();
-                                                td(class? = world_class(*source)) : format_override_key(modules, *key).ok()?;
-                                                td(class? = world_class(world_id)) : format_item_kind(modules, *kind).ok()?;
+                                                td(class? = world_class(*source)) : format_override_key(modules, *key)?;
+                                                td(class? = world_class(world_id)) : format_item_kind(modules, *kind)?;
                                             }
                                         }
                                     }
@@ -240,7 +245,7 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Option<RawHtml<Strin
                     }
                 }
             }
-        })
+        }))
     })
 }
 
