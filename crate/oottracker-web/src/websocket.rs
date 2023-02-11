@@ -291,7 +291,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 };
                 let mut mw_room = mw_room.write().await;
                 let (tx, model) = match mw_room.world_mut(world) {
-                    Some((tx, _, model, _)) => (tx, model),
+                    Some((tx, _, model, _, _)) => (tx, model),
                     None => {
                         let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())
@@ -326,7 +326,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                         };
                         let mw_room = mw_room.read().await;
                         let (rx, model) = match mw_room.world(world) {
-                            Some((_, rx, model, _)) => (rx, model),
+                            Some((_, rx, model, _, _)) => (rx, model),
                             None => {
                                 let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                                 return
@@ -350,7 +350,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                             };
                             let mw_room = mw_room.read().await;
                             let model = match mw_room.world(world) {
-                                Some((_, _, model, _)) => model,
+                                Some((_, _, model, _, _)) => model,
                                 None => {
                                     let _ = ServerMessage::from_error("no such world").write_warp(&mut *sink.lock().await).await; //TODO better error handling
                                     return

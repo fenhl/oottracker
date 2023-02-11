@@ -3,6 +3,7 @@ use {
         num::NonZeroU8,
         time::Duration,
     },
+    itertools::Itertools as _,
     ootr_utils::{
         PyModules,
         Version,
@@ -137,7 +138,7 @@ async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, l
         mw_room.write().await.autotracker_delay = Duration::try_from_secs_f64(delay).ok()?;
     }
     let mw_room = mw_room.read().await;
-    let (_, _, model, _) = mw_room.world(world)?;
+    let (_, _, model, _, _) = mw_room.world(world)?;
     Some(tracker_page(&layout.to_string(), theme, html! {
         @for cell in layout.cells() {
             @let cell_id = cell.idx.try_into().expect("too many cells");
@@ -152,7 +153,7 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layou
         let mw_rooms = mw_rooms.read().await;
         let mw_room = mw_rooms.get(room).ok_or(NotFound("No such multiworld room"))?;
         let mut mw_room = mw_room.write().await;
-        let (tx, _, model, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
+        let (tx, _, model, _, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
         layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(model);
         tx.send(()).expect("failed to notify websockets about state change");
     }
@@ -218,7 +219,7 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
                 }
                 body {
                     div(class = "table-wrapper") {
-                        @for (idx, (_, _, _, queue)) in mw_room.worlds.iter().enumerate() {
+                        @for (idx, (_, _, _, queue, own_items)) in mw_room.worlds.iter().enumerate() {
                             @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
                             div {
                                 h1(class? = world_class(world_id)) {
@@ -234,7 +235,7 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
                                         }
                                     }
                                     tbody {
-                                        @for MwItem { source, key, kind } in queue {
+                                        @for MwItem { source, key, kind } in own_items.iter().sorted().chain(queue) {
                                             tr {
                                                 @let item_name = format_item_kind(modules, *kind)?;
                                                 td(class? = world_class(*source)) : source.get();

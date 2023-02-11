@@ -18,7 +18,7 @@ use {
     },
 };
 
-#[derive(Debug, Clone, Copy, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Protocol)]
 pub struct MwItem {
     pub source: NonZeroU8,
     pub key: u32,

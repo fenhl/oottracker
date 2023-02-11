@@ -3446,6 +3446,7 @@ dependencies = [
  "derive_more",
  "futures",
  "iced_core",
+ "itertools",
  "lazy-regex",
  "ootr",
  "ootr-utils",
