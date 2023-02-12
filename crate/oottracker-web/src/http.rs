@@ -237,9 +237,9 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
                                     tbody {
                                         @for MwItem { source, key, kind } in own_items.iter().sorted().chain(queue) {
                                             tr {
-                                                @let item_name = format_item_kind(modules, *kind)?;
+                                                @let item_name = format_item_kind(modules.clone(), *kind)?;
                                                 td(class? = world_class(*source)) : source.get();
-                                                td(class? = world_class(*source)) : format_override_key(modules, *key, &item_name)?;
+                                                td(class? = world_class(*source)) : format_override_key(modules.clone(), *key, &item_name)?;
                                                 td(class? = world_class(world_id)) : item_name;
                                             }
                                         }
