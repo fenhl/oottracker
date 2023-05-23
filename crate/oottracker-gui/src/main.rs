@@ -968,7 +968,7 @@ struct Args {
     show_logic_tracker: bool,
 }
 
-#[derive(From)]
+#[derive(Debug, From)]
 enum Error {
     Iced(iced::Error),
     Icon(iced::window::icon::Error),

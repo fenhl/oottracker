@@ -81,7 +81,7 @@ version = "0.1"
 features = ["net"]
 
 [dependencies.tokio-tungstenite]
-version = "0.18"
+version = "0.19"
 features = ["rustls-tls-webpki-roots"]
 
 [dependencies.url]

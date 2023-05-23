@@ -90,4 +90,4 @@ features = ["derive"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 directories = "4"
-git2 = "0.16"
+git2 = "0.17"

@@ -24,7 +24,6 @@ use {
         future::FutureExt as _,
         stream::TryStreamExt as _,
     },
-    heim::process::pid_exists,
     iced::{
         Application,
         Command,
@@ -51,6 +50,11 @@ use {
     itertools::Itertools as _,
     open::that as open,
     semver::Version,
+    sysinfo::{
+        Pid,
+        ProcessRefreshKind,
+        SystemExt as _,
+    },
     tokio::{
         io,
         time::sleep,
@@ -135,7 +139,8 @@ impl Application for App {
 
     fn new(args: Args) -> (Self, Command<Result<Message, Error>>) {
         let cmd = Command::single(Action::Future(async move {
-            while pid_exists(args.pid).await? {
+            let mut system = sysinfo::System::default();
+            while system.refresh_process_specifics(args.pid, ProcessRefreshKind::default()) {
                 sleep(Duration::from_secs(1)).await;
             }
             Ok(Message::Exited)
@@ -362,7 +367,7 @@ impl Application for App {
 #[clap(version)]
 struct Args {
     path: PathBuf,
-    pid: u32,
+    pid: Pid,
     local_bizhawk_version: Version,
 }
 
@@ -375,8 +380,6 @@ enum Error {
     MissingAsset,
     MissingReadme,
     NoReleases,
-    #[from_arc]
-    Process(Arc<heim::process::ProcessError>),
     ReadmeFormat,
     #[from_arc]
     Reqwest(Arc<reqwest::Error>),
@@ -398,7 +401,6 @@ impl fmt::Display for Error {
             Self::MissingAsset => write!(f, "release does not have a download for this platform"),
             Self::MissingReadme => write!(f, "the file README.md is missing from the download"),
             Self::NoReleases => write!(f, "there are no released versions"),
-            Self::Process(e) => e.fmt(f),
             Self::ReadmeFormat => write!(f, "could not find expected BizHawk version in README.md"),
             Self::Reqwest(e) => if let Some(url) = e.url() {
                 write!(f, "HTTP error at {url}: {e}")
