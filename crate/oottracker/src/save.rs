@@ -612,6 +612,14 @@ impl<'a> From<&'a Equipment> for Vec<u8> {
 bitflags! {
     #[derive(Default)]
     pub struct Upgrades: u32 {
+        const DEKU_NUT_CAPACITY_MASK = 0x0070_0000;
+        const DEKU_NUT_CAPACITY_40 = 0x0030_0000;
+        const DEKU_NUT_CAPACITY_30 = 0x0020_0000;
+        const DEKU_NUT_CAPACITY_20 = 0x0010_0000;
+        const DEKU_STICK_CAPACITY_MASK = 0x000E_0000;
+        const DEKU_STICK_CAPACITY_30 = 0x0006_0000;
+        const DEKU_STICK_CAPACITY_20 = 0x0004_0000;
+        const DEKU_STICK_CAPACITY_10 = 0x0002_0000;
         const BULLET_BAG_MASK = 0x0001_c000;
         const BULLET_BAG_50 = 0x0001_8000;
         const BULLET_BAG_40 = 0x0001_0000;
