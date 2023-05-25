@@ -108,6 +108,38 @@ impl<'a> From<&'a MagicCapacity> for u8 {
 
 #[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
 #[derivative(Default)]
+pub enum Ocarina {
+    #[derivative(Default)]
+    None,
+    FairyOcarina,
+    OcarinaOfTime,
+}
+
+impl TryFrom<u8> for Ocarina {
+    type Error = u8;
+
+    fn try_from(raw_data: u8) -> Result<Ocarina, u8> {
+        match raw_data {
+            item_ids::NONE => Ok(Ocarina::None),
+            item_ids::FAIRY_OCARINA=> Ok(Ocarina::FairyOcarina),
+            item_ids::OCARINA_OF_TIME => Ok(Ocarina::OcarinaOfTime),
+            _ => Err(raw_data),
+        }
+    }
+}
+
+impl From<Ocarina> for u8 {
+    fn from(ocarina: Ocarina) -> u8 {
+        match ocarina {
+            Ocarina::None => item_ids::NONE,
+            Ocarina::FairyOcarina => item_ids::FAIRY_OCARINA,
+            Ocarina::OcarinaOfTime => item_ids::OCARINA_OF_TIME,
+        }
+    }
+}
+
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default)]
 pub enum Hookshot {
     #[derivative(Default)]
     None,
@@ -336,7 +368,7 @@ pub struct Inventory {
     pub fire_arrows: bool,
     pub dins_fire: bool,
     pub slingshot: bool,
-    pub ocarina: bool,
+    pub ocarina: Ocarina,
     pub bombchus: bool,
     pub hookshot: Hookshot,
     pub ice_arrows: bool,
@@ -451,7 +483,7 @@ impl TryFrom<Vec<u8>> for Inventory {
             fire_arrows: bool_item!(0x04, item_ids::FIRE_ARROWS),
             dins_fire: bool_item!(0x05, item_ids::DINS_FIRE),
             slingshot: bool_item!(0x06, item_ids::SLINGSHOT),
-            ocarina: bool_item!(0x07, item_ids::FAIRY_OCARINA | item_ids::OCARINA_OF_TIME),
+            ocarina: Ocarina::try_from(raw_data[0x07]).map_err(|_| raw_data.clone())?,
             bombchus: bool_item!(0x08, item_ids::BOMBCHU_10),
             hookshot: Hookshot::try_from(raw_data[0x09]).map_err(|_| raw_data.clone())?,
             ice_arrows: bool_item!(0x0a, item_ids::ICE_ARROWS),
@@ -484,7 +516,7 @@ impl<'a> From<&'a Inventory> for [u8; 0x18] {
 
         [
             item_ids::NONE, item_ids::NONE, item_ids::NONE, bool_item!(bow, item_ids::BOW), bool_item!(fire_arrows, item_ids::FIRE_ARROWS), bool_item!(dins_fire, item_ids::DINS_FIRE),
-            bool_item!(slingshot, item_ids::SLINGSHOT), bool_item!(ocarina, item_ids::FAIRY_OCARINA), bool_item!(bombchus, item_ids::BOMBCHU_10), inv.hookshot.into(), bool_item!(ice_arrows, item_ids::ICE_ARROWS), bool_item!(farores_wind, item_ids::FARORES_WIND),
+            bool_item!(slingshot, item_ids::SLINGSHOT), inv.ocarina.into(), bool_item!(bombchus, item_ids::BOMBCHU_10), inv.hookshot.into(), bool_item!(ice_arrows, item_ids::ICE_ARROWS), bool_item!(farores_wind, item_ids::FARORES_WIND),
             bool_item!(boomerang, item_ids::BOOMERANG), bool_item!(lens, item_ids::LENS_OF_TRUTH), bool_item!(beans, item_ids::MAGIC_BEAN), bool_item!(hammer, item_ids::MEGATON_HAMMER), bool_item!(light_arrows, item_ids::LIGHT_ARROWS), bool_item!(nayrus_love, item_ids::NAYRUS_LOVE),
             inv.bottles[0].into(), inv.bottles[1].into(), inv.bottles[2].into(), inv.bottles[3].into(), inv.adult_trade_item.into(), inv.child_trade_item.into(),
         ]
@@ -1331,7 +1363,10 @@ impl Save {
                 MagicCapacity::None => MagicCapacity::Small,
                 MagicCapacity::Small | MagicCapacity::Large => MagicCapacity::Large,
             },
-            0x8B => self.inv.ocarina = true, // Ocarina
+            0x8B => self.inv.ocarina = match self.inv.ocarina { // Ocarina
+                Ocarina::None => Ocarina::FairyOcarina,
+                Ocarina::FairyOcarina | Ocarina::OcarinaOfTime => Ocarina::OcarinaOfTime,
+            },
             0x8C => { self.inv.add_bottle(Bottle::RedPotion); } // Bottle with Red Potion
             0x8D => { self.inv.add_bottle(Bottle::GreenPotion); } // Bottle with Green Potion
             0x8E => { self.inv.add_bottle(Bottle::BluePotion); } // Bottle with Blue Potion

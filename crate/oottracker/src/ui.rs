@@ -1499,8 +1499,11 @@ cells! {
         // * it leaks the info that the free scarecrow setting is active as soon as the scarecrow song has been set as child
         // * it doesn't display free scarecrow song known from settings input
         // see also https://github.com/fenhl/oottracker/issues/21
-        active: Box::new(|state| (state.ram.save.inv.ocarina, state.ram.save.scarecrow_song_child && state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))),
-        toggle_main: Box::new(|state| state.ram.save.inv.ocarina = !state.ram.save.inv.ocarina),
+        active: Box::new(|state| (state.ram.save.inv.ocarina != Ocarina::None, state.ram.save.scarecrow_song_child && state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG))),
+        toggle_main: Box::new(|state| state.ram.save.inv.ocarina = match state.ram.save.inv.ocarina {
+            Ocarina::None => Ocarina::FairyOcarina,
+            Ocarina::FairyOcarina | Ocarina::OcarinaOfTime => Ocarina::None,
+        }),
         toggle_overlay: Box::new(|state| if state.ram.save.scarecrow_song_child && state.ram.save.event_chk_inf.9.contains(EventChkInf9::SCARECROW_SONG) {
             state.ram.save.event_chk_inf.9.remove(EventChkInf9::SCARECROW_SONG);
         } else {
