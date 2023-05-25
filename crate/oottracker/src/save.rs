@@ -648,6 +648,20 @@ bitflags! {
 }
 
 impl Upgrades {
+    pub fn nut_capacity(&self) -> Upgrades { *self & Upgrades::DEKU_NUT_CAPACITY_MASK }
+
+    pub fn set_nut_capacity(&mut self, nut_capacity: Upgrades) {
+        self.remove(Upgrades::DEKU_NUT_CAPACITY_MASK);
+        self.insert(nut_capacity & Upgrades::DEKU_NUT_CAPACITY_MASK);
+    }
+
+    pub fn stick_capacity(&self) -> Upgrades { *self & Upgrades::DEKU_STICK_CAPACITY_MASK }
+
+    pub fn set_stick_capacity(&mut self, stick_capacity: Upgrades) {
+        self.remove(Upgrades::DEKU_STICK_CAPACITY_MASK);
+        self.insert(stick_capacity & Upgrades::DEKU_STICK_CAPACITY_MASK);
+    }
+
     pub fn bullet_bag(&self) -> Upgrades { *self & Upgrades::BULLET_BAG_MASK }
 
     pub fn set_bullet_bag(&mut self, bullet_bag: Upgrades) {
