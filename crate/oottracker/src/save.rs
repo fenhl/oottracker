@@ -1378,8 +1378,16 @@ impl Save {
                 Upgrades::SILVER_SCALE | Upgrades::GOLD_SCALE => Upgrades::GOLD_SCALE,
                 _ => Upgrades::SILVER_SCALE,
             }),
-            0x87 => {} // Deku Nut Capacity
-            0x88 => {} // Deku Stick Capacity
+            0x87 => self.upgrades.set_nut_capacity(match self.upgrades.nut_capacity() { // Deku Nut Capacity
+                Upgrades::DEKU_NUT_CAPACITY_20 => Upgrades::DEKU_NUT_CAPACITY_30,
+                Upgrades::DEKU_NUT_CAPACITY_30 | Upgrades::DEKU_NUT_CAPACITY_40 => Upgrades::DEKU_NUT_CAPACITY_40,
+                _ => Upgrades::DEKU_NUT_CAPACITY_20,
+            }),
+            0x88 => self.upgrades.set_stick_capacity(match self.upgrades.stick_capacity() { // Deku Stick Capacity
+                Upgrades::DEKU_STICK_CAPACITY_10 => Upgrades::DEKU_STICK_CAPACITY_20,
+                Upgrades::DEKU_STICK_CAPACITY_20 | Upgrades::DEKU_STICK_CAPACITY_30 => Upgrades::DEKU_STICK_CAPACITY_30,
+                _ => Upgrades::DEKU_STICK_CAPACITY_10,
+            }),
             0x89 => self.inv.bombchus = true, // Bombchus
             0x8A => self.magic = match self.magic { // Magic Meter
                 MagicCapacity::None => MagicCapacity::Small,
