@@ -1252,108 +1252,108 @@ impl Save {
     pub fn recv_mw_item(&mut self, item: u16) -> Result<(), ()> {
         self.inv_amounts.num_received_mw_items += 1;
         match item {
-            0x01 => {} // Bombs (5)
-            0x02 => {} // Deku Nuts (5)
-            0x03 => { // Bombchus (10)
+            0x0001 => {} // Bombs (5)
+            0x0002 => {} // Deku Nuts (5)
+            0x0003 => { // Bombchus (10)
                 self.inv.bombchus = true;
                 self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 10);
             }
-            0x06 => self.inv.boomerang = true, // Boomerang
-            0x07 => {} // Deku Stick (1)
-            0x0A => self.inv.lens = true, // Lens of Truth
-            0x0D => self.inv.hammer = true, // Megaton Hammer
-            0x0E => self.inv.adult_trade_item = AdultTradeItem::Cojiro, // Cojiro
-            0x0F => { self.inv.add_bottle(Bottle::Empty); } // Bottle
-            0x14 => { self.inv.add_bottle(Bottle::MilkFull); } // Bottle with Milk
-            0x15 => { self.inv.add_bottle(Bottle::RutosLetter); } // Rutos Letter
-            0x16 => self.inv.beans = true, // Magic Bean
-            0x17 => self.inv.child_trade_item = ChildTradeItem::SkullMask, // Skull Mask
-            0x18 => self.inv.child_trade_item = ChildTradeItem::SpookyMask, // Spooky Mask
-            0x1A => self.inv.child_trade_item = ChildTradeItem::KeatonMask, // Keaton Mask
-            0x1B => self.inv.child_trade_item = ChildTradeItem::BunnyHood, // Bunny Hood
-            0x1C => self.inv.child_trade_item = ChildTradeItem::MaskOfTruth, // Mask of Truth
-            0x1D => self.inv.adult_trade_item = AdultTradeItem::PocketEgg, // Pocket Egg
-            0x1E => self.inv.adult_trade_item = AdultTradeItem::PocketCucco, // Pocket Cucco
-            0x1F => self.inv.adult_trade_item = AdultTradeItem::OddMushroom, // Odd Mushroom
-            0x20 => self.inv.adult_trade_item = AdultTradeItem::OddPotion, // Odd Potion
-            0x21 => self.inv.adult_trade_item = AdultTradeItem::PoachersSaw, // Poachers Saw
-            0x22 => self.inv.adult_trade_item = AdultTradeItem::BrokenSword, // Broken Sword
-            0x23 => self.inv.adult_trade_item = AdultTradeItem::Prescription, // Prescription
-            0x24 => self.inv.adult_trade_item = AdultTradeItem::EyeballFrog, // Eyeball Frog
-            0x25 => self.inv.adult_trade_item = AdultTradeItem::Eyedrops, // Eyedrops
-            0x26 => self.inv.adult_trade_item = AdultTradeItem::ClaimCheck, // Claim Check
-            0x27 => self.equipment.insert(Equipment::KOKIRI_SWORD), // Kokiri Sword
-            0x28 => self.equipment.insert(Equipment::GIANTS_KNIFE), // Giants Knife
-            0x29 => self.equipment.insert(Equipment::DEKU_SHIELD), // Deku Shield
-            0x2A => self.equipment.insert(Equipment::HYLIAN_SHIELD), // Hylian Shield
-            0x2B => self.equipment.insert(Equipment::MIRROR_SHIELD), // Mirror Shield
-            0x2C => self.equipment.insert(Equipment::GORON_TUNIC), // Goron Tunic
-            0x2D => self.equipment.insert(Equipment::ZORA_TUNIC), // Zora Tunic
-            0x2E => self.equipment.insert(Equipment::IRON_BOOTS), // Iron Boots
-            0x2F => self.equipment.insert(Equipment::HOVER_BOOTS), // Hover Boots
-            0x39 => self.quest_items.insert(QuestItems::STONE_OF_AGONY), // Stone of Agony
-            0x3A => self.quest_items.insert(QuestItems::GERUDO_CARD), // Gerudo Membership Card
-            0x3D => {} // Heart Container
-            0x3E => {} // Piece of Heart
-            0x3F => {} // Boss Key
-            0x40 => {} // Compass
-            0x41 => {} // Map
-            0x42 => {} // Small Key
-            0x47 => self.inv.child_trade_item = ChildTradeItem::WeirdEgg, // Weird Egg
-            0x48 => {} // Recovery Heart
-            0x49 => {} // Arrows (5)
-            0x4A => {} // Arrows (10)
-            0x4B => {} // Arrows (30)
-            0x4C => {} // Rupee (1)
-            0x4D => {} // Rupees (5)
-            0x4E => {} // Rupees (20)
-            0x50 => {} // Milk
-            0x51 => self.inv.child_trade_item = ChildTradeItem::GoronMask, // Goron Mask
-            0x52 => self.inv.child_trade_item = ChildTradeItem::ZoraMask, // Zora Mask
-            0x53 => self.inv.child_trade_item = ChildTradeItem::GerudoMask, // Gerudo Mask
-            0x55 => {} // Rupees (50)
-            0x56 => {} // Rupees (200)
-            0x57 => { // Biggoron Sword
+            0x0006 => self.inv.boomerang = true, // Boomerang
+            0x0007 => {} // Deku Stick (1)
+            0x000A => self.inv.lens = true, // Lens of Truth
+            0x000D => self.inv.hammer = true, // Megaton Hammer
+            0x000E => self.inv.adult_trade_item = AdultTradeItem::Cojiro, // Cojiro
+            0x000F => { self.inv.add_bottle(Bottle::Empty); } // Bottle
+            0x0014 => { self.inv.add_bottle(Bottle::MilkFull); } // Bottle with Milk
+            0x0015 => { self.inv.add_bottle(Bottle::RutosLetter); } // Rutos Letter
+            0x0016 => self.inv.beans = true, // Magic Bean
+            0x0017 => self.inv.child_trade_item = ChildTradeItem::SkullMask, // Skull Mask
+            0x0018 => self.inv.child_trade_item = ChildTradeItem::SpookyMask, // Spooky Mask
+            0x001A => self.inv.child_trade_item = ChildTradeItem::KeatonMask, // Keaton Mask
+            0x001B => self.inv.child_trade_item = ChildTradeItem::BunnyHood, // Bunny Hood
+            0x001C => self.inv.child_trade_item = ChildTradeItem::MaskOfTruth, // Mask of Truth
+            0x001D => self.inv.adult_trade_item = AdultTradeItem::PocketEgg, // Pocket Egg
+            0x001E => self.inv.adult_trade_item = AdultTradeItem::PocketCucco, // Pocket Cucco
+            0x001F => self.inv.adult_trade_item = AdultTradeItem::OddMushroom, // Odd Mushroom
+            0x0020 => self.inv.adult_trade_item = AdultTradeItem::OddPotion, // Odd Potion
+            0x0021 => self.inv.adult_trade_item = AdultTradeItem::PoachersSaw, // Poachers Saw
+            0x0022 => self.inv.adult_trade_item = AdultTradeItem::BrokenSword, // Broken Sword
+            0x0023 => self.inv.adult_trade_item = AdultTradeItem::Prescription, // Prescription
+            0x0024 => self.inv.adult_trade_item = AdultTradeItem::EyeballFrog, // Eyeball Frog
+            0x0025 => self.inv.adult_trade_item = AdultTradeItem::Eyedrops, // Eyedrops
+            0x0026 => self.inv.adult_trade_item = AdultTradeItem::ClaimCheck, // Claim Check
+            0x0027 => self.equipment.insert(Equipment::KOKIRI_SWORD), // Kokiri Sword
+            0x0028 => self.equipment.insert(Equipment::GIANTS_KNIFE), // Giants Knife
+            0x0029 => self.equipment.insert(Equipment::DEKU_SHIELD), // Deku Shield
+            0x002A => self.equipment.insert(Equipment::HYLIAN_SHIELD), // Hylian Shield
+            0x002B => self.equipment.insert(Equipment::MIRROR_SHIELD), // Mirror Shield
+            0x002C => self.equipment.insert(Equipment::GORON_TUNIC), // Goron Tunic
+            0x002D => self.equipment.insert(Equipment::ZORA_TUNIC), // Zora Tunic
+            0x002E => self.equipment.insert(Equipment::IRON_BOOTS), // Iron Boots
+            0x002F => self.equipment.insert(Equipment::HOVER_BOOTS), // Hover Boots
+            0x0039 => self.quest_items.insert(QuestItems::STONE_OF_AGONY), // Stone of Agony
+            0x003A => self.quest_items.insert(QuestItems::GERUDO_CARD), // Gerudo Membership Card
+            0x003D => {} // Heart Container
+            0x003E => {} // Piece of Heart
+            0x003F => {} // Boss Key
+            0x0040 => {} // Compass
+            0x0041 => {} // Map
+            0x0042 => {} // Small Key
+            0x0047 => self.inv.child_trade_item = ChildTradeItem::WeirdEgg, // Weird Egg
+            0x0048 => {} // Recovery Heart
+            0x0049 => {} // Arrows (5)
+            0x004A => {} // Arrows (10)
+            0x004B => {} // Arrows (30)
+            0x004C => {} // Rupee (1)
+            0x004D => {} // Rupees (5)
+            0x004E => {} // Rupees (20)
+            0x0050 => {} // Milk
+            0x0051 => self.inv.child_trade_item = ChildTradeItem::GoronMask, // Goron Mask
+            0x0052 => self.inv.child_trade_item = ChildTradeItem::ZoraMask, // Zora Mask
+            0x0053 => self.inv.child_trade_item = ChildTradeItem::GerudoMask, // Gerudo Mask
+            0x0055 => {} // Rupees (50)
+            0x0056 => {} // Rupees (200)
+            0x0057 => { // Biggoron Sword
                 self.equipment.insert(Equipment::GIANTS_KNIFE);
                 self.biggoron_sword = true;
             }
-            0x58 => self.inv.fire_arrows = true, // Fire Arrows
-            0x59 => self.inv.ice_arrows = true, // Ice Arrows
-            0x5A => self.inv.light_arrows = true, // Light Arrows
-            0x5B => self.skull_tokens += 1, // Gold Skulltula Token
-            0x5C => self.inv.dins_fire = true, // Dins Fire
-            0x5E => self.inv.nayrus_love = true, // Nayrus Love
-            0x5D => self.inv.farores_wind = true, // Farores Wind
-            0x64 => {} // Deku Nuts (10)
-            0x66 => {} // Bombs (10)
-            0x67 => {} // Bombs (20)
-            0x69 => {} // Deku Seeds (30)
-            0x6A => { // Bombchus (5)
+            0x0058 => self.inv.fire_arrows = true, // Fire Arrows
+            0x0059 => self.inv.ice_arrows = true, // Ice Arrows
+            0x005A => self.inv.light_arrows = true, // Light Arrows
+            0x005B => self.skull_tokens += 1, // Gold Skulltula Token
+            0x005C => self.inv.dins_fire = true, // Dins Fire
+            0x005E => self.inv.nayrus_love = true, // Nayrus Love
+            0x005D => self.inv.farores_wind = true, // Farores Wind
+            0x0064 => {} // Deku Nuts (10)
+            0x0066 => {} // Bombs (10)
+            0x0067 => {} // Bombs (20)
+            0x0069 => {} // Deku Seeds (30)
+            0x006A => { // Bombchus (5)
                 self.inv.bombchus = true;
                 self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 5);
             }
-            0x6B => { // Bombchus (20)
+            0x006B => { // Bombchus (20)
                 self.inv.bombchus = true;
                 self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 20);
             }
-            0x72 => {} // Rupee (Treasure Chest Game)
-            0x76 => {} // Piece of Heart (Treasure Chest Game)
-            0x7C => {} // Ice Trap
-            0x80 => self.inv.hookshot = match self.inv.hookshot { // Progressive Hookshot
+            0x0072 => {} // Rupee (Treasure Chest Game)
+            0x0076 => {} // Piece of Heart (Treasure Chest Game)
+            0x007C => {} // Ice Trap
+            0x0080 => self.inv.hookshot = match self.inv.hookshot { // Progressive Hookshot
                 Hookshot::None => Hookshot::Hookshot,
                 Hookshot::Hookshot | Hookshot::Longshot => Hookshot::Longshot,
             },
-            0x81 => self.upgrades.set_strength(match self.upgrades.strength() { // Progressive Strength Upgrade
+            0x0081 => self.upgrades.set_strength(match self.upgrades.strength() { // Progressive Strength Upgrade
                 Upgrades::GORON_BRACELET => Upgrades::SILVER_GAUNTLETS,
                 Upgrades::SILVER_GAUNTLETS | Upgrades::GOLD_GAUNTLETS => Upgrades::GOLD_GAUNTLETS,
                 _ => Upgrades::GORON_BRACELET,
             }),
-            0x82 => self.upgrades.set_bomb_bag(match self.upgrades.bomb_bag() { // Bomb Bag
+            0x0082 => self.upgrades.set_bomb_bag(match self.upgrades.bomb_bag() { // Bomb Bag
                 Upgrades::BOMB_BAG_20 => Upgrades::BOMB_BAG_30,
                 Upgrades::BOMB_BAG_30 | Upgrades::BOMB_BAG_40 => Upgrades::BOMB_BAG_40,
                 _ => Upgrades::BOMB_BAG_20,
             }),
-            0x83 => { // Bow
+            0x0083 => { // Bow
                 self.inv.bow = true;
                 self.upgrades.set_quiver(match self.upgrades.quiver() {
                     Upgrades::QUIVER_30 => Upgrades::QUIVER_40,
@@ -1361,7 +1361,7 @@ impl Save {
                     _ => Upgrades::QUIVER_30,
                 });
             }
-            0x84 => { // Slingshot
+            0x0084 => { // Slingshot
                 self.inv.slingshot = true;
                 self.upgrades.set_bullet_bag(match self.upgrades.bullet_bag() {
                     Upgrades::BULLET_BAG_30 => Upgrades::BULLET_BAG_40,
@@ -1369,107 +1369,107 @@ impl Save {
                     _ => Upgrades::BULLET_BAG_30,
                 });
             }
-            0x85 => self.upgrades.set_wallet(match self.upgrades.wallet() { // Progressive Wallet
+            0x0085 => self.upgrades.set_wallet(match self.upgrades.wallet() { // Progressive Wallet
                 Upgrades::ADULTS_WALLET => Upgrades::GIANTS_WALLET,
                 Upgrades::GIANTS_WALLET | Upgrades::TYCOONS_WALLET => Upgrades::TYCOONS_WALLET,
                 _ => Upgrades::ADULTS_WALLET,
             }),
-            0x86 => self.upgrades.set_scale(match self.upgrades.scale() { // Progressive Scale
+            0x0086 => self.upgrades.set_scale(match self.upgrades.scale() { // Progressive Scale
                 Upgrades::SILVER_SCALE | Upgrades::GOLD_SCALE => Upgrades::GOLD_SCALE,
                 _ => Upgrades::SILVER_SCALE,
             }),
-            0x87 => self.upgrades.set_nut_capacity(match self.upgrades.nut_capacity() { // Deku Nut Capacity
+            0x0087 => self.upgrades.set_nut_capacity(match self.upgrades.nut_capacity() { // Deku Nut Capacity
                 Upgrades::DEKU_NUT_CAPACITY_20 => Upgrades::DEKU_NUT_CAPACITY_30,
                 Upgrades::DEKU_NUT_CAPACITY_30 | Upgrades::DEKU_NUT_CAPACITY_40 => Upgrades::DEKU_NUT_CAPACITY_40,
                 _ => Upgrades::DEKU_NUT_CAPACITY_20,
             }),
-            0x88 => self.upgrades.set_stick_capacity(match self.upgrades.stick_capacity() { // Deku Stick Capacity
+            0x0088 => self.upgrades.set_stick_capacity(match self.upgrades.stick_capacity() { // Deku Stick Capacity
                 Upgrades::DEKU_STICK_CAPACITY_10 => Upgrades::DEKU_STICK_CAPACITY_20,
                 Upgrades::DEKU_STICK_CAPACITY_20 | Upgrades::DEKU_STICK_CAPACITY_30 => Upgrades::DEKU_STICK_CAPACITY_30,
                 _ => Upgrades::DEKU_STICK_CAPACITY_10,
             }),
-            0x89 => self.inv.bombchus = true, // Bombchus
-            0x8A => self.magic = match self.magic { // Magic Meter
+            0x0089 => self.inv.bombchus = true, // Bombchus
+            0x008A => self.magic = match self.magic { // Magic Meter
                 MagicCapacity::None => MagicCapacity::Small,
                 MagicCapacity::Small | MagicCapacity::Large => MagicCapacity::Large,
             },
-            0x8B => self.inv.ocarina = match self.inv.ocarina { // Ocarina
+            0x008B => self.inv.ocarina = match self.inv.ocarina { // Ocarina
                 Ocarina::None => Ocarina::FairyOcarina,
                 Ocarina::FairyOcarina | Ocarina::OcarinaOfTime => Ocarina::OcarinaOfTime,
             },
-            0x8C => { self.inv.add_bottle(Bottle::RedPotion); } // Bottle with Red Potion
-            0x8D => { self.inv.add_bottle(Bottle::GreenPotion); } // Bottle with Green Potion
-            0x8E => { self.inv.add_bottle(Bottle::BluePotion); } // Bottle with Blue Potion
-            0x8F => { self.inv.add_bottle(Bottle::Fairy); } // Bottle with Fairy
-            0x90 => { self.inv.add_bottle(Bottle::Fish); } // Bottle with Fish
-            0x91 => { self.inv.add_bottle(Bottle::BlueFire); } // Bottle with Blue Fire
-            0x92 => { self.inv.add_bottle(Bottle::Bug); } // Bottle with Bugs
-            0x93 => { self.inv.add_bottle(Bottle::BigPoe); } // Bottle with Big Poe
-            0x94 => { self.inv.add_bottle(Bottle::Poe); } // Bottle with Poe
-            0x95 => self.dungeon_items.forest_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Forest Temple)
-            0x96 => self.dungeon_items.fire_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Fire Temple)
-            0x97 => self.dungeon_items.water_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Water Temple)
-            0x98 => self.dungeon_items.spirit_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Spirit Temple)
-            0x99 => self.dungeon_items.shadow_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Shadow Temple)
-            0x9A => self.dungeon_items.ganons_castle.insert(DungeonItems::BOSS_KEY), // Boss Key (Ganons Castle)
-            0x9B => self.dungeon_items.deku_tree.insert(DungeonItems::COMPASS), // Compass (Deku Tree)
-            0x9C => self.dungeon_items.dodongos_cavern.insert(DungeonItems::COMPASS), // Compass (Dodongos Cavern)
-            0x9D => self.dungeon_items.jabu_jabu.insert(DungeonItems::COMPASS), // Compass (Jabu Jabus Belly)
-            0x9E => self.dungeon_items.forest_temple.insert(DungeonItems::COMPASS), // Compass (Forest Temple)
-            0x9F => self.dungeon_items.fire_temple.insert(DungeonItems::COMPASS), // Compass (Fire Temple)
-            0xA0 => self.dungeon_items.water_temple.insert(DungeonItems::COMPASS), // Compass (Water Temple)
-            0xA1 => self.dungeon_items.spirit_temple.insert(DungeonItems::COMPASS), // Compass (Spirit Temple)
-            0xA2 => self.dungeon_items.shadow_temple.insert(DungeonItems::COMPASS), // Compass (Shadow Temple)
-            0xA3 => self.dungeon_items.bottom_of_the_well.insert(DungeonItems::COMPASS), // Compass (Bottom of the Well)
-            0xA4 => self.dungeon_items.ice_cavern.insert(DungeonItems::COMPASS), // Compass (Ice Cavern)
-            0xA5 => self.dungeon_items.deku_tree.insert(DungeonItems::MAP), // Map (Deku Tree)
-            0xA6 => self.dungeon_items.dodongos_cavern.insert(DungeonItems::MAP), // Map (Dodongos Cavern)
-            0xA7 => self.dungeon_items.jabu_jabu.insert(DungeonItems::MAP), // Map (Jabu Jabus Belly)
-            0xA8 => self.dungeon_items.forest_temple.insert(DungeonItems::MAP), // Map (Forest Temple)
-            0xA9 => self.dungeon_items.fire_temple.insert(DungeonItems::MAP), // Map (Fire Temple)
-            0xAA => self.dungeon_items.water_temple.insert(DungeonItems::MAP), // Map (Water Temple)
-            0xAB => self.dungeon_items.spirit_temple.insert(DungeonItems::MAP), // Map (Spirit Temple)
-            0xAC => self.dungeon_items.shadow_temple.insert(DungeonItems::MAP), // Map (Shadow Temple)
-            0xAD => self.dungeon_items.bottom_of_the_well.insert(DungeonItems::MAP), // Map (Bottom of the Well)
-            0xAE => self.dungeon_items.ice_cavern.insert(DungeonItems::MAP), // Map (Ice Cavern)
-            0xAF => self.small_keys.forest_temple += 1, // Small Key (Forest Temple)
-            0xB0 => self.small_keys.fire_temple += 1, // Small Key (Fire Temple)
-            0xB1 => self.small_keys.water_temple += 1, // Small Key (Water Temple)
-            0xB2 => self.small_keys.spirit_temple += 1, // Small Key (Spirit Temple)
-            0xB3 => self.small_keys.shadow_temple += 1, // Small Key (Shadow Temple)
-            0xB4 => self.small_keys.bottom_of_the_well += 1, // Small Key (Bottom of the Well)
-            0xB5 => self.small_keys.gerudo_training_ground += 1, // Small Key (Gerudo Training Ground)
-            0xB6 => self.small_keys.thieves_hideout += 1, // Small Key (Thieves Hideout)
-            0xB7 => self.small_keys.ganons_castle += 1, // Small Key (Ganons Castle)
-            0xB8 => {} // Double Defense
-            0xC9 => self.inv.beans = true, // Magic Bean Pack
-            0xCA => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce Piece
-            0x0B => self.inv.child_trade_item = ChildTradeItem::ZeldasLetter, // Zeldas Letter
-            0xCB => self.small_keys.forest_temple = 10, // Small Key Ring (Forest Temple)
-            0xCC => self.small_keys.fire_temple = 10, // Small Key Ring (Fire Temple)
-            0xCD => self.small_keys.water_temple = 10, // Small Key Ring (Water Temple)
-            0xCE => self.small_keys.spirit_temple = 10, // Small Key Ring (Spirit Temple)
-            0xCF => self.small_keys.shadow_temple = 10, // Small Key Ring (Shadow Temple)
-            0xD0 => self.small_keys.bottom_of_the_well = 10, // Small Key Ring (Bottom of the Well)
-            0xD1 => self.small_keys.gerudo_training_ground = 10, // Small Key Ring (Gerudo Training Ground)
-            0xD2 => self.small_keys.thieves_hideout = 10, // Small Key Ring (Thieves Hideout)
-            0xD3 => self.small_keys.ganons_castle = 10, // Small Key Ring (Ganons Castle)
-            0xD4 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Pink)
-            0xD5 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Orange)
-            0xD6 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Green)
-            0xD7 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Blue)
-            0xBB => self.quest_items.insert(QuestItems::MINUET_OF_FOREST), // Minuet of Forest
-            0xBC => self.quest_items.insert(QuestItems::BOLERO_OF_FIRE), // Bolero of Fire
-            0xBD => self.quest_items.insert(QuestItems::SERENADE_OF_WATER), // Serenade of Water
-            0xBE => self.quest_items.insert(QuestItems::REQUIEM_OF_SPIRIT), // Requiem of Spirit
-            0xBF => self.quest_items.insert(QuestItems::NOCTURNE_OF_SHADOW), // Nocturne of Shadow
-            0xC0 => self.quest_items.insert(QuestItems::PRELUDE_OF_LIGHT), // Prelude of Light
-            0xC1 => self.quest_items.insert(QuestItems::ZELDAS_LULLABY), // Zeldas Lullaby
-            0xC2 => self.quest_items.insert(QuestItems::EPONAS_SONG), // Eponas Song
-            0xC3 => self.quest_items.insert(QuestItems::SARIAS_SONG), // Sarias Song
-            0xC4 => self.quest_items.insert(QuestItems::SUNS_SONG), // Suns Song
-            0xC5 => self.quest_items.insert(QuestItems::SONG_OF_TIME), // Song of Time
-            0xC6 => self.quest_items.insert(QuestItems::SONG_OF_STORMS), // Song of Storms
+            0x008C => { self.inv.add_bottle(Bottle::RedPotion); } // Bottle with Red Potion
+            0x008D => { self.inv.add_bottle(Bottle::GreenPotion); } // Bottle with Green Potion
+            0x008E => { self.inv.add_bottle(Bottle::BluePotion); } // Bottle with Blue Potion
+            0x008F => { self.inv.add_bottle(Bottle::Fairy); } // Bottle with Fairy
+            0x0090 => { self.inv.add_bottle(Bottle::Fish); } // Bottle with Fish
+            0x0091 => { self.inv.add_bottle(Bottle::BlueFire); } // Bottle with Blue Fire
+            0x0092 => { self.inv.add_bottle(Bottle::Bug); } // Bottle with Bugs
+            0x0093 => { self.inv.add_bottle(Bottle::BigPoe); } // Bottle with Big Poe
+            0x0094 => { self.inv.add_bottle(Bottle::Poe); } // Bottle with Poe
+            0x0095 => self.dungeon_items.forest_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Forest Temple)
+            0x0096 => self.dungeon_items.fire_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Fire Temple)
+            0x0097 => self.dungeon_items.water_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Water Temple)
+            0x0098 => self.dungeon_items.spirit_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Spirit Temple)
+            0x0099 => self.dungeon_items.shadow_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Shadow Temple)
+            0x009A => self.dungeon_items.ganons_castle.insert(DungeonItems::BOSS_KEY), // Boss Key (Ganons Castle)
+            0x009B => self.dungeon_items.deku_tree.insert(DungeonItems::COMPASS), // Compass (Deku Tree)
+            0x009C => self.dungeon_items.dodongos_cavern.insert(DungeonItems::COMPASS), // Compass (Dodongos Cavern)
+            0x009D => self.dungeon_items.jabu_jabu.insert(DungeonItems::COMPASS), // Compass (Jabu Jabus Belly)
+            0x009E => self.dungeon_items.forest_temple.insert(DungeonItems::COMPASS), // Compass (Forest Temple)
+            0x009F => self.dungeon_items.fire_temple.insert(DungeonItems::COMPASS), // Compass (Fire Temple)
+            0x00A0 => self.dungeon_items.water_temple.insert(DungeonItems::COMPASS), // Compass (Water Temple)
+            0x00A1 => self.dungeon_items.spirit_temple.insert(DungeonItems::COMPASS), // Compass (Spirit Temple)
+            0x00A2 => self.dungeon_items.shadow_temple.insert(DungeonItems::COMPASS), // Compass (Shadow Temple)
+            0x00A3 => self.dungeon_items.bottom_of_the_well.insert(DungeonItems::COMPASS), // Compass (Bottom of the Well)
+            0x00A4 => self.dungeon_items.ice_cavern.insert(DungeonItems::COMPASS), // Compass (Ice Cavern)
+            0x00A5 => self.dungeon_items.deku_tree.insert(DungeonItems::MAP), // Map (Deku Tree)
+            0x00A6 => self.dungeon_items.dodongos_cavern.insert(DungeonItems::MAP), // Map (Dodongos Cavern)
+            0x00A7 => self.dungeon_items.jabu_jabu.insert(DungeonItems::MAP), // Map (Jabu Jabus Belly)
+            0x00A8 => self.dungeon_items.forest_temple.insert(DungeonItems::MAP), // Map (Forest Temple)
+            0x00A9 => self.dungeon_items.fire_temple.insert(DungeonItems::MAP), // Map (Fire Temple)
+            0x00AA => self.dungeon_items.water_temple.insert(DungeonItems::MAP), // Map (Water Temple)
+            0x00AB => self.dungeon_items.spirit_temple.insert(DungeonItems::MAP), // Map (Spirit Temple)
+            0x00AC => self.dungeon_items.shadow_temple.insert(DungeonItems::MAP), // Map (Shadow Temple)
+            0x00AD => self.dungeon_items.bottom_of_the_well.insert(DungeonItems::MAP), // Map (Bottom of the Well)
+            0x00AE => self.dungeon_items.ice_cavern.insert(DungeonItems::MAP), // Map (Ice Cavern)
+            0x00AF => self.small_keys.forest_temple += 1, // Small Key (Forest Temple)
+            0x00B0 => self.small_keys.fire_temple += 1, // Small Key (Fire Temple)
+            0x00B1 => self.small_keys.water_temple += 1, // Small Key (Water Temple)
+            0x00B2 => self.small_keys.spirit_temple += 1, // Small Key (Spirit Temple)
+            0x00B3 => self.small_keys.shadow_temple += 1, // Small Key (Shadow Temple)
+            0x00B4 => self.small_keys.bottom_of_the_well += 1, // Small Key (Bottom of the Well)
+            0x00B5 => self.small_keys.gerudo_training_ground += 1, // Small Key (Gerudo Training Ground)
+            0x00B6 => self.small_keys.thieves_hideout += 1, // Small Key (Thieves Hideout)
+            0x00B7 => self.small_keys.ganons_castle += 1, // Small Key (Ganons Castle)
+            0x00B8 => {} // Double Defense
+            0x00C9 => self.inv.beans = true, // Magic Bean Pack
+            0x00CA => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce Piece
+            0x000B => self.inv.child_trade_item = ChildTradeItem::ZeldasLetter, // Zeldas Letter
+            0x00CB => self.small_keys.forest_temple = 10, // Small Key Ring (Forest Temple)
+            0x00CC => self.small_keys.fire_temple = 10, // Small Key Ring (Fire Temple)
+            0x00CD => self.small_keys.water_temple = 10, // Small Key Ring (Water Temple)
+            0x00CE => self.small_keys.spirit_temple = 10, // Small Key Ring (Spirit Temple)
+            0x00CF => self.small_keys.shadow_temple = 10, // Small Key Ring (Shadow Temple)
+            0x00D0 => self.small_keys.bottom_of_the_well = 10, // Small Key Ring (Bottom of the Well)
+            0x00D1 => self.small_keys.gerudo_training_ground = 10, // Small Key Ring (Gerudo Training Ground)
+            0x00D2 => self.small_keys.thieves_hideout = 10, // Small Key Ring (Thieves Hideout)
+            0x00D3 => self.small_keys.ganons_castle = 10, // Small Key Ring (Ganons Castle)
+            0x00D4 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Pink)
+            0x00D5 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Orange)
+            0x00D6 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Green)
+            0x00D7 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Blue)
+            0x00BB => self.quest_items.insert(QuestItems::MINUET_OF_FOREST), // Minuet of Forest
+            0x00BC => self.quest_items.insert(QuestItems::BOLERO_OF_FIRE), // Bolero of Fire
+            0x00BD => self.quest_items.insert(QuestItems::SERENADE_OF_WATER), // Serenade of Water
+            0x00BE => self.quest_items.insert(QuestItems::REQUIEM_OF_SPIRIT), // Requiem of Spirit
+            0x00BF => self.quest_items.insert(QuestItems::NOCTURNE_OF_SHADOW), // Nocturne of Shadow
+            0x00C0 => self.quest_items.insert(QuestItems::PRELUDE_OF_LIGHT), // Prelude of Light
+            0x00C1 => self.quest_items.insert(QuestItems::ZELDAS_LULLABY), // Zeldas Lullaby
+            0x00C2 => self.quest_items.insert(QuestItems::EPONAS_SONG), // Eponas Song
+            0x00C3 => self.quest_items.insert(QuestItems::SARIAS_SONG), // Sarias Song
+            0x00C4 => self.quest_items.insert(QuestItems::SUNS_SONG), // Suns Song
+            0x00C5 => self.quest_items.insert(QuestItems::SONG_OF_TIME), // Song of Time
+            0x00C6 => self.quest_items.insert(QuestItems::SONG_OF_STORMS), // Song of Storms
             _ => return Err(()),
         }
         Ok(())

@@ -30,7 +30,7 @@ path = "../ootr"
 path = "../ootr-dynamic"
 
 [dependencies.pyo3]
-version = "0.18"
+version = "0.19"
 features = ["auto-initialize"]
 
 [dependencies.quote-value]
