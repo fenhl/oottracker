@@ -561,7 +561,7 @@ impl TrackerCellKind {
                     _ => unreachable!(),
                 }),
                 style: if state.ram.save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
-                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                overlay: if Check::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
                     CellOverlay::Image(ImageInfo::new("check"))
                 } else {
                     CellOverlay::None
@@ -570,7 +570,7 @@ impl TrackerCellKind {
             SongCheck { check, .. } => CellRender {
                 img: ImageInfo::extra("blank"),
                 style: CellStyle::Normal,
-                overlay: if Check::<ootr_static::Rando>::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
+                overlay: if Check::Location(check.to_string()).checked(state).unwrap_or(false) { //TODO allow ootr_dynamic::Rando
                     CellOverlay::Image(ImageInfo::new("check"))
                 } else {
                     CellOverlay::None

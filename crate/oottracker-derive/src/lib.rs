@@ -333,24 +333,12 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
         #vis #struct_token #name(#(#contents,)*);
 
         impl #name {
-            pub(crate) fn checked<R: ootr::Rando>(&self, check: &ootr::check::Check<R>) -> Option<bool> {
+            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
                 match check {
-                    ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
-                        ootr::check::Check::Exit { from, to, .. } => match (id, (from.as_ref(), to.as_ref())) {
-                            #(#entrance_prereqs,)*
-                            _ => None,
-                        },
-                        _ => None,
-                    },
-                    ootr::check::Check::Event(event) => match &event[..] {
-                        #(#event_checks,)*
-                        _ => None,
-                    }
                     ootr::check::Check::Location(loc) => match &loc[..] {
                         #(#location_checks,)*
                         _ => None,
                     },
-                    _ => None,
                 }
             }
         }
@@ -832,28 +820,12 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         }
 
         impl #name {
-            pub(crate) fn checked<R: ootr::Rando>(&self, check: &ootr::check::Check<R>) -> Option<bool> {
+            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
                 match check {
-                    ootr::check::Check::AnonymousEvent(at_check, id) => match &**at_check {
-                        ootr::check::Check::Exit { from, to, .. } => match (id, (from.as_ref(), to.as_ref())) {
-                            #(#entrance_prereqs,)*
-                            _ => None,
-                        },
-                        ootr::check::Check::Location(loc) => match (id, &**loc) {
-                            #(#location_prereqs,)*
-                            _ => None,
-                        },
-                        _ => None,
-                    },
-                    ootr::check::Check::Event(event) => match &event[..] {
-                        #(#event_checks,)*
-                        _ => None,
-                    }
                     ootr::check::Check::Location(loc) => match &loc[..] {
                         #(#location_checks,)*
                         _ => None,
                     },
-                    _ => None,
                 }
             }
 
@@ -901,13 +873,12 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
         }
 
         impl GoldSkulltulas {
-            pub(crate) fn checked<R: ootr::Rando>(&self, check: &ootr::check::Check<R>) -> Option<bool> {
+            pub(crate) fn checked(&self, check: &ootr::check::Check) -> Option<bool> {
                 match check {
                     ootr::check::Check::Location(loc) => match &loc[..] {
                         #(#skull_location_checks,)*
                         _ => None,
                     },
-                    _ => None,
                 }
             }
         }

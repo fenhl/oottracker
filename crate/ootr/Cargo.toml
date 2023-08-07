@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 async-proto = "0.16"
-derivative = "2"
 enum-iterator = "1"
 semver = "1"
 serde_plain = "1"
