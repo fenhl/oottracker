@@ -923,6 +923,7 @@ pub struct SmallKeys {
     pub gerudo_training_ground: u8,
     pub thieves_hideout: u8,
     pub ganons_castle: u8,
+    pub treasure_chest_game: u8,
 }
 
 impl TryFrom<Vec<u8>> for SmallKeys {
@@ -946,6 +947,7 @@ impl TryFrom<Vec<u8>> for SmallKeys {
             gerudo_training_ground: get!(0x0b),
             thieves_hideout: get!(0x0c),
             ganons_castle: get!(0x0d),
+            treasure_chest_game: get!(0x10),
         })
     }
 }
@@ -957,7 +959,7 @@ impl<'a> From<&'a SmallKeys> for [u8; 0x13] {
             small_keys.fire_temple, small_keys.water_temple, small_keys.spirit_temple, small_keys.shadow_temple,
             small_keys.bottom_of_the_well, 0, 0, small_keys.gerudo_training_ground,
             small_keys.thieves_hideout, small_keys.ganons_castle, 0, 0,
-            0, 0, 0,
+            small_keys.treasure_chest_game, 0, 0,
         ]
     }
 }
@@ -1261,6 +1263,7 @@ impl Save {
             0x0006 => self.inv.boomerang = true, // Boomerang
             0x0007 => {} // Deku Stick (1)
             0x000A => self.inv.lens = true, // Lens of Truth
+            0x000B => self.inv.child_trade_item = ChildTradeItem::ZeldasLetter, // Zeldas Letter
             0x000D => self.inv.hammer = true, // Megaton Hammer
             0x000E => self.inv.adult_trade_item = AdultTradeItem::Cojiro, // Cojiro
             0x000F => { self.inv.add_bottle(Bottle::Empty); } // Bottle
@@ -1322,8 +1325,8 @@ impl Save {
             0x005A => self.inv.light_arrows = true, // Light Arrows
             0x005B => self.skull_tokens += 1, // Gold Skulltula Token
             0x005C => self.inv.dins_fire = true, // Dins Fire
-            0x005E => self.inv.nayrus_love = true, // Nayrus Love
             0x005D => self.inv.farores_wind = true, // Farores Wind
+            0x005E => self.inv.nayrus_love = true, // Nayrus Love
             0x0064 => {} // Deku Nuts (10)
             0x0066 => {} // Bombs (10)
             0x0067 => {} // Bombs (20)
@@ -1336,7 +1339,11 @@ impl Save {
                 self.inv.bombchus = true;
                 self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 20);
             }
+            0x0071 => self.small_keys.treasure_chest_game += 1, // Small Key (Treasure Chest Game)
             0x0072 => {} // Rupee (Treasure Chest Game)
+            0x0073 => {} // Rupees (5) (Treasure Chest Game)
+            0x0074 => {} // Rupees (20) (Treasure Chest Game)
+            0x0075 => {} // Rupees (50) (Treasure Chest Game)
             0x0076 => {} // Piece of Heart (Treasure Chest Game)
             0x007C => {} // Ice Trap
             0x0080 => self.inv.hookshot = match self.inv.hookshot { // Progressive Hookshot
@@ -1442,22 +1449,6 @@ impl Save {
             0x00B6 => self.small_keys.thieves_hideout += 1, // Small Key (Thieves Hideout)
             0x00B7 => self.small_keys.ganons_castle += 1, // Small Key (Ganons Castle)
             0x00B8 => {} // Double Defense
-            0x00C9 => self.inv.beans = true, // Magic Bean Pack
-            0x00CA => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce Piece
-            0x000B => self.inv.child_trade_item = ChildTradeItem::ZeldasLetter, // Zeldas Letter
-            0x00CB => self.small_keys.forest_temple = 10, // Small Key Ring (Forest Temple)
-            0x00CC => self.small_keys.fire_temple = 10, // Small Key Ring (Fire Temple)
-            0x00CD => self.small_keys.water_temple = 10, // Small Key Ring (Water Temple)
-            0x00CE => self.small_keys.spirit_temple = 10, // Small Key Ring (Spirit Temple)
-            0x00CF => self.small_keys.shadow_temple = 10, // Small Key Ring (Shadow Temple)
-            0x00D0 => self.small_keys.bottom_of_the_well = 10, // Small Key Ring (Bottom of the Well)
-            0x00D1 => self.small_keys.gerudo_training_ground = 10, // Small Key Ring (Gerudo Training Ground)
-            0x00D2 => self.small_keys.thieves_hideout = 10, // Small Key Ring (Thieves Hideout)
-            0x00D3 => self.small_keys.ganons_castle = 10, // Small Key Ring (Ganons Castle)
-            0x00D4 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Pink)
-            0x00D5 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Orange)
-            0x00D6 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Green)
-            0x00D7 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Blue)
             0x00BB => self.quest_items.insert(QuestItems::MINUET_OF_FOREST), // Minuet of Forest
             0x00BC => self.quest_items.insert(QuestItems::BOLERO_OF_FIRE), // Bolero of Fire
             0x00BD => self.quest_items.insert(QuestItems::SERENADE_OF_WATER), // Serenade of Water
@@ -1470,6 +1461,149 @@ impl Save {
             0x00C4 => self.quest_items.insert(QuestItems::SUNS_SONG), // Suns Song
             0x00C5 => self.quest_items.insert(QuestItems::SONG_OF_TIME), // Song of Time
             0x00C6 => self.quest_items.insert(QuestItems::SONG_OF_STORMS), // Song of Storms
+            0x00C9 => self.inv.beans = true, // Magic Bean Pack
+            0x00CA => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce Piece
+            0x00CB => self.small_keys.forest_temple = 10, // Small Key Ring (Forest Temple)
+            0x00CC => self.small_keys.fire_temple = 10, // Small Key Ring (Fire Temple)
+            0x00CD => self.small_keys.water_temple = 10, // Small Key Ring (Water Temple)
+            0x00CE => self.small_keys.spirit_temple = 10, // Small Key Ring (Spirit Temple)
+            0x00CF => self.small_keys.shadow_temple = 10, // Small Key Ring (Shadow Temple)
+            0x00D0 => self.small_keys.bottom_of_the_well = 10, // Small Key Ring (Bottom of the Well)
+            0x00D1 => self.small_keys.gerudo_training_ground = 10, // Small Key Ring (Gerudo Training Ground)
+            0x00D2 => self.small_keys.thieves_hideout = 10, // Small Key Ring (Thieves Hideout)
+            0x00D3 => self.small_keys.ganons_castle = 10, // Small Key Ring (Ganons Castle)
+            0x00D4 => { // Bombchu Bag (20)
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 20);
+            }
+            0x00D5 => { // Bombchu Bag (10)
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 10);
+            }
+            0x00D6 => { // Bombchu Bag (5)
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 5);
+            }
+            0x00D7 => self.small_keys.treasure_chest_game = 10, // Small Key Ring (Treasure Chest Game)
+            0x00D8 => {} // Silver Rupee (Dodongos Cavern Staircase)
+            0x00D9 => {} // Silver Rupee (Ice Cavern Spinning Scythe)
+            0x00DA => {} // Silver Rupee (Ice Cavern Push Block)
+            0x00DB => {} // Silver Rupee (Bottom of the Well Basement)
+            0x00DC => {} // Silver Rupee (Shadow Temple Scythe Shortcut)
+            0x00DD => {} // Silver Rupee (Shadow Temple Invisible Blades)
+            0x00DE => {} // Silver Rupee (Shadow Temple Huge Pit)
+            0x00DF => {} // Silver Rupee (Shadow Temple Invisible Spikes)
+            0x00E0 => {} // Silver Rupee (Gerudo Training Ground Slopes)
+            0x00E1 => {} // Silver Rupee (Gerudo Training Ground Lava)
+            0x00E2 => {} // Silver Rupee (Gerudo Training Ground Water)
+            0x00E3 => {} // Silver Rupee (Spirit Temple Child Early Torches)
+            0x00E4 => {} // Silver Rupee (Spirit Temple Adult Boulders)
+            0x00E5 => {} // Silver Rupee (Spirit Temple Lobby and Lower Adult)
+            0x00E6 => {} // Silver Rupee (Spirit Temple Sun Block)
+            0x00E7 => {} // Silver Rupee (Spirit Temple Adult Climb)
+            0x00E8 => {} // Silver Rupee (Ganons Castle Spirit Trial)
+            0x00E9 => {} // Silver Rupee (Ganons Castle Light Trial)
+            0x00EA => {} // Silver Rupee (Ganons Castle Fire Trial)
+            0x00EB => {} // Silver Rupee (Ganons Castle Shadow Trial)
+            0x00EC => {} // Silver Rupee (Ganons Castle Water Trial)
+            0x00ED => {} // Silver Rupee (Ganons Castle Forest Trial)
+            0x00EE => {} // Silver Rupee Pouch (Dodongos Cavern Staircase)
+            0x00EF => {} // Silver Rupee Pouch (Ice Cavern Spinning Scythe)
+            0x00F0 => {} // Silver Rupee Pouch (Ice Cavern Push Block)
+            0x00F1 => {} // Silver Rupee Pouch (Bottom of the Well Basement)
+            0x00F2 => {} // Silver Rupee Pouch (Shadow Temple Scythe Shortcut)
+            0x00F3 => {} // Silver Rupee Pouch (Shadow Temple Invisible Blades)
+            0x00F4 => {} // Silver Rupee Pouch (Shadow Temple Huge Pit)
+            0x00F5 => {} // Silver Rupee Pouch (Shadow Temple Invisible Spikes)
+            0x00F6 => {} // Silver Rupee Pouch (Gerudo Training Ground Slopes)
+            0x00F7 => {} // Silver Rupee Pouch (Gerudo Training Ground Lava)
+            0x00F8 => {} // Silver Rupee Pouch (Gerudo Training Ground Water)
+            0x00F9 => {} // Silver Rupee Pouch (Spirit Temple Child Early Torches)
+            0x00FA => {} // Silver Rupee Pouch (Spirit Temple Adult Boulders)
+            0x00FB => {} // Silver Rupee Pouch (Spirit Temple Lobby and Lower Adult)
+            0x00FC => {} // Silver Rupee Pouch (Spirit Temple Sun Block)
+            0x00FD => {} // Silver Rupee Pouch (Spirit Temple Adult Climb)
+            0x00FE => {} // Silver Rupee Pouch (Ganons Castle Spirit Trial)
+            0x00FF => {} // Silver Rupee Pouch (Ganons Castle Light Trial)
+            0x0100 => {} // Silver Rupee Pouch (Ganons Castle Fire Trial)
+            0x0101 => {} // Silver Rupee Pouch (Ganons Castle Shadow Trial)
+            0x0102 => {} // Silver Rupee Pouch (Ganons Castle Water Trial)
+            0x0103 => {} // Silver Rupee Pouch (Ganons Castle Forest Trial)
+            0x0104 => {} // Ocarina A
+            0x0105 => {} // Ocarina C up
+            0x0106 => {} // Ocarina C down
+            0x0107 => {} // Ocarina C left
+            0x0108 => {} // Ocarina C right
+            0x0109 => self.dungeon_items.forest_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Forest Temple)
+            0x010A => self.dungeon_items.fire_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Fire Temple)
+            0x010B => self.dungeon_items.water_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Water Temple)
+            0x010C => self.dungeon_items.spirit_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Spirit Temple)
+            0x010D => self.dungeon_items.shadow_temple.insert(DungeonItems::BOSS_KEY), // Boss Key (Shadow Temple)
+            0x010E => self.dungeon_items.ganons_castle.insert(DungeonItems::BOSS_KEY), // Boss Key (Ganons Castle)
+            0x010F => self.small_keys.forest_temple += 1, // Small Key (Forest Temple)
+            0x0110 => self.small_keys.fire_temple += 1, // Small Key (Fire Temple)
+            0x0111 => self.small_keys.water_temple += 1, // Small Key (Water Temple)
+            0x0112 => self.small_keys.spirit_temple += 1, // Small Key (Spirit Temple)
+            0x0113 => self.small_keys.shadow_temple += 1, // Small Key (Shadow Temple)
+            0x0114 => self.small_keys.bottom_of_the_well += 1, // Small Key (Bottom of the Well)
+            0x0115 => self.small_keys.gerudo_training_ground += 1, // Small Key (Gerudo Training Ground)
+            0x0116 => self.small_keys.thieves_hideout += 1, // Small Key (Thieves Hideout)
+            0x0117 => self.small_keys.ganons_castle += 1, // Small Key (Ganons Castle)
+            0x0118 => self.small_keys.treasure_chest_game += 1, // Small Key (Treasure Chest Game)
+            0x0119 => {} // Stalfos Soul
+            0x011A => {} // Octorok Soul
+            0x011B => {} // Wallmaster Soul
+            0x011C => {} // Dodongo Soul
+            0x011D => {} // Keese Soul
+            0x011E => {} // Tektite Soul
+            0x011F => {} // Peahat Soul
+            0x0120 => {} // Lizalfos and Dinalfos Soul
+            0x0121 => {} // Gohma Larvae Soul
+            0x0122 => {} // Shabom Soul
+            0x0123 => {} // Baby Dodongo Soul
+            0x0124 => {} // Biri and Bari Soul
+            0x0125 => {} // Tailpasaran Soul
+            0x0126 => {} // Skulltula Soul
+            0x0127 => {} // Torch Slug Soul
+            0x0128 => {} // Moblin Soul
+            0x0129 => {} // Armos Soul
+            0x012A => {} // Deku Baba Soul
+            0x012B => {} // Deku Scrub Soul
+            0x012C => {} // Bubble Soul
+            0x012D => {} // Beamos Soul
+            0x012E => {} // Floormaster Soul
+            0x012F => {} // Redead and Gibdo Soul
+            0x0130 => {} // Skullwalltula Soul
+            0x0131 => {} // Flare Dancer Soul
+            0x0132 => {} // Dead hand Soul
+            0x0133 => {} // Shell blade Soul
+            0x0134 => {} // Like-like Soul
+            0x0135 => {} // Spike Enemy Soul
+            0x0136 => {} // Anubis Soul
+            0x0137 => {} // Iron Knuckle Soul
+            0x0138 => {} // Skull Kid Soul
+            0x0139 => {} // Flying Pot Soul
+            0x013A => {} // Freezard Soul
+            0x013B => {} // Stinger Soul
+            0x013C => {} // Wolfos Soul
+            0x013D => {} // Guay Soul
+            0x013E => {} // Queen Gohma Soul
+            0x013F => {} // King Dodongo Soul
+            0x0140 => {} // Barinade Soul
+            0x0141 => {} // Phantom Ganon Soul
+            0x0142 => {} // Volvagia Soul
+            0x0143 => {} // Morpha Soul
+            0x0144 => {} // Bongo Bongo Soul
+            0x0145 => {} // Twinrova Soul
+            0x0146 => {} // Jabu Jabu Tentacle Soul
+            0x0147 => {} // Dark Link Soul
+            0x1000 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Pink)
+            0x1001 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Orange)
+            0x1002 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Green)
+            0x1003 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Blue)
+            0x1004 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce of Power
+            0x1005 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce of Wisdom
+            0x1006 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce of Courage
             _ => return Err(()),
         }
         Ok(())
