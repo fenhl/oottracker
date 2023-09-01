@@ -24,7 +24,7 @@ semver = "1"
 serde_json = "1"
 
 [dependencies.async-proto]
-version = "0.16"
+version = "=0.16.9" # rocket-ws is still on tungstenite 0.19
 features = ["serde_json", "tokio-tungstenite"]
 
 [dependencies.derive_more]
