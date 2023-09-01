@@ -184,7 +184,7 @@ impl Parse for Flags {
         input.parse::<Token![:]>()?;
         let content;
         braced!(content in input);
-        let fields = content.parse_terminated(Flag::parse)?;
+        let fields = content.parse_terminated(Flag::parse, Token![,])?;
         Ok(Flags { idx, fields })
     }
 }
@@ -211,7 +211,7 @@ impl Parse for FlagsList {
         let num_fields = content.parse()?;
         let content;
         braced!(content in input);
-        let fields = content.parse_terminated(Flags::parse)?;
+        let fields = content.parse_terminated(Flags::parse, Token![,])?;
         Ok(FlagsList { vis, struct_token, name, field_ty, num_fields, fields })
     }
 }
@@ -285,7 +285,7 @@ pub fn flags_list(input: TokenStream) -> TokenStream {
             };
             quote! {
                 ::bitflags::bitflags! {
-                    #[derive(Default)]
+                    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
                     #vis struct #fields_ty: #field_ty {
                         #(#fields)*
                     }
@@ -517,7 +517,7 @@ impl Parse for SceneData {
                 input.parse::<Token![:]>()?;
                 let content;
                 braced!(content in input);
-                let fields = content.parse_terminated(Flag::parse)?;
+                let fields = content.parse_terminated(Flag::parse, Token![,])?;
                 SceneData::Fields {
                     kind: SceneFieldsKind::try_from(ident)?,
                     fields,
@@ -546,7 +546,7 @@ impl Parse for Scene {
         let name = input.parse()?;
         let content;
         braced!(content in input);
-        let data = content.parse_terminated(SceneData::parse)?;
+        let data = content.parse_terminated(SceneData::parse, Token![,])?;
         Ok(Scene { idx, name, data })
     }
 }
@@ -565,7 +565,7 @@ impl Parse for SceneFlags {
         let name = input.parse()?;
         let content;
         braced!(content in input);
-        let scenes = content.parse_terminated(Scene::parse)?;
+        let scenes = content.parse_terminated(Scene::parse, Token![,])?;
         Ok(SceneFlags { vis, struct_token, name, scenes })
     }
 }
@@ -719,7 +719,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
             let read_field_ty = Ident::new(&format!("read_{}", field_ty), Span::call_site());
             quote! {
                 ::bitflags::bitflags! {
-                    #[derive(Default)]
+                    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
                     #vis struct #fields_ty: #field_ty {
                         #(#fields)*
                     }
@@ -784,7 +784,7 @@ pub fn scene_flags(input: TokenStream) -> TokenStream {
             });
             quote! {
                 ::bitflags::bitflags! {
-                    #[derive(Default)]
+                    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
                     #vis struct #fields_ty: u8 {
                         #(#fields)*
                     }

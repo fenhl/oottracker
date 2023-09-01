@@ -48,22 +48,6 @@ use {
         save::*,
     },
 };
-#[cfg(feature = "iced")] use iced::keyboard::Modifiers as KeyboardModifiers;
-#[cfg(feature = "rocket")] use {
-    rocket::{
-        http::uri::fmt::{
-            Formatter,
-            Path,
-            UriDisplay,
-        },
-        request::FromParam,
-        response::content::RawHtml,
-    },
-    rocket_util::{
-        ToHtml,
-        html,
-    },
-};
 
 const VERSION: u8 = 0;
 
@@ -720,98 +704,6 @@ impl TrackerCellKind {
             FreeReward => {}
             BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
         }
-    }
-
-    #[cfg(feature = "iced")]
-    /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
-        #[cfg(target_os = "macos")] if keyboard_modifiers.control() {
-            return self.right_click(can_change_state, keyboard_modifiers, state)
-        }
-        if can_change_state {
-            match self {
-                Composite { toggle_left, .. } | Overlay { toggle_main: toggle_left, .. } => toggle_left(state),
-                CompositeKeys { boss, .. } => if let BossKey { toggle, .. } = boss.kind() {
-                    toggle(&mut state.ram.save.dungeon_items);
-                } else {
-                    unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
-                },
-                Count { get, set, max, step, .. } => {
-                    let current = get(state);
-                    set(state, if current == *max { 0 } else { current.saturating_add(step * if keyboard_modifiers.shift() && *max >= 10 { 10 } else { 1 }).min(*max) });
-                }
-                GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
-                    ProgressionMode::Normal => ProgressionMode::Go,
-                    ProgressionMode::Go => ProgressionMode::Normal,
-                    ProgressionMode::Bk => ProgressionMode::Done,
-                    ProgressionMode::Done => ProgressionMode::Bk,
-                },
-                MagicLens => state.ram.save.magic = match (keyboard_modifiers.shift(), state.ram.save.magic) {
-                    (true, MagicCapacity::Large) => MagicCapacity::Small,
-                    (true, _) => MagicCapacity::Large,
-                    (false, MagicCapacity::None) => MagicCapacity::Small,
-                    (false, _) => MagicCapacity::None,
-                },
-                Spells => if keyboard_modifiers.shift() {
-                    state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love;
-                } else {
-                    state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
-                },
-                _ => self.click(state),
-            }
-        }
-        false
-    }
-
-    #[cfg(feature = "iced")]
-    /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
-        if let Medallion(_) = self { return true }
-        if can_change_state {
-            match self {
-                Composite { toggle_right, .. } | OptionalOverlay { toggle_overlay: toggle_right, .. } | Overlay { toggle_overlay: toggle_right, .. } => toggle_right(state),
-                CompositeKeys { small, .. } => if let TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } = small.kind() {
-                    let num = get(&state.ram.save.small_keys);
-                    if num == max_vanilla.max(max_mq) { //TODO check MQ knowledge? Does plentiful go to +1?
-                        set(&mut state.ram.save.small_keys, 0);
-                    } else {
-                        set(&mut state.ram.save.small_keys, num + 1);
-                    }
-                } else {
-                    unimplemented!("CompositeKeys that aren't SmallKeys + BossKey")
-                },
-                Count { get, set, max, step, .. } => {
-                    let current = get(state);
-                    set(state, if current == 0 { *max } else { current.saturating_sub(step * if keyboard_modifiers.shift() && *max >= 10 { 10 } else { 1 }) });
-                }
-                GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
-                    ProgressionMode::Normal => ProgressionMode::Bk,
-                    ProgressionMode::Bk => ProgressionMode::Normal,
-                    ProgressionMode::Go => ProgressionMode::Done,
-                    ProgressionMode::Done => ProgressionMode::Go,
-                },
-                MagicLens => state.ram.save.inv.lens = !state.ram.save.inv.lens,
-                Medallion(_) => unreachable!("already handled above"),
-                MedallionLocation(med) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Medallion(*med)),
-                MedallionWithLocation(med) => state.ram.save.quest_items.toggle(QuestItems::from(med)),
-                Sequence { decrement, .. } => decrement(state),
-                TrackerCellKind::SmallKeys { get, set, max_vanilla, max_mq } => {
-                    let num = get(&state.ram.save.small_keys);
-                    if num == 0 {
-                        set(&mut state.ram.save.small_keys, *max_vanilla.max(max_mq)); //TODO check MQ knowledge? Does plentiful go to +1?
-                    } else {
-                        set(&mut state.ram.save.small_keys, num - 1);
-                    }
-                }
-                Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
-                Spells => state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind,
-                StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
-                StoneWithLocation(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
-                FreeReward | FortressMq | Mq(_) | Simple { .. } | Stone(_) => {}
-                BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
-            }
-        }
-        false
     }
 }
 
@@ -2124,59 +2016,6 @@ impl<'a> From<&'a Option<Config>> for TrackerLayout {
     }
 }
 
-#[cfg(feature = "rocket")]
-impl fmt::Display for TrackerLayout {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Default { .. } if *self == TrackerLayout::default() => write!(f, "default"),
-            Self::Default { .. } => unimplemented!(), //TODO
-            Self::MultiworldExpanded => write!(f, "mw-expanded"),
-            Self::MultiworldCollapsed => write!(f, "mw-collapsed"),
-            Self::MultiworldEdit => write!(f, "mw-edit"),
-            Self::RslLeft => write!(f, "rsl-left"),
-            Self::RslRight => write!(f, "rsl-right"),
-            Self::RslEdit => write!(f, "rsl-edit"),
-            Self::Rsl3Player => write!(f, "rsl-3player"),
-            Self::TsgMainWithRewardLocations => write!(f, "tsg-main-locs"),
-            Self::TsgMainWithRewardLocationsEdit => write!(f, "tsg-main-locs-edit"),
-            Self::TriforcePieces => write!(f, "triforce-pieces"),
-        }
-    }
-}
-
-#[cfg(feature = "rocket")]
-impl<'a> FromParam<'a> for TrackerLayout {
-    type Error = ();
-
-    fn from_param(param: &'a str) -> Result<Self, ()> {
-        Ok(match param {
-            "default" => Self::default(),
-            //TODO parse Default variant with custom fields
-            "mw-expanded" => Self::MultiworldExpanded,
-            "mw-collapsed" => Self::MultiworldCollapsed,
-            "mw-edit" => Self::MultiworldEdit,
-            "rsl-left" => Self::RslLeft,
-            "rsl-right" => Self::RslRight,
-            "rsl-edit" => Self::RslEdit,
-            "rsl-3player" => Self::Rsl3Player,
-            "tsg-main-locs" => Self::TsgMainWithRewardLocations,
-            "tsg-main-locs-edit" => Self::TsgMainWithRewardLocationsEdit,
-            "triforce-pieces" => Self::TriforcePieces,
-            _ => return Err(()),
-        })
-    }
-}
-
-#[cfg(feature = "rocket")]
-rocket::http::impl_from_uri_param_identity!([Path] TrackerLayout);
-
-#[cfg(feature = "rocket")]
-impl UriDisplay<Path> for TrackerLayout {
-    fn fmt(&self, f: &mut Formatter<'_, Path>) -> fmt::Result {
-        f.write_raw(format!("{}", self))
-    }
-}
-
 /// A layout for a tracker displaying data from two players at once.
 ///
 /// Used in the web app for more compact dungeon reward layouts on restreams.
@@ -2203,45 +2042,12 @@ impl DoubleTrackerLayout {
     }
 }
 
-#[cfg(feature = "rocket")]
-impl<'a> FromParam<'a> for DoubleTrackerLayout {
-    type Error = ();
-
-    fn from_param(param: &'a str) -> Result<DoubleTrackerLayout, ()> {
-        Ok(match param {
-            "dungeon-rewards" => DoubleTrackerLayout::DungeonRewards,
-            _ => return Err(()),
-        })
-    }
-}
-
-#[cfg(feature = "rocket")]
-impl fmt::Display for DoubleTrackerLayout {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DoubleTrackerLayout::DungeonRewards => write!(f, "dungeon-rewards"),
-        }
-    }
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Protocol)]
 pub enum CellStyle {
     Normal,
     Dimmed,
     LeftDimmed,
     RightDimmed,
-}
-
-#[cfg(feature = "rocket")]
-impl CellStyle {
-    fn css_class(&self) -> &'static str {
-        match self {
-            Self::Normal => "",
-            Self::Dimmed => "dimmed",
-            Self::LeftDimmed => "left-dimmed",
-            Self::RightDimmed => "right-dimmed",
-        }
-    }
 }
 
 #[derive(Clone, PartialEq, Eq, Protocol)]
@@ -2265,37 +2071,11 @@ pub enum LocationStyle {
     Mq,
 }
 
-#[cfg(feature = "rocket")]
-impl LocationStyle {
-    fn css_classes(&self) -> &'static str {
-        match self {
-            Self::Normal => "loc",
-            Self::Dimmed => "loc dimmed",
-            Self::Mq => "loc mq",
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Protocol)]
 pub struct CellRender {
     pub img: ImageInfo,
     pub style: CellStyle,
     pub overlay: CellOverlay,
-}
-
-#[cfg(feature = "rocket")]
-impl ToHtml for CellRender {
-    fn to_html(&self) -> RawHtml<String> {
-        html! {
-            img(class = self.style.css_class(), src = format!("/static/img/{}.png", self.img.to_string('/', ImageDirContext::Normal)));
-            @match self.overlay {
-                CellOverlay::None => ;
-                CellOverlay::Count { count, .. } => span(class = "count") : count;
-                CellOverlay::Image(ref overlay) => img(src = format!("/static/img/{}.png", overlay.to_string('/', ImageDirContext::OverlayOnly)));
-                CellOverlay::Location { ref loc, style } => img(class = style.css_classes(), src = format!("/static/img/{}.png", loc.to_string('/', ImageDirContext::Normal)));
-            }
-        }
-    }
 }
 
 fn default_med_order() -> ElementOrder { ElementOrder::LightShadowSpirit }
@@ -2348,20 +2128,6 @@ impl ImageInfo {
         ImageInfo { dir: ImageDir::Extra, name: name.into() }
     }
 
-    #[cfg(feature = "embed-images")]
-    pub fn embedded<T: FromEmbeddedImage>(&self, ctx: ImageDirContext) -> T {
-        match (self.dir, ctx) {
-            (ImageDir::Xopar, ImageDirContext::Normal) => images::xopar_images(&self.name),
-            (ImageDir::Extra, ImageDirContext::Normal) => images::extra_images(&self.name),
-            (ImageDir::Xopar, ImageDirContext::Count(count)) => images::xopar_images_count(&format!("{}_{}", self.name, count)),
-            (ImageDir::Extra, ImageDirContext::Count(count)) => images::extra_images_count(&format!("{}_{}", self.name, count)),
-            (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(&self.name),
-            (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(&self.name),
-            (ImageDir::Xopar, ImageDirContext::OverlayOnly) => images::xopar_overlays(&self.name),
-            (ImageDir::Extra, ImageDirContext::OverlayOnly) => images::extra_overlays(&self.name),
-        }
-    }
-
     pub fn to_string(&self, sep: char, ctx: ImageDirContext) -> String {
         format!("{}{}{}", self.dir.to_string(ctx), sep, self.name)
     }
@@ -2382,16 +2148,6 @@ pub struct OverlayImageInfo {
 }
 
 impl OverlayImageInfo {
-    #[cfg(feature = "embed-images")]
-    pub fn embedded<T: FromEmbeddedImage>(&self, main_active: bool) -> T {
-        (match (self.dir, main_active) {
-            (ImageDir::Xopar, false) => images::xopar_images_overlay_dimmed,
-            (ImageDir::Xopar, true) => images::xopar_images_overlay,
-            (ImageDir::Extra, false) => images::extra_images_overlay_dimmed,
-            (ImageDir::Extra, true) => images::extra_images_overlay,
-        })(&format!("{}_{}", self.main, self.overlay))
-    }
-
     pub fn to_string(&self, sep: char, main_active: bool) -> String {
         format!(
             "{}-images-overlay{}{}{}_{}",
@@ -2408,34 +2164,8 @@ pub trait FromEmbeddedImage {
     fn from_embedded_image(contents: &'static [u8]) -> Self;
 }
 
-#[cfg(feature = "iced")]
-impl FromEmbeddedImage for iced::widget::Image {
-    fn from_embedded_image(contents: &'static [u8]) -> iced::widget::Image {
-        iced::widget::Image::new(iced::widget::image::Handle::from_memory(contents.to_vec()))
-    }
-}
-
 impl FromEmbeddedImage for DynamicImage {
     fn from_embedded_image(contents: &'static [u8]) -> DynamicImage {
         image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
     }
-}
-
-#[cfg(feature = "embed-images")]
-pub mod images {
-    use super::FromEmbeddedImage;
-
-    oottracker_derive::embed_images!("assets/img/extra-images");
-    oottracker_derive::embed_images!("assets/img/extra-images-count");
-    oottracker_derive::embed_images!("assets/img/extra-images-dimmed");
-    oottracker_derive::embed_images!("assets/img/extra-images-overlay");
-    oottracker_derive::embed_images!("assets/img/extra-images-overlay-dimmed");
-    oottracker_derive::embed_images!("assets/img/extra-overlays");
-    oottracker_derive::embed_images!("assets/img/xopar-images");
-    oottracker_derive::embed_images!("assets/img/xopar-images-count");
-    oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");
-    oottracker_derive::embed_images!("assets/img/xopar-images-overlay");
-    oottracker_derive::embed_images!("assets/img/xopar-images-overlay-dimmed");
-    oottracker_derive::embed_images!("assets/img/xopar-overlays");
-    oottracker_derive::embed_image!("assets/icon.ico");
 }

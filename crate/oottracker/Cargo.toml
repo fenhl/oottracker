@@ -4,22 +4,17 @@ version = "0.7.4"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
-[features]
-embed-images = ["once_cell"]
-firebase = ["eventsource-client"]
-rocket = ["dep:rocket", "dep:rocket-util"]
-
 [dependencies]
 async-stream = "0.3"
-bitflags = "1"
+bitflags = "2"
 byteorder = "1"
 collect-mac = "0.1"
 derivative = "2"
-directories = "4"
+directories = "5"
 enum-iterator = "1"
 futures = "0.3"
 image = "0.24"
-itertools = "0.10"
+itertools = "0.11"
 semver = "1"
 serde_json = "1"
 
@@ -32,19 +27,6 @@ version = "0.99"
 default-features = false
 features = ["from"]
 
-[dependencies.eventsource-client]
-version = "0.11"
-optional = true
-
-[dependencies.iced]
-version = "0.4"
-features = ["image"]
-optional = true
-
-[dependencies.once_cell]
-version = "1"
-optional = true
-
 [dependencies.ootr]
 path = "../ootr"
 
@@ -55,15 +37,6 @@ path = "../oottracker-derive"
 version = "0.11"
 default-features = false
 features = ["blocking", "json", "rustls-tls"]
-
-[dependencies.rocket]
-version = "0.5.0-rc.2"
-optional = true
-
-[dependencies.rocket-util]
-git = "https://github.com/fenhl/rocket-util"
-branch = "main"
-optional = true
 
 [dependencies.serde]
 version = "1"
