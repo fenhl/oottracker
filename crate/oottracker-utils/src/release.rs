@@ -447,7 +447,7 @@ impl Task<Result<(), Error>> for BuildMacOs {
     async fn run(self) -> Result<Result<(), Error>, Self> {
         match self {
             Self::Connect(client, repo, release_rx) => gres::transpose(async move {
-                let mut ssh = Command::new("ssh").arg(MACOS_ADDR).arg("/opt/git/github.com/fenhl/oottracker/master/target/release/oottracker-release").stdout(Stdio::piped()).spawn()?;
+                let mut ssh = Command::new("ssh").arg(MACOS_ADDR).arg("/opt/git/github.com/fenhl/oottracker/main/target/release/oottracker-release").stdout(Stdio::piped()).spawn()?;
                 let stdout = ssh.stdout.take().expect("stdout was piped");
                 Ok(Err(Self::Remote(format!("connecting to Mac"), Percent::default(), client, repo, release_rx, ssh, stdout)))
             }).await,
@@ -467,7 +467,7 @@ impl Task<Result<(), Error>> for BuildMacOs {
                 Ok(Err(Self::Download(client, repo, release_rx)))
             }).await,
             Self::Download(client, repo, release_rx) => gres::transpose(async move {
-                Command::new("scp").arg(format!("{}:/opt/git/github.com/fenhl/oottracker/master/assets/oottracker-mac.dmg", MACOS_ADDR)).arg("assets/oottracker-mac.dmg").check("scp").await?;
+                Command::new("scp").arg(format!("{}:/opt/git/github.com/fenhl/oottracker/main/assets/oottracker-mac.dmg", MACOS_ADDR)).arg("assets/oottracker-mac.dmg").check("scp").await?;
                 Ok(Err(Self::ReadDmg(client, repo, release_rx)))
             }).await,
             Self::ReadDmg(client, repo, release_rx) => gres::transpose(async move {
@@ -582,7 +582,7 @@ impl Default for BuildWeb {
 impl fmt::Display for BuildWeb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UpdateRepo => write!(f, "updating repo on mercredi"),
+            Self::UpdateRepo => write!(f, "updating repo on fenhl.net"),
             Self::Build => write!(f, "building oottracker.fenhl.net"),
             Self::Restart => write!(f, "restarting oottracker.fenhl.net"),
         }
@@ -606,15 +606,15 @@ impl Task<Result<(), Error>> for BuildWeb {
     async fn run(self) -> Result<Result<(), Error>, Self> {
         match self {
             Self::UpdateRepo => gres::transpose(async move {
-                Command::new("ssh").arg("mercredi").arg("cd /opt/git/github.com/fenhl/oottracker/master && git pull --ff-only").check("ssh").await?;
+                Command::new("ssh").arg("fenhl.net").arg("cd /opt/git/github.com/fenhl/oottracker/main && git pull --ff-only").check("ssh").await?;
                 Ok(Err(Self::Build))
             }).await,
             Self::Build => gres::transpose(async move {
-                Command::new("ssh").arg("mercredi").arg(concat!("env -C /opt/git/github.com/fenhl/oottracker/master ", include_str!("../../../assets/web/env.txt"), " cargo build --release --package=oottracker-web")).check("ssh").await?;
+                Command::new("ssh").arg("fenhl.net").arg(concat!("env -C /opt/git/github.com/fenhl/oottracker/main ", include_str!("../../../assets/web/env.txt"), " cargo build --release --package=oottracker-web")).check("ssh").await?;
                 Ok(Err(Self::Restart))
             }).await,
             Self::Restart => gres::transpose(async move {
-                Command::new("ssh").arg("mercredi").arg("sudo systemctl restart oottracker-web").check("ssh").await?;
+                Command::new("ssh").arg("fenhl.net").arg("sudo systemctl restart oottracker-web").check("ssh").await?;
                 Ok(Ok(()))
             }).await,
         }
@@ -773,19 +773,19 @@ async fn main() -> Result<(), Error> {
     }
     sweep_cmd.check("cargo").await?;
     progress!(25, "updating oottracker repo on Mac");
-    let repo = Repository::open("/opt/git/github.com/fenhl/oottracker/master")?;
+    let repo = Repository::open("/opt/git/github.com/fenhl/oottracker/main")?;
     let mut origin = repo.find_remote("origin")?;
     origin.fetch(&["main"], None, None)?;
     repo.reset(&repo.find_branch("origin/main", BranchType::Remote)?.into_reference().peel_to_commit()?.into_object(), ResetType::Hard, None)?;
     progress!(30, "building oottracker-mac.app for x86_64");
-    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").env("MACOSX_DEPLOYMENT_TARGET", "10.9").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("cargo").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-apple-darwin").arg("--package=oottracker-gui").env("MACOSX_DEPLOYMENT_TARGET", "10.9").current_dir("/opt/git/github.com/fenhl/oottracker/main").check("cargo").await?;
     progress!(60, "building oottracker-mac.app for aarch64");
-    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("cargo").await?;
+    Command::new("cargo").arg("build").arg("--release").arg("--target=aarch64-apple-darwin").arg("--package=oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/main").check("cargo").await?;
     progress!(90, "creating Universal macOS binary");
-    fs::create_dir("/opt/git/github.com/fenhl/oottracker/master/assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
-    Command::new("lipo").arg("-create").arg("target/aarch64-apple-darwin/release/oottracker-gui").arg("target/x86_64-apple-darwin/release/oottracker-gui").arg("-output").arg("assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("lipo").await?;
+    fs::create_dir("/opt/git/github.com/fenhl/oottracker/main/assets/macos/OoT Tracker.app/Contents/MacOS").await.exist_ok()?;
+    Command::new("lipo").arg("-create").arg("target/aarch64-apple-darwin/release/oottracker-gui").arg("target/x86_64-apple-darwin/release/oottracker-gui").arg("-output").arg("assets/macos/OoT Tracker.app/Contents/MacOS/oottracker-gui").current_dir("/opt/git/github.com/fenhl/oottracker/main").check("lipo").await?;
     progress!(95, "packing oottracker-mac.dmg");
-    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").current_dir("/opt/git/github.com/fenhl/oottracker/master").check("hdiutil").await?;
+    Command::new("hdiutil").arg("create").arg("assets/oottracker-mac.dmg").arg("-volname").arg("OoT Tracker").arg("-srcfolder").arg("assets/macos").arg("-ov").current_dir("/opt/git/github.com/fenhl/oottracker/main").check("hdiutil").await?;
     Ok(())
 }
 
