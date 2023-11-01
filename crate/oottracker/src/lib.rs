@@ -36,7 +36,6 @@ pub use crate::{
 
 pub mod checks;
 pub mod ctx;
-#[cfg(feature = "firebase")] pub mod firebase;
 pub mod github;
 pub mod info_tables;
 mod item_ids;

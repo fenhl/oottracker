@@ -60,13 +60,10 @@ use {
         websocket,
     },
 };
-#[cfg(feature = "firebase")] use crate::firebase;
 
 #[derive(Debug, From, FromArc, Clone)]
 pub enum Error {
     CannotChangeState,
-    #[cfg(feature = "firebase")]
-    Firebase(firebase::Error),
     #[from_arc]
     Io(Arc<io::Error>),
     Protocol(proto::ReadError),
@@ -84,8 +81,6 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::CannotChangeState => write!(f, "this type of connection is read-only"),
-            #[cfg(feature = "firebase")]
-            Error::Firebase(e) => e.fmt(f),
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::Protocol(e) => e.fmt(f),
             Error::RamDecode(e) => write!(f, "error decoding game RAM: {:?}", e),
@@ -102,9 +97,6 @@ pub trait Connection: fmt::Debug + Send + Sync {
     fn display_kind(&self) -> &'static str;
     fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>>;
     fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
-
-    #[cfg(feature = "firebase")]
-    fn firebase_app(&self) -> Option<&dyn firebase::App> { None }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -194,56 +186,6 @@ impl Connection for WebConnection {
                 .await?;
             Ok(())
         })
-    }
-}
-
-#[cfg(feature = "firebase")]
-#[derive(Debug)]
-pub struct FirebaseConnection {
-    app: Box<dyn firebase::App>,
-    room: firebase::DynRoom,
-}
-
-#[cfg(feature = "firebase")]
-impl FirebaseConnection {
-    pub fn new<A: firebase::App + Default + Clone + Send>(room: firebase::Room<A>) -> FirebaseConnection {
-        FirebaseConnection {
-            app: Box::new(A::default()),
-            room: room.to_dyn(),
-        }
-    }
-}
-
-#[cfg(feature = "firebase")]
-impl Connection for FirebaseConnection {
-    fn hash(&self) -> u64 {
-        let mut state = DefaultHasher::default();
-        TypeId::of::<Self>().hash(&mut state);
-        self.room.hash(&mut state);
-        state.finish()
-    }
-
-    fn can_change_state(&self) -> bool { true } //TODO support for read-only (passwordless) connections?
-    fn display_kind(&self) -> &'static str { "Firebase" }
-
-    fn packet_stream(&self) -> Pin<Box<dyn Stream<Item = Result<Packet, Error>> + Send>> {
-        Box::pin(
-            self.room.subscribe()
-                .map_ok(|(cell, new_value)| Packet::UpdateCell(cell, new_value))
-                .err_into()
-        )
-    }
-
-    fn set_state(&self, model: &ModelState) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> {
-        let room = self.room.clone();
-        let model = model.clone();
-        Box::pin(async move {
-            Ok(room.set_state(&model).await?)
-        })
-    }
-
-    fn firebase_app(&self) -> Option<&dyn firebase::App> {
-        Some(&self.app)
     }
 }
 

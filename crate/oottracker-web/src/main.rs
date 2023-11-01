@@ -20,15 +20,12 @@ use {
         WriteError,
     },
     derive_more::From,
-    futures::{
-        future::{
-            FutureExt as _,
-            TryFutureExt as _,
-        },
-        stream::TryStreamExt as _,
-    },
+    futures::stream::TryStreamExt as _,
     lazy_regex::regex_is_match,
-    rocket::http::Status,
+    rocket::{
+        Rocket,
+        http::Status,
+    },
     sqlx::{
         PgPool,
         postgres::PgConnectOptions,
@@ -39,7 +36,6 @@ use {
         RwLock,
         watch::*,
     },
-    warp::Filter as _,
     oottracker::{
         Knowledge,
         ModelState,
@@ -193,19 +189,6 @@ async fn main() -> Result<(), Error> {
         Restreams::new(RwLock::new(map))
     };
     let mw_rooms = MwRooms::default();
-    let websocket_task = {
-        let pool = pool.clone();
-        let rooms = Rooms::clone(&rooms);
-        let restreams = Restreams::clone(&restreams);
-        let mw_rooms = MwRooms::clone(&mw_rooms);
-        let handler = warp::ws().and_then(move |ws| websocket::ws_handler(pool.clone(), Rooms::clone(&rooms), Restreams::clone(&restreams), MwRooms::clone(&mw_rooms), ws));
-        tokio::spawn(warp::serve(handler).run(([127, 0, 0, 1], 24808))).err_into()
-    };
-    let rocket_task = tokio::spawn(http::rocket(pool, rooms, restreams, mw_rooms).launch()).map(|res| match res {
-        Ok(Ok(_)) => Ok(()),
-        Ok(Err(e)) => Err(Error::from(e)),
-        Err(e) => Err(Error::from(e)),
-    });
-    let ((), ()) = tokio::try_join!(websocket_task, rocket_task)?;
+    let Rocket { .. } = http::rocket(pool, rooms, restreams, mw_rooms).launch().await?;
     Ok(())
 }

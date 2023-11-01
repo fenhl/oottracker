@@ -1,6 +1,7 @@
 use {
     std::{
         collections::{
+            HashMap,
             HashSet,
             VecDeque,
         },
@@ -48,6 +49,8 @@ pub(crate) struct MwState {
     pub(crate) worlds: Vec<(watch::Sender<()>, watch::Receiver<()>, ModelState, Vec<MwItem>, HashSet<MwItem>)>,
     pub(crate) autotracker_delay: Duration,
     pub(crate) incoming_queue: mpsc::UnboundedSender<AutoUpdate>,
+    pub(crate) location_cache: HashMap<NonZeroU8, HashMap<u64, String>>,
+    pub(crate) item_cache: HashMap<u16, String>,
 }
 
 impl MwState {
@@ -59,6 +62,8 @@ impl MwState {
                 (tx, rx, ModelState { ram: save.unwrap_or_default().into(), knowledge: Default::default(), tracker_ctx: Default::default() }, queue, HashSet::default())
             }).collect(),
             autotracker_delay: Duration::default(),
+            location_cache: HashMap::default(),
+            item_cache: HashMap::default(),
             incoming_queue,
         }));
         let this_clone = Arc::clone(&this);

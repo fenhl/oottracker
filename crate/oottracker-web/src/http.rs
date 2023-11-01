@@ -1,16 +1,17 @@
 use {
     std::{
+        collections::hash_map::{
+            self,
+            HashMap,
+        },
         num::NonZeroU8,
         time::Duration,
     },
     itertools::Itertools as _,
     ootr_utils::{
+        PyJsonError,
         PyModules,
         Version,
-    },
-    pyo3::{
-        prelude::*,
-        types::PyDict,
     },
     rocket::{
         FromForm,
@@ -36,6 +37,7 @@ use {
         ToHtml,
         html,
     },
+    rocket_ws::WebSocket,
     sqlx::PgPool,
     oottracker::{
         ModelState,
@@ -56,6 +58,21 @@ use {
         restream::render_double_cell,
     },
 };
+
+//HACK assume all child trade items are shuffled for the purpose of override key generation, not sure if this breaks anything
+const SHUFFLE_CHILD_TRADE: [&str; 11] = [
+    "Weird Egg",
+    "Chicken",
+    "Zeldas Letter",
+    "Keaton Mask",
+    "Skull Mask",
+    "Spooky Mask",
+    "Bunny Hood",
+    "Goron Mask",
+    "Zora Mask",
+    "Gerudo Mask",
+    "Mask of Truth",
+];
 
 trait TrackerCellIdExt {
     fn view<'a>(&self, click_uri: Origin<'_>, cell_id: u8, state: &ModelState, colspan: u8, loc: bool) -> RawHtml<String>;
@@ -170,92 +187,111 @@ fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
     }
 }
 
-fn format_override_key(modules: PyModules<'_>, key: u32, item_name: &str) -> PyResult<String> {
-    let location_list = modules.py().import("LocationList")?;
-    for location_name in location_list.getattr("location_table")?.iter()? {
-        let location_name = location_name?.extract::<String>()?;
-        if modules.override_key(&location_name, item_name)? == Some(key) {
-            return Ok(location_name)
+async fn format_override_key<'a>(modules: &PyModules, cache: &'a mut HashMap<NonZeroU8, HashMap<u64, String>>, shuffle_child_trade: &[&str], source_world: NonZeroU8, key: u64, target_world: NonZeroU8, item: &str) -> Result<&'a str, PyJsonError> {
+    Ok(match cache.entry(source_world) {
+        hash_map::Entry::Occupied(entry) => entry.into_mut(),
+        hash_map::Entry::Vacant(entry) => {
+            let entries = modules.py_json::<HashMap<String, [u8; 16]>>(&format!("
+import json, Item, Location, LocationList, Patches
+
+class Settings:
+    def __init__(self):
+        self.shuffle_child_trade = {shuffle_child_trade:?}
+
+class World:
+    def __init__(self, id):
+        self.id = id
+        self.settings = Settings()
+
+entries = {{}}
+for loc_name in LocationList.location_table:
+    loc = Location.LocationFactory(loc_name)
+    loc.world = World({source_world})
+    loc.item = Item.ItemFactory({item:?}, World({target_world}))
+    entry = Patches.get_override_entry(loc)
+    if entry is not None:
+        entries[loc_name] = list(Patches.override_struct.pack(*entry))
+print(json.dumps(entries))
+            ")).await?;
+            entry.insert(entries.into_iter().map(|(name, [k0, k1, k2, k3, k4, k5, k6, k7, _, _, _, _, _, _, _, _])| (u64::from_be_bytes([k0, k1, k2, k3, k4, k5, k6, k7]), name)).collect())
         }
-    }
-    Ok(format!("0x{key:08x}"))
+    }.entry(key).or_insert_with(|| format!("0x{key:016x}")))
 }
 
-fn format_item_kind(modules: PyModules<'_>, kind: u16) -> PyResult<String> {
-    let item_list = modules.py().import("ItemList")?;
-    for (item_name, entry) in item_list.getattr("item_table")?.downcast::<PyDict>()?.iter() {
-        let (_, _, get_item_id, _) = entry.extract::<(&PyAny, &PyAny, Option<u16>, &PyAny)>()?;
-        if get_item_id == Some(kind) {
-            return item_name.extract()
+async fn format_item_kind<'a>(modules: &PyModules, cache: &'a mut HashMap<u16, String>, kind: u16) -> Result<&'a str, PyJsonError> {
+    Ok(match cache.entry(kind) {
+        hash_map::Entry::Occupied(entry) => entry.into_mut(),
+        hash_map::Entry::Vacant(entry) => {
+            let mut entries = modules.py_json::<HashMap<u16, String>>("import json; import ItemList; print(json.dumps({get_item_id: name for name, (_, _, get_item_id, _) in ItemList.item_table.items()}))").await?;
+            entry.insert(entries.remove(&kind).unwrap_or_else(|| format!("0x{kind:04x}"))) //TODO generate entire table in 1 Python call
         }
-    }
-    Ok(format!("0x{kind:04x}"))
+    })
 }
 
 #[derive(Debug, thiserror::Error, rocket_util::Error)]
 enum NotesError {
-    #[error(transparent)] Python(#[from] PyErr),
+    #[error(transparent)] Dir(#[from] ootr_utils::DirError),
+    #[error(transparent)] PyJson(#[from] PyJsonError),
 }
 
 #[rocket::get("/mw-notes/<room>")]
 async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtml<String>>, NotesError> {
     let mw_rooms = mw_rooms.read().await;
     let Some(mw_room) = mw_rooms.get(room) else { return Ok(None) };
-    let mw_room = mw_room.read().await;
+    let mut mw_room = mw_room.write().await;
+    let mw_room = &mut *mw_room;
     let rando_version = Version::from_dev(6, 2, 205); //TODO don't hardcode
-    Python::with_gil(|py| {
-        let modules = rando_version.py_modules(py)?;
-        Ok(Some(html! {
-            : Doctype;
-            html {
-                head {
-                    meta(charset = "utf-8");
-                    title : "OoT Tracker";
-                    meta(name = "author", content = "Fenhl");
-                    meta(name = "viewport", content = "width=device-width, initial-scale=1");
-                    link(rel = "icon", sizes = "512x512", type = "image/png", href = "/static/img/favicon.png");
-                    link(rel = "stylesheet", href = "/static/common.css");
-                    link(rel = "stylesheet", href = "/static/light.css", media = "(prefers-color-scheme: light)");
-                }
-                body {
-                    div(class = "table-wrapper") {
-                        @for (idx, (_, _, _, queue, own_items)) in mw_room.worlds.iter().enumerate() {
-                            @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
-                            div {
-                                h1(class? = world_class(world_id)) {
-                                    : "For player ";
-                                    : world_id.get();
-                                };
-                                table {
-                                    thead {
-                                        tr {
-                                            th : "From world";
-                                            th : "From location";
-                                            th : "Item";
-                                        }
+    let modules = rando_version.py_modules()?;
+    Ok(Some(html! {
+        : Doctype;
+        html {
+            head {
+                meta(charset = "utf-8");
+                title : "OoT Tracker";
+                meta(name = "author", content = "Fenhl");
+                meta(name = "viewport", content = "width=device-width, initial-scale=1");
+                link(rel = "icon", sizes = "512x512", type = "image/png", href = "/static/img/favicon.png");
+                link(rel = "stylesheet", href = "/static/common.css");
+                link(rel = "stylesheet", href = "/static/light.css", media = "(prefers-color-scheme: light)");
+            }
+            body {
+                div(class = "table-wrapper") {
+                    @for (idx, (_, _, _, queue, own_items)) in mw_room.worlds.iter().enumerate() {
+                        @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
+                        div {
+                            h1(class? = world_class(world_id)) {
+                                : "For player ";
+                                : world_id.get();
+                            };
+                            table {
+                                thead {
+                                    tr {
+                                        th : "From world";
+                                        th : "From location";
+                                        th : "Item";
                                     }
-                                    tbody {
-                                        @for MwItem { source, key, kind } in own_items.iter().sorted().chain(queue) {
-                                            tr {
-                                                @let item_name = format_item_kind(modules.clone(), *kind)?;
-                                                td(class? = world_class(*source)) : source.get();
-                                                td(class? = world_class(*source)) : format_override_key(modules.clone(), *key, &item_name)?;
-                                                td(class? = world_class(world_id)) : item_name;
-                                            }
+                                }
+                                tbody {
+                                    @for MwItem { source, key, kind } in own_items.iter().sorted().chain(queue) {
+                                        tr {
+                                            @let item_name = format_item_kind(&modules, &mut mw_room.item_cache, *kind).await?;
+                                            td(class? = world_class(*source)) : source.get();
+                                            td(class? = world_class(*source)) : format_override_key(&modules, &mut mw_room.location_cache, &SHUFFLE_CHILD_TRADE, *source, *key, world_id, item_name).await?;
+                                            td(class? = world_class(world_id)) : item_name;
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    p : "live update not yet implemented (refresh to update)"; //TODO
-                    footer {
-                        a(href = "https://fenhl.net/disc") : "disclaimer / Impressum";
-                    }
+                }
+                p : "live update not yet implemented (refresh to update)"; //TODO
+                footer {
+                    a(href = "https://fenhl.net/disc") : "disclaimer / Impressum";
                 }
             }
-        }))
-    })
+        }
+    }))
 }
 
 #[rocket::get("/restream/<restreamer>/<runner>?<theme>")]
@@ -326,6 +362,18 @@ async fn click(pool: &State<PgPool>, rooms: &State<Rooms>, name: &str, cell_id: 
     Ok(Redirect::to(rocket::uri!(room(name, _))))
 }
 
+#[rocket::get("/websocket")]
+fn websocket(db_pool: &State<PgPool>, rooms: &State<Rooms>, restreams: &State<Restreams>, mw_rooms: &State<MwRooms>, ws: WebSocket) -> rocket_ws::Channel<'static> {
+    let db_pool = (*db_pool).clone();
+    let rooms = (*rooms).clone();
+    let restreams = (*restreams).clone();
+    let mw_rooms = (*mw_rooms).clone();
+    ws.channel(move |stream| Box::pin(async move {
+        let () = crate::websocket::client_connection(db_pool, rooms, restreams, mw_rooms, stream).await;
+        Ok(())
+    }))
+}
+
 pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms) -> Rocket<rocket::Build> {
     rocket::custom(rocket::Config {
         port: 24807,
@@ -349,5 +397,6 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms:
         restream_double_room_layout,
         room,
         click,
+        websocket,
     ])
 }

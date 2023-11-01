@@ -1,3 +1,8 @@
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
 server {
     server_name oottracker.fenhl.net;
 
@@ -16,16 +21,19 @@ server {
     ssl_certificate /etc/letsencrypt/live/inwx/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/inwx/privkey.pem;
 
+    add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
+
     location / {
+        add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
         proxy_pass http://localhost:24807;
     }
 
     location /websocket {
         proxy_http_version 1.1;
         proxy_buffering off;
-        proxy_pass http://127.0.0.1:24808;
+        proxy_pass http://127.0.0.1:24807;
         proxy_read_timeout 300;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection $connection_upgrade;
     }
 }

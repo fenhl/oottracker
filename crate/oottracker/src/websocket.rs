@@ -21,7 +21,7 @@ use {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Protocol)]
 pub struct MwItem {
     pub source: NonZeroU8,
-    pub key: u32,
+    pub key: u64,
     pub kind: u16,
 }
 
@@ -103,7 +103,7 @@ pub enum ClientMessage {
     MwQueueItem {
         room: String,
         source_world: NonZeroU8,
-        key: u32,
+        key: u64,
         kind: u16,
         target_world: NonZeroU8,
     },

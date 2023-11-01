@@ -6,7 +6,6 @@ edition = "2021"
 
 [features]
 embed-images = ["once_cell"]
-firebase = ["eventsource-client"]
 rocket = ["dep:rocket", "dep:rocket-util"]
 
 [dependencies]
@@ -32,10 +31,6 @@ version = "0.99"
 default-features = false
 features = ["from"]
 
-[dependencies.eventsource-client]
-version = "0.11"
-optional = true
-
 [dependencies.iced]
 version = "0.4"
 features = ["image"]
@@ -47,9 +42,6 @@ optional = true
 
 [dependencies.ootr]
 path = "../ootr"
-
-[dependencies.ootr-static] # used in tests
-path = "../ootr-static"
 
 [dependencies.oottracker-derive]
 path = "../oottracker-derive"
