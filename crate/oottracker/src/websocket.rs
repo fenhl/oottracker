@@ -103,7 +103,7 @@ pub enum ClientMessage {
     MwQueueItem {
         room: String,
         source_world: NonZeroU8,
-        key: u32,
+        key: u64,
         kind: u16,
         target_world: NonZeroU8,
     },
