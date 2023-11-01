@@ -5,7 +5,7 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 
 [dependencies]
-async-proto = "=0.16.9" # rocket-ws is still on tungstenite 0.19
+async-proto = "0.16.10"
 enum-iterator = "1"
 semver = "1"
 serde_plain = "1"
