@@ -21,7 +21,7 @@ use {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Protocol)]
 pub struct MwItem {
     pub source: NonZeroU8,
-    pub key: u32,
+    pub key: u64,
     pub kind: u16,
 }
 
