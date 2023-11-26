@@ -621,9 +621,9 @@ bitflags! {
         const DEKU_STICK_CAPACITY_20 = 0x0004_0000;
         const DEKU_STICK_CAPACITY_10 = 0x0002_0000;
         const BULLET_BAG_MASK = 0x0001_c000;
-        const BULLET_BAG_50 = 0x0001_8000;
-        const BULLET_BAG_40 = 0x0001_0000;
-        const BULLET_BAG_30 = 0x0000_8000; //TODO check for parity with slingshot
+        const BULLET_BAG_50 = 0x0000_c000;
+        const BULLET_BAG_40 = 0x0000_8000;
+        const BULLET_BAG_30 = 0x0000_4000; //TODO check for parity with slingshot
         const WALLET_MASK = 0x0000_3000;
         const ADULTS_WALLET = 0x0000_1000;
         const GIANTS_WALLET = 0x0000_2000;
