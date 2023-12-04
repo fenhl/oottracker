@@ -1329,8 +1329,10 @@ impl Save {
             0x005D => self.inv.farores_wind = true, // Farores Wind
             0x005E => self.inv.nayrus_love = true, // Nayrus Love
             0x0064 => {} // Deku Nuts (10)
+            0x0065 => {} // Bomb
             0x0066 => {} // Bombs (10)
             0x0067 => {} // Bombs (20)
+            0x0068 => {} // Bombs (30)
             0x0069 => {} // Deku Seeds (30)
             0x006A => { // Bombchus (5)
                 self.inv.bombchus = true;
@@ -1551,53 +1553,55 @@ impl Save {
             0x0116 => self.small_keys.thieves_hideout += 1, // Small Key (Thieves Hideout)
             0x0117 => self.small_keys.ganons_castle += 1, // Small Key (Ganons Castle)
             0x0118 => self.small_keys.treasure_chest_game += 1, // Small Key (Treasure Chest Game)
-            0x0119 => {} // Stalfos Soul
-            0x011A => {} // Octorok Soul
-            0x011B => {} // Wallmaster Soul
-            0x011C => {} // Dodongo Soul
-            0x011D => {} // Keese Soul
-            0x011E => {} // Tektite Soul
-            0x011F => {} // Peahat Soul
-            0x0120 => {} // Lizalfos and Dinalfos Soul
-            0x0121 => {} // Gohma Larvae Soul
-            0x0122 => {} // Shabom Soul
-            0x0123 => {} // Baby Dodongo Soul
-            0x0124 => {} // Biri and Bari Soul
-            0x0125 => {} // Tailpasaran Soul
-            0x0126 => {} // Skulltula Soul
-            0x0127 => {} // Torch Slug Soul
-            0x0128 => {} // Moblin Soul
-            0x0129 => {} // Armos Soul
-            0x012A => {} // Deku Baba Soul
-            0x012B => {} // Deku Scrub Soul
-            0x012C => {} // Bubble Soul
-            0x012D => {} // Beamos Soul
-            0x012E => {} // Floormaster Soul
-            0x012F => {} // Redead and Gibdo Soul
-            0x0130 => {} // Skullwalltula Soul
-            0x0131 => {} // Flare Dancer Soul
-            0x0132 => {} // Dead hand Soul
-            0x0133 => {} // Shell blade Soul
-            0x0134 => {} // Like-like Soul
-            0x0135 => {} // Spike Enemy Soul
-            0x0136 => {} // Anubis Soul
-            0x0137 => {} // Iron Knuckle Soul
-            0x0138 => {} // Skull Kid Soul
-            0x0139 => {} // Flying Pot Soul
-            0x013A => {} // Freezard Soul
-            0x013B => {} // Stinger Soul
-            0x013C => {} // Wolfos Soul
-            0x013D => {} // Guay Soul
-            0x013E => {} // Queen Gohma Soul
-            0x013F => {} // King Dodongo Soul
-            0x0140 => {} // Barinade Soul
-            0x0141 => {} // Phantom Ganon Soul
-            0x0142 => {} // Volvagia Soul
-            0x0143 => {} // Morpha Soul
-            0x0144 => {} // Bongo Bongo Soul
-            0x0145 => {} // Twinrova Soul
-            0x0146 => {} // Jabu Jabu Tentacle Soul
-            0x0147 => {} // Dark Link Soul
+            0x0119 => {} // Fairy
+            0x011A => {} // Nothing :)
+            0x011B => {} // Stalfos Soul
+            0x011C => {} // Octorok Soul
+            0x011D => {} // Wallmaster Soul
+            0x011E => {} // Dodongo Soul
+            0x011F => {} // Keese Soul
+            0x0120 => {} // Tektite Soul
+            0x0121 => {} // Peahat Soul
+            0x0122 => {} // Lizalfos and Dinalfos Soul
+            0x0123 => {} // Gohma Larvae Soul
+            0x0124 => {} // Shabom Soul
+            0x0125 => {} // Baby Dodongo Soul
+            0x0126 => {} // Biri and Bari Soul
+            0x0127 => {} // Tailpasaran Soul
+            0x0128 => {} // Skulltula Soul
+            0x0129 => {} // Torch Slug Soul
+            0x012A => {} // Moblin Soul
+            0x012B => {} // Armos Soul
+            0x012C => {} // Deku Baba Soul
+            0x012D => {} // Deku Scrub Soul
+            0x012E => {} // Bubble Soul
+            0x012F => {} // Beamos Soul
+            0x0130 => {} // Floormaster Soul
+            0x0131 => {} // Redead and Gibdo Soul
+            0x0132 => {} // Skullwalltula Soul
+            0x0133 => {} // Flare Dancer Soul
+            0x0134 => {} // Dead hand Soul
+            0x0135 => {} // Shell blade Soul
+            0x0136 => {} // Like-like Soul
+            0x0137 => {} // Spike Enemy Soul
+            0x0138 => {} // Anubis Soul
+            0x0139 => {} // Iron Knuckle Soul
+            0x013A => {} // Skull Kid Soul
+            0x013B => {} // Flying Pot Soul
+            0x013C => {} // Freezard Soul
+            0x013D => {} // Stinger Soul
+            0x013E => {} // Wolfos Soul
+            0x013F => {} // Guay Soul
+            0x0140 => {} // Queen Gohma Soul
+            0x0141 => {} // King Dodongo Soul
+            0x0142 => {} // Barinade Soul
+            0x0143 => {} // Phantom Ganon Soul
+            0x0144 => {} // Volvagia Soul
+            0x0145 => {} // Morpha Soul
+            0x0146 => {} // Bongo Bongo Soul
+            0x0147 => {} // Twinrova Soul
+            0x0148 => {} // Jabu Jabu Tentacle Soul
+            0x0149 => {} // Dark Link Soul
             0x1000 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Pink)
             0x1001 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Orange)
             0x1002 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Easter Egg (Green)
@@ -1605,6 +1609,115 @@ impl Save {
             0x1004 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce of Power
             0x1005 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce of Wisdom
             0x1006 => self.set_triforce_pieces(self.triforce_pieces() + 1), // Triforce of Courage
+            0x1007 => self.skull_tokens += 1, // Gold Skulltula Token (normal text)
+            0x1008 => self.skull_tokens += 1, // Gold Skulltula Token (big chest, normal text)
+            0x1009 => {} // Fairy
+            0x100A => {} // Nothing :)
+            0x100B => self.quest_items.insert(QuestItems::KOKIRI_EMERALD), // Kokiri Emerald
+            0x100C => self.quest_items.insert(QuestItems::GORON_RUBY), // Goron Ruby
+            0x100D => self.quest_items.insert(QuestItems::ZORA_SAPPHIRE), // Zora Sapphire
+            0x100E => self.quest_items.insert(QuestItems::LIGHT_MEDALLION), // Light Medallion
+            0x100F => self.quest_items.insert(QuestItems::FOREST_MEDALLION), // Forest Medallion
+            0x1010 => self.quest_items.insert(QuestItems::FIRE_MEDALLION), // Fire Medallion
+            0x1011 => self.quest_items.insert(QuestItems::WATER_MEDALLION), // Water Medallion
+            0x1012 => self.quest_items.insert(QuestItems::SHADOW_MEDALLION), // Shadow Medallion
+            0x1013 => self.quest_items.insert(QuestItems::SPIRIT_MEDALLION), // Spirit Medallion
+            0x1014 => { // Forest Temple Key Ring (with boss key)
+                self.small_keys.forest_temple = 10;
+                self.dungeon_items.forest_temple.insert(DungeonItems::BOSS_KEY);
+            }
+            0x1015 => { // Fire Temple Key Ring (with boss key)
+                self.small_keys.fire_temple = 10;
+                self.dungeon_items.fire_temple.insert(DungeonItems::BOSS_KEY);
+            }
+            0x1016 => { // Water Temple Key Ring (with boss key)
+                self.small_keys.water_temple = 10;
+                self.dungeon_items.water_temple.insert(DungeonItems::BOSS_KEY);
+            }
+            0x1017 => { // Spirit Temple Key Ring (with boss key)
+                self.small_keys.spirit_temple = 10;
+                self.dungeon_items.spirit_temple.insert(DungeonItems::BOSS_KEY);
+            }
+            0x1018 => { // Shadow Temple Key Ring (with boss key)
+                self.small_keys.shadow_temple = 10;
+                self.dungeon_items.shadow_temple.insert(DungeonItems::BOSS_KEY);
+            }
+            0x1019 => self.inv.ice_arrows = true, // Blue Fire Arrow
+            0x101A => self.skull_tokens += 1, // Gold Skulltula Token (big chest)
+            0x101B => {} // Heart Container (big chest)
+            0x101C => {} // Piece of Heart (big chest)
+            0x101D => {} // Piece of Heart (Chest Game) (big chest)
+            0x101E => self.equipment.insert(Equipment::DEKU_SHIELD), // Deku Shield (big chest)
+            0x101F => self.equipment.insert(Equipment::HYLIAN_SHIELD), // Hylian Shield (big chest)
+            0x1020 => { // Bombchu (5) (big chest)
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 5);
+            }
+            0x1021 => { // Bombchu (10) (big chest)
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 10);
+            }
+            0x1022 => { // Bombchu (20) (big chest)
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 20);
+            }
+            0x1023 => self.upgrades.set_nut_capacity(match self.upgrades.nut_capacity() { // Progressive Nut Capacity (big chest)
+                Upgrades::DEKU_NUT_CAPACITY_20 => Upgrades::DEKU_NUT_CAPACITY_30,
+                Upgrades::DEKU_NUT_CAPACITY_30 | Upgrades::DEKU_NUT_CAPACITY_40 => Upgrades::DEKU_NUT_CAPACITY_40,
+                _ => Upgrades::DEKU_NUT_CAPACITY_20,
+            }),
+            0x1024 => self.upgrades.set_stick_capacity(match self.upgrades.stick_capacity() { // Progressive Stick Capacity (big chest)
+                Upgrades::DEKU_STICK_CAPACITY_10 => Upgrades::DEKU_STICK_CAPACITY_20,
+                Upgrades::DEKU_STICK_CAPACITY_20 | Upgrades::DEKU_STICK_CAPACITY_30 => Upgrades::DEKU_STICK_CAPACITY_30,
+                _ => Upgrades::DEKU_STICK_CAPACITY_10,
+            }),
+            0x2000 => {} // Stalfos Soul
+            0x2001 => {} // Octorok Soul
+            0x2002 => {} // Wallmaster Soul
+            0x2003 => {} // Dodongo Soul
+            0x2004 => {} // Keese Soul
+            0x2005 => {} // Tektite Soul
+            0x2006 => {} // Peahat Soul
+            0x2007 => {} // Lizalfos and Dinalfos Soul
+            0x2008 => {} // Gohma Larvae Soul
+            0x2009 => {} // Shabom Soul
+            0x200A => {} // Baby Dodongo Soul
+            0x200B => {} // Biri and Bari Soul
+            0x200C => {} // Tailpasaran Soul
+            0x200D => {} // Skulltula Soul
+            0x200E => {} // Torch Slug Soul
+            0x200F => {} // Moblin Soul
+            0x2010 => {} // Armos Soul
+            0x2011 => {} // Deku Baba Soul
+            0x2012 => {} // Deku Scrub Soul
+            0x2013 => {} // Bubble Soul
+            0x2014 => {} // Beamos Soul
+            0x2015 => {} // Floormaster Soul
+            0x2016 => {} // Redead and Gibdo Soul
+            0x2017 => {} // Skullwalltula Soul
+            0x2018 => {} // Flare Dancer Soul
+            0x2019 => {} // Dead hand Soul
+            0x201A => {} // Shell blade Soul
+            0x201B => {} // Like-like Soul
+            0x201C => {} // Spike Enemy Soul
+            0x201D => {} // Anubis Soul
+            0x201E => {} // Iron Knuckle Soul
+            0x201F => {} // Skull Kid Soul
+            0x2020 => {} // Flying Pot Soul
+            0x2021 => {} // Freezard Soul
+            0x2022 => {} // Stinger Soul
+            0x2023 => {} // Wolfos Soul
+            0x2024 => {} // Guay Soul
+            0x2025 => {} // Queen Gohma Soul
+            0x2026 => {} // King Dodongo Soul
+            0x2027 => {} // Barinade Soul
+            0x2028 => {} // Phantom Ganon Soul
+            0x2029 => {} // Volvagia Soul
+            0x202A => {} // Morpha Soul
+            0x202B => {} // Bongo Bongo Soul
+            0x202C => {} // Twinrova Soul
+            0x202D => {} // Jabu Jabu Tentacle Soul
+            0x202E => {} // Dark Link Soul
             _ => return Err(()),
         }
         Ok(())
