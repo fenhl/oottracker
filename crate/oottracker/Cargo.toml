@@ -19,7 +19,9 @@ semver = "1"
 serde_json = "1"
 
 [dependencies.async-proto]
-version = "0.16.10"
+#version = "0.16.10"
+git = "https://github.com/fenhl/async-proto" #TODO release
+branch = "error-ctx"
 features = ["serde_json", "tokio-tungstenite"]
 
 [dependencies.derive_more]

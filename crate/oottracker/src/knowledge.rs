@@ -11,8 +11,10 @@ use {
         pin::Pin,
     },
     async_proto::{
+        ErrorContext,
         Protocol,
         ReadError,
+        ReadErrorKind,
         WriteError,
     },
     collect_mac::collect,
@@ -356,7 +358,10 @@ impl Protocol for Knowledge {
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
-                n => return Err(ReadError::UnknownVariant8(n)),
+                n => return Err(ReadError {
+                    context: ErrorContext::Custom(format!("oottracker::knowledge::Knowledge::read_sync")),
+                    kind: ReadErrorKind::UnknownVariant8(n),
+                }),
             })
         })
     }
@@ -396,7 +401,10 @@ impl Protocol for Knowledge {
             },
             1 => Knowledge::default(),
             2 => Knowledge::vanilla(),
-            n => return Err(ReadError::UnknownVariant8(n)),
+            n => return Err(ReadError {
+                context: ErrorContext::Custom(format!("oottracker::knowledge::Knowledge::read_sync")),
+                kind: ReadErrorKind::UnknownVariant8(n),
+            })
         })
     }
 
