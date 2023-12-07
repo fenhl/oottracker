@@ -2097,7 +2097,7 @@ impl TrackerLayout {
                 MirrorShield, Strength, SpiritMedallion, SpiritMedallionLocation,
                 Boots, Scale, LightMedallion, LightMedallionLocation,
                 KokiriEmerald, GoronRuby, ZoraSapphire, Blank,
-                KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, Blank,
+                KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation, Triforce,
             ]),
             Self::TriforcePieces => columns!(1, [
                 Triforce,
@@ -2113,7 +2113,7 @@ impl TrackerLayout {
             Self::TsgSquareWithRewardLocationsEdit => columns!(6, [
                 ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion, LightMedallion,
                 ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation, LightMedallionLocation,
-                Blank, Blank, Blank, KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation,
+                Triforce, Blank, Blank, KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation,
                 SwordShield, Bottle, Skulltula, KokiriEmerald, GoronRuby, ZoraSapphire,
                 Slingshot, Bombs, Boomerang, Strength, Scale, DinsFarores,
                 Hookshot, Bow, Hammer, MirrorShield, Boots, Arrows,
