@@ -57,6 +57,12 @@ function makeLayoutBuf(layoutString) {
         case 'triforce-pieces':
             new DataView(buf).setUint8(0, 10);
             return buf;
+        case 'tsg-square-locs':
+            new DataView(buf).setUint8(0, 11);
+            return buf;
+        case 'tsg-square-locs-edit':
+            new DataView(buf).setUint8(0, 12);
+            return buf;
         default:
             throw 'unknown layout';
     }

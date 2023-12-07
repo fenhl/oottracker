@@ -87,7 +87,9 @@ table td {
 /* 6-column layouts */
 .items.default,
 .items.mw-edit,
-.items.rsl-edit {
+.items.rsl-edit,
+.items.tsg-square-locs,
+.items.tsg-square-locs-edit {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 

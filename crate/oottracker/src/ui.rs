@@ -1945,6 +1945,8 @@ pub enum TrackerLayout {
     TsgMainWithRewardLocations,
     TsgMainWithRewardLocationsEdit,
     TriforcePieces,
+    TsgSquareWithRewardLocations,
+    TsgSquareWithRewardLocationsEdit,
 }
 
 pub struct CellLayout {
@@ -2100,6 +2102,24 @@ impl TrackerLayout {
             Self::TriforcePieces => columns!(1, [
                 Triforce,
             ]),
+            Self::TsgSquareWithRewardLocations => columns!(6, [
+                ForestMedallionWithLocation, FireMedallionWithLocation, WaterMedallionWithLocation, ShadowMedallionWithLocation, SpiritMedallionWithLocation, LightMedallionWithLocation,
+                SwordShield, Bottle, Skulltula, KokiriEmeraldWithLocation, GoronRubyWithLocation, ZoraSapphireWithLocation,
+                Slingshot, Bombs, Boomerang, Strength, Scale, DinsFarores,
+                Hookshot, Bow, Hammer, MirrorShield, Boots, Arrows,
+                ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
+                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude,
+            ]),
+            Self::TsgSquareWithRewardLocationsEdit => columns!(6, [
+                ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion, LightMedallion,
+                ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation, LightMedallionLocation,
+                Blank, Blank, Blank, KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation,
+                SwordShield, Bottle, Skulltula, KokiriEmerald, GoronRuby, ZoraSapphire,
+                Slingshot, Bombs, Boomerang, Strength, Scale, DinsFarores,
+                Hookshot, Bow, Hammer, MirrorShield, Boots, Arrows,
+                ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
+                Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude,
+            ]),
         }
     }
 }
@@ -2140,6 +2160,8 @@ impl fmt::Display for TrackerLayout {
             Self::TsgMainWithRewardLocations => write!(f, "tsg-main-locs"),
             Self::TsgMainWithRewardLocationsEdit => write!(f, "tsg-main-locs-edit"),
             Self::TriforcePieces => write!(f, "triforce-pieces"),
+            Self::TsgSquareWithRewardLocations => write!(f, "tsg-square-locs"),
+            Self::TsgSquareWithRewardLocationsEdit => write!(f, "tsg-square-locs-edit"),
         }
     }
 }
@@ -2162,6 +2184,8 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "tsg-main-locs" => Self::TsgMainWithRewardLocations,
             "tsg-main-locs-edit" => Self::TsgMainWithRewardLocationsEdit,
             "triforce-pieces" => Self::TriforcePieces,
+            "tsg-square-locs" => Self::TsgSquareWithRewardLocations,
+            "tsg-square-locs-edit" => Self::TsgSquareWithRewardLocationsEdit,
             _ => return Err(()),
         })
     }
