@@ -31,10 +31,13 @@ use {
         postgres::PgConnectOptions,
         types::Json,
     },
-    tokio::sync::{
-        Mutex,
-        RwLock,
-        watch::*,
+    tokio::{
+        process::Command,
+        sync::{
+            Mutex,
+            RwLock,
+            watch::*,
+        },
     },
     oottracker::{
         Knowledge,
@@ -166,6 +169,11 @@ impl<'r> rocket::response::Responder<'r, 'static> for Error {
 
 #[wheel::main(rocket)]
 async fn main() -> Result<(), Error> {
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = Command::new("sudo").arg("-u").arg("fenhl").arg("/opt/night/bin/nightd").arg("report").arg("/games/zelda/oot/tracker/error").spawn(); //TODO include error details in report
+        default_panic_hook(info)
+    }));
     let pool = PgPool::connect_with(PgConnectOptions::default().database("oottracker").application_name("oottracker-web")).await?;
     let rooms = {
         let mut rooms = HashMap::default();

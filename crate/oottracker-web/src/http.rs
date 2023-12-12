@@ -39,6 +39,7 @@ use {
     },
     rocket_ws::WebSocket,
     sqlx::PgPool,
+    tokio::process::Command,
     oottracker::{
         ModelState,
         ui::{
@@ -374,15 +375,22 @@ fn websocket(db_pool: &State<PgPool>, rooms: &State<Rooms>, restreams: &State<Re
     }))
 }
 
+#[rocket::catch(404)]
+fn not_found() -> RawHtml<String> {
+    RawHtml(format!(include_str!("../../../assets/web/404.html"), env!("CARGO_PKG_VERSION")))
+}
+
+#[rocket::catch(500)]
+fn internal_server_error() -> RawHtml<String> {
+    let _ = Command::new("sudo").arg("-u").arg("fenhl").arg("/opt/night/bin/nightd").arg("report").arg("/games/zelda/oot/tracker/error").spawn(); //TODO include error details in report
+    RawHtml(format!(include_str!("../../../assets/web/500.html"), env!("CARGO_PKG_VERSION")))
+}
+
 pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms) -> Rocket<rocket::Build> {
     rocket::custom(rocket::Config {
         port: 24807,
         ..rocket::Config::default()
     })
-    .manage(pool)
-    .manage(rooms)
-    .manage(restreams)
-    .manage(mw_rooms)
     .mount("/static", FileServer::new(relative!("../../assets/web/static"), rocket::fs::Options::None))
     .mount("/", rocket::routes![
         index,
@@ -399,4 +407,12 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms:
         click,
         websocket,
     ])
+    .register("/", rocket::catchers![
+        not_found,
+        internal_server_error,
+    ])
+    .manage(pool)
+    .manage(rooms)
+    .manage(restreams)
+    .manage(mw_rooms)
 }
