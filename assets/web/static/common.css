@@ -72,6 +72,11 @@ table td {
     grid-template-columns: 10px;
 }
 
+/* 2-column layouts */
+.items.luiferns-mw-main {
+    grid-template-columns: 10px 10px;
+}
+
 /* 3-column layouts */
 .items.dungeon-rewards,
 .items.tsg-main-locs {
@@ -95,7 +100,9 @@ table td {
 
 /* 9-column layouts */
 .items.rsl-left,
-.items.rsl-right {
+.items.rsl-right,
+.items.luiferns-mw-rewards,
+.items.luiferns-mw-rewards-edit {
     grid-template-columns: 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px 10px;
 }
 

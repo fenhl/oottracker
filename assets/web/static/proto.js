@@ -63,6 +63,15 @@ function makeLayoutBuf(layoutString) {
         case 'tsg-square-locs-edit':
             new DataView(buf).setUint8(0, 12);
             return buf;
+        case 'luiferns-mw-main':
+            new DataView(buf).setUint8(0, 13);
+            return buf;
+        case 'luiferns-mw-rewards':
+            new DataView(buf).setUint8(0, 14);
+            return buf;
+        case 'luiferns-mw-rewards-edit':
+            new DataView(buf).setUint8(0, 15);
+            return buf;
         default:
             throw 'unknown layout';
     }

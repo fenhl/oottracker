@@ -1947,6 +1947,9 @@ pub enum TrackerLayout {
     TriforcePieces,
     TsgSquareWithRewardLocations,
     TsgSquareWithRewardLocationsEdit,
+    LuifernsMwMain,
+    LuifernsMwRewards,
+    LuifernsMwRewardsEdit,
 }
 
 pub struct CellLayout {
@@ -2120,6 +2123,22 @@ impl TrackerLayout {
                 ZeldasLullaby, EponasSong, SariasSong, SunsSong, SongOfTime, SongOfStorms,
                 Minuet, Bolero, Serenade, Nocturne, Requiem, Prelude,
             ]),
+            Self::LuifernsMwMain => columns!(2, [
+                Bombs, Scale,
+                Strength, Arrows,
+                KokiriSword, Slingshot,
+                Hookshot, Bottle,
+                Hammer, DinsFarores,
+                Bow, Boomerang,
+                MirrorShield, Boots,
+            ]),
+            Self::LuifernsMwRewards => columns!(9, [
+                ForestMedallionWithLocation, FireMedallionWithLocation, WaterMedallionWithLocation, ShadowMedallionWithLocation, SpiritMedallionWithLocation, LightMedallionWithLocation, KokiriEmeraldWithLocation, GoronRubyWithLocation, ZoraSapphireWithLocation,
+            ]),
+            Self::LuifernsMwRewardsEdit => columns!(9, [
+                ForestMedallion, FireMedallion, WaterMedallion, ShadowMedallion, SpiritMedallion, LightMedallion, KokiriEmerald, GoronRuby, ZoraSapphire,
+                ForestMedallionLocation, FireMedallionLocation, WaterMedallionLocation, ShadowMedallionLocation, SpiritMedallionLocation, LightMedallionLocation, KokiriEmeraldLocation, GoronRubyLocation, ZoraSapphireLocation,
+            ]),
         }
     }
 }
@@ -2162,6 +2181,9 @@ impl fmt::Display for TrackerLayout {
             Self::TriforcePieces => write!(f, "triforce-pieces"),
             Self::TsgSquareWithRewardLocations => write!(f, "tsg-square-locs"),
             Self::TsgSquareWithRewardLocationsEdit => write!(f, "tsg-square-locs-edit"),
+            Self::LuifernsMwMain => write!(f, "luiferns-mw-main"),
+            Self::LuifernsMwRewards => write!(f, "luiferns-mw-rewards"),
+            Self::LuifernsMwRewardsEdit => write!(f, "luiferns-mw-rewards-edit"),
         }
     }
 }
@@ -2186,6 +2208,9 @@ impl<'a> FromParam<'a> for TrackerLayout {
             "triforce-pieces" => Self::TriforcePieces,
             "tsg-square-locs" => Self::TsgSquareWithRewardLocations,
             "tsg-square-locs-edit" => Self::TsgSquareWithRewardLocationsEdit,
+            "luiferns-mw-main" => Self::LuifernsMwMain,
+            "luiferns-mw-rewards" => Self::LuifernsMwRewards,
+            "luiferns-mw-rewards-edit" => Self::LuifernsMwRewardsEdit,
             _ => return Err(()),
         })
     }
