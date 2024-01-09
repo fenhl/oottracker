@@ -6,6 +6,10 @@ use {
         num::NonZeroU8,
     },
     async_proto::Protocol,
+    ootr::model::{
+        DungeonReward,
+        DungeonRewardLocation,
+    },
     crate::{
         ModelDelta,
         ModelState,
@@ -106,6 +110,12 @@ pub enum ClientMessage {
         key: u64,
         kind: u16,
         target_world: NonZeroU8,
+    },
+    MwDungeonRewardLocation {
+        room: String,
+        world: NonZeroU8,
+        reward: DungeonReward,
+        location: DungeonRewardLocation,
     },
 }
 
