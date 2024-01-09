@@ -25,6 +25,10 @@ use {
             sleep_until,
         },
     },
+    ootr::model::{
+        DungeonReward,
+        DungeonRewardLocation,
+    },
     oottracker::{
         ModelState,
         Save,
@@ -43,6 +47,11 @@ pub(crate) enum AutoUpdate {
         world: NonZeroU8,
         save: Save,
     },
+    DungeonRewardLocation {
+        world: NonZeroU8,
+        reward: DungeonReward,
+        location: DungeonRewardLocation,
+    },
 }
 
 pub(crate) struct MwState {
@@ -54,12 +63,12 @@ pub(crate) struct MwState {
 }
 
 impl MwState {
-    pub(crate) fn new(worlds: Vec<(Option<Save>, Vec<MwItem>)>) -> Arc<RwLock<Self>> {
+    pub(crate) fn new(worlds: Vec<(ModelState, Vec<MwItem>)>) -> Arc<RwLock<Self>> {
         let (incoming_queue, mut rx) = mpsc::unbounded_channel();
         let this = Arc::new(RwLock::new(Self {
-            worlds: worlds.into_iter().map(|(save, queue)| {
+            worlds: worlds.into_iter().map(|(model, queue)| {
                 let (tx, rx) = watch::channel(());
-                (tx, rx, ModelState { ram: save.unwrap_or_default().into(), knowledge: Default::default(), tracker_ctx: Default::default() }, queue, HashSet::default())
+                (tx, rx, model, queue, HashSet::default())
             }).collect(),
             autotracker_delay: Duration::default(),
             location_cache: HashMap::default(),
@@ -134,7 +143,14 @@ impl MwState {
                 tx.send(()).expect("failed to notify websockets about state change");
             } else {
                 return Err(())
-            }
+            },
+            AutoUpdate::DungeonRewardLocation { world, reward, location } => if let Some((tx, _, model, _, _)) = self.world_mut(world) {
+                if model.knowledge.dungeon_reward_locations.insert(reward, location) != Some(location) {
+                    tx.send(()).expect("failed to notify websockets about state change");
+                }
+            } else {
+                return Err(())
+            },
         }
         Ok(())
     }

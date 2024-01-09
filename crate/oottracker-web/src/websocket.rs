@@ -370,6 +370,11 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_ws(&mut *sink.lock().await).await; //TODO better error handling
             },
+            ClientMessage::MwDungeonRewardLocation { room, world, reward, location } => if let Some(room) = mw_rooms.read().await.get(&room) {
+                let _ = room.read().await.incoming_queue.send(AutoUpdate::DungeonRewardLocation { world, reward, location });
+            } else {
+                let _ = ServerMessage::from_error("no such multiworld room").write_ws(&mut *sink.lock().await).await; //TODO better error handling
+            },
         }
     }
 }
