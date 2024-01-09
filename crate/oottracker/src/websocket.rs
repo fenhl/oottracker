@@ -69,7 +69,7 @@ pub enum ClientMessage {
     },
     MwCreateRoom {
         room: String,
-        worlds: Vec<(Option<Save>, Vec<MwItem>)>,
+        worlds: Vec<(ModelState, Vec<MwItem>)>,
     },
     MwDeleteRoom {
         room: String,
