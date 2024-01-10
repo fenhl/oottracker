@@ -1275,6 +1275,7 @@ impl Save {
             0x0016 => self.inv.beans = true, // Magic Bean
             0x0017 => self.inv.child_trade_item = ChildTradeItem::SkullMask, // Skull Mask
             0x0018 => self.inv.child_trade_item = ChildTradeItem::SpookyMask, // Spooky Mask
+            0x0019 => self.inv.child_trade_item = ChildTradeItem::Chicken, // Chicken
             0x001A => self.inv.child_trade_item = ChildTradeItem::KeatonMask, // Keaton Mask
             0x001B => self.inv.child_trade_item = ChildTradeItem::BunnyHood, // Bunny Hood
             0x001C => self.inv.child_trade_item = ChildTradeItem::MaskOfTruth, // Mask of Truth
