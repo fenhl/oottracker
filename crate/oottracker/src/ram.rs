@@ -97,7 +97,7 @@ impl fmt::Display for DecodeError {
 impl std::error::Error for DecodeError {} //TODO use thiserror?
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct Pad: u16 {
         const A = 0x8000;
         const B = 0x4000;

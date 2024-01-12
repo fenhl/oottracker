@@ -574,7 +574,7 @@ impl<'a> From<&'a InvAmounts> for Vec<u8> {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct Equipment: u16 {
         const HOVER_BOOTS = 0x4000;
         const IRON_BOOTS = 0x2000;
@@ -612,7 +612,7 @@ impl<'a> From<&'a Equipment> for Vec<u8> {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct Upgrades: u32 {
         const DEKU_NUT_CAPACITY_MASK = 0x0070_0000;
         const DEKU_NUT_CAPACITY_40 = 0x0030_0000;
@@ -729,7 +729,7 @@ impl<'a> From<&'a Upgrades> for Vec<u8> {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct QuestItems: u32 {
         const GERUDO_CARD = 0x0040_0000;
         const STONE_OF_AGONY = 0x0020_0000;
@@ -827,7 +827,7 @@ impl<'a> From<&'a QuestItems> for Vec<u8> {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct DungeonItems: u8 {
         const MAP = 0x04;
         const COMPASS = 0x02;
@@ -973,7 +973,7 @@ impl<'a> From<&'a SmallKeys> for Vec<u8> {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct FishingContext: u32 {
         const ADULT_PRIZE_OBTAINED = 0x0000_0800;
         const CHILD_PRIZE_OBTAINED = 0x0000_0400;
@@ -1162,6 +1162,7 @@ impl Save {
             },
             dmt_biggoron_checked: {
                 bitflags! {
+                    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
                     struct DmtBiggoronCheckedFlags: u16 {
                         const DMT_BIGGORON_CHECKED = 0x0100;
                     }

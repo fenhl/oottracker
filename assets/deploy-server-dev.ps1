@@ -14,5 +14,5 @@ ThrowOnNativeFailure
 scp target/debug/oottracker-web fenhl.net:bin/oottracker-web-dev
 ThrowOnNativeFailure
 
-ssh fenhl.net "chmod +x bin/oottracker-web-dev && env -C /opt/git/github.com/fenhl/oottracker/branch/web $(Get-Content .\assets\web\env.txt) /home/fenhl/bin/oottracker-web-dev"
+ssh fenhl.net "chmod +x bin/oottracker-web-dev && env -C /opt/git/github.com/fenhl/oottracker/branch/mw $(Get-Content .\assets\web\env.txt) /home/fenhl/bin/oottracker-web-dev"
 ThrowOnNativeFailure

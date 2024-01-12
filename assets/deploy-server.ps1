@@ -8,10 +8,10 @@ function ThrowOnNativeFailure {
 git push
 ThrowOnNativeFailure
 
-ssh fenhl.net 'cd /opt/git/github.com/fenhl/oottracker/branch/web && git pull --ff-only'
+ssh fenhl.net 'cd /opt/git/github.com/fenhl/oottracker/branch/mw && git pull --ff-only'
 ThrowOnNativeFailure
 
-ssh fenhl.net "env -C /opt/git/github.com/fenhl/oottracker/branch/web $(Get-Content .\assets\web\env.txt) cargo build --release --package=oottracker-web"
+ssh fenhl.net "env -C /opt/git/github.com/fenhl/oottracker/branch/mw $(Get-Content .\assets\web\env.txt) cargo build --release --package=oottracker-web"
 ThrowOnNativeFailure
 
 ssh fenhl.net 'sudo systemctl restart oottracker-web'

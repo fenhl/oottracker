@@ -2397,20 +2397,6 @@ impl ImageInfo {
         ImageInfo { dir: ImageDir::Extra, name: name.into() }
     }
 
-    #[cfg(feature = "embed-images")]
-    pub fn embedded<T: FromEmbeddedImage>(&self, ctx: ImageDirContext) -> T {
-        match (self.dir, ctx) {
-            (ImageDir::Xopar, ImageDirContext::Normal) => images::xopar_images(&self.name),
-            (ImageDir::Extra, ImageDirContext::Normal) => images::extra_images(&self.name),
-            (ImageDir::Xopar, ImageDirContext::Count(count)) => images::xopar_images_count(&format!("{}_{}", self.name, count)),
-            (ImageDir::Extra, ImageDirContext::Count(count)) => images::extra_images_count(&format!("{}_{}", self.name, count)),
-            (ImageDir::Xopar, ImageDirContext::Dimmed) => images::xopar_images_dimmed(&self.name),
-            (ImageDir::Extra, ImageDirContext::Dimmed) => images::extra_images_dimmed(&self.name),
-            (ImageDir::Xopar, ImageDirContext::OverlayOnly) => images::xopar_overlays(&self.name),
-            (ImageDir::Extra, ImageDirContext::OverlayOnly) => images::extra_overlays(&self.name),
-        }
-    }
-
     pub fn to_string(&self, sep: char, ctx: ImageDirContext) -> String {
         format!("{}{}{}", self.dir.to_string(ctx), sep, self.name)
     }
@@ -2431,16 +2417,6 @@ pub struct OverlayImageInfo {
 }
 
 impl OverlayImageInfo {
-    #[cfg(feature = "embed-images")]
-    pub fn embedded<T: FromEmbeddedImage>(&self, main_active: bool) -> T {
-        (match (self.dir, main_active) {
-            (ImageDir::Xopar, false) => images::xopar_images_overlay_dimmed,
-            (ImageDir::Xopar, true) => images::xopar_images_overlay,
-            (ImageDir::Extra, false) => images::extra_images_overlay_dimmed,
-            (ImageDir::Extra, true) => images::extra_images_overlay,
-        })(&format!("{}_{}", self.main, self.overlay))
-    }
-
     pub fn to_string(&self, sep: char, main_active: bool) -> String {
         format!(
             "{}-images-overlay{}{}{}_{}",
@@ -2468,23 +2444,4 @@ impl FromEmbeddedImage for DynamicImage {
     fn from_embedded_image(contents: &'static [u8]) -> DynamicImage {
         image::load_from_memory(contents).expect("failed to load embedded DynamicImage")
     }
-}
-
-#[cfg(feature = "embed-images")]
-pub mod images {
-    use super::FromEmbeddedImage;
-
-    oottracker_derive::embed_images!("assets/img/extra-images");
-    oottracker_derive::embed_images!("assets/img/extra-images-count");
-    oottracker_derive::embed_images!("assets/img/extra-images-dimmed");
-    oottracker_derive::embed_images!("assets/img/extra-images-overlay");
-    oottracker_derive::embed_images!("assets/img/extra-images-overlay-dimmed");
-    oottracker_derive::embed_images!("assets/img/extra-overlays");
-    oottracker_derive::embed_images!("assets/img/xopar-images");
-    oottracker_derive::embed_images!("assets/img/xopar-images-count");
-    oottracker_derive::embed_images!("assets/img/xopar-images-dimmed");
-    oottracker_derive::embed_images!("assets/img/xopar-images-overlay");
-    oottracker_derive::embed_images!("assets/img/xopar-images-overlay-dimmed");
-    oottracker_derive::embed_images!("assets/img/xopar-overlays");
-    oottracker_derive::embed_image!("assets/icon.ico");
 }

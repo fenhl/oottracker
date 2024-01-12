@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Restart=always
-ExecStart=/opt/git/github.com/fenhl/oottracker/branch/web/target/release/oottracker-web
+ExecStart=/opt/git/github.com/fenhl/oottracker/branch/mw/target/release/oottracker-web
 User=fenhl
 Group=fenhl
-WorkingDirectory=/opt/git/github.com/fenhl/oottracker/branch/web
-EnvironmentFile=/opt/git/github.com/fenhl/oottracker/branch/web/assets/web/env.txt
+WorkingDirectory=/opt/git/github.com/fenhl/oottracker/branch/mw
+EnvironmentFile=/opt/git/github.com/fenhl/oottracker/branch/mw/assets/web/env.txt
 
 [Install]
 WantedBy=multi-user.target
