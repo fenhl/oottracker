@@ -29,7 +29,7 @@ server {
     }
 
     location /static/ {
-        root /opt/git/github.com/fenhl/oottracker/branch/mw/assets;
+        root /opt/git/github.com/fenhl/oottracker/branch/mw/assets/web;
     }
 
     location /websocket {
