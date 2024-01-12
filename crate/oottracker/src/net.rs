@@ -132,7 +132,10 @@ pub struct WebConnection {
 
 impl WebConnection {
     pub async fn new(room: impl ToString) -> Result<WebConnection, async_proto::WriteError> {
-        let (mut sink, stream) = tokio_tungstenite::connect_async("wss://oottracker.fenhl.net/websocket").await?.0.split();
+        let (mut sink, stream) = tokio_tungstenite::connect_async("wss://oottracker.fenhl.net/websocket").await.map_err(|e| async_proto::WriteError {
+            context: async_proto::ErrorContext::Custom(format!("oottracker::net::WebConnection::new")),
+            kind: e.into(),
+        })?.0.split();
         websocket::ClientMessage::SubscribeRaw { room: room.to_string() }.write_ws(&mut sink).await?;
         Ok(WebConnection {
             room: room.to_string(),

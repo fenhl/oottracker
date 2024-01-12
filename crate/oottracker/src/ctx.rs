@@ -7,8 +7,10 @@ use {
         pin::Pin,
     },
     async_proto::{
+        ErrorContext,
         Protocol,
         ReadError,
+        ReadErrorKind,
         WriteError,
     },
     byteorder::{
@@ -164,19 +166,28 @@ impl Protocol for TrackerCtx {
             Ok(if let Some(len) = version_buf_len(version) {
                 let mut buf = vec![0; 4 + len];
                 buf.splice(0..4, version.to_be_bytes().into_iter());
-                stream.read_exact(&mut buf[4..]).await?;
+                stream.read_exact(&mut buf[4..]).await.map_err(|e| ReadError {
+                    context: ErrorContext::Custom(format!("oottracker::ctx::TrackerCtx::read")),
+                    kind: e.into(),
+                })?;
                 Self::new(&buf)
             } else if version == 0 {
                 Self::default()
             } else {
-                return Err(ReadError::UnknownVariant32(version))
+                return Err(ReadError {
+                    context: ErrorContext::Custom(format!("oottracker::ctx::TrackerCtx::read")),
+                    kind: ReadErrorKind::UnknownVariant32(version),
+                })
             })
         })
     }
 
     fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
         Box::pin(async move {
-            sink.write_all(&self.serialize()).await?;
+            sink.write_all(&self.serialize()).await.map_err(|e| WriteError {
+                context: ErrorContext::Custom(format!("oottracker::ctx::TrackerCtx::write")),
+                kind: e.into(),
+            })?;
             Ok(())
         })
     }
@@ -186,17 +197,26 @@ impl Protocol for TrackerCtx {
         Ok(if let Some(len) = version_buf_len(version) {
             let mut buf = vec![0; 4 + len];
             buf.splice(0..4, version.to_be_bytes().into_iter());
-            stream.read_exact(&mut buf[4..])?;
+            stream.read_exact(&mut buf[4..]).map_err(|e| ReadError {
+                context: ErrorContext::Custom(format!("oottracker::ctx::TrackerCtx::read_sync")),
+                kind: e.into(),
+            })?;
             Self::new(&buf)
         } else if version == 0 {
             Self::default()
         } else {
-            return Err(ReadError::UnknownVariant32(version))
+            return Err(ReadError {
+                context: ErrorContext::Custom(format!("oottracker::ctx::TrackerCtx::read_sync")),
+                kind: ReadErrorKind::UnknownVariant32(version),
+            })
         })
     }
 
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
-        sink.write_all(&self.serialize())?;
+        sink.write_all(&self.serialize()).map_err(|e| WriteError {
+            context: ErrorContext::Custom(format!("oottracker::ctx::TrackerCtx::write_sync")),
+            kind: e.into(),
+        })?;
         Ok(())
     }
 }

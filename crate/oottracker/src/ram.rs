@@ -12,8 +12,10 @@ use {
         pin::Pin,
     },
     async_proto::{
+        ErrorContext,
         Protocol,
         ReadError,
+        ReadErrorKind,
         WriteError,
     },
     bitflags::bitflags,
@@ -303,17 +305,26 @@ impl Protocol for Ram {
             let mut ranges = Vec::with_capacity(NUM_RANGES);
             for (_, len) in RANGES.iter().copied().tuples() {
                 let mut buf = vec![0; len as usize];
-                stream.read_exact(&mut buf).await?;
+                stream.read_exact(&mut buf).await.map_err(|e| ReadError {
+                    context: ErrorContext::Custom(format!("oottracker::ram::Ram::read")),
+                    kind: e.into(),
+                })?;
                 ranges.push(buf);
             }
-            Ok(Self::from_range_bufs(ranges).map_err(|e| ReadError::Custom(format!("failed to decode RAM data: {e:?}")))?)
+            Ok(Self::from_range_bufs(ranges).map_err(|e| ReadError {
+                context: ErrorContext::Custom(format!("oottracker::ram::Ram::read")),
+                kind: ReadErrorKind::Custom(format!("failed to decode RAM data: {e:?}")),
+            })?)
         })
     }
 
     fn write<'a, W: AsyncWrite + Unpin + Send + 'a>(&'a self, sink: &'a mut W) -> Pin<Box<dyn Future<Output = Result<(), WriteError>> + Send + 'a>> {
         Box::pin(async move {
             for range in self.to_ranges() {
-                sink.write_all(&range).await?;
+                sink.write_all(&range).await.map_err(|e| WriteError {
+                    context: ErrorContext::Custom(format!("oottracker::ram::Ram::write")),
+                    kind: e.into(),
+                })?;
             }
             Ok(())
         })
@@ -323,15 +334,24 @@ impl Protocol for Ram {
         let mut ranges = Vec::with_capacity(NUM_RANGES);
         for (_, len) in RANGES.iter().copied().tuples() {
             let mut buf = vec![0; len as usize];
-            stream.read_exact(&mut buf)?;
+            stream.read_exact(&mut buf).map_err(|e| ReadError {
+                context: ErrorContext::Custom(format!("oottracker::ram::Ram::read_sync")),
+                kind: e.into(),
+            })?;
             ranges.push(buf);
         }
-        Ok(Self::from_range_bufs(ranges).map_err(|e| ReadError::Custom(format!("failed to decode RAM data: {e:?}")))?)
+        Ok(Self::from_range_bufs(ranges).map_err(|e| ReadError {
+            context: ErrorContext::Custom(format!("oottracker::ram::Ram::read_sync")),
+            kind: ReadErrorKind::Custom(format!("failed to decode RAM data: {e:?}")),
+        })?)
     }
 
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         for range in self.to_ranges() {
-            sink.write_all(&range)?;
+            sink.write_all(&range).map_err(|e| WriteError {
+                context: ErrorContext::Custom(format!("oottracker::ram::Ram::write_sync")),
+                kind: e.into(),
+            })?;
         }
         Ok(())
     }

@@ -10,8 +10,10 @@ use {
         pin::Pin,
     },
     async_proto::{
+        ErrorContext,
         Protocol,
         ReadError,
+        ReadErrorKind,
         WriteError,
     },
     bitflags::bitflags,
@@ -1272,6 +1274,7 @@ impl Save {
             0x0016 => self.inv.beans = true, // Magic Bean
             0x0017 => self.inv.child_trade_item = ChildTradeItem::SkullMask, // Skull Mask
             0x0018 => self.inv.child_trade_item = ChildTradeItem::SpookyMask, // Spooky Mask
+            0x0019 => self.inv.child_trade_item = ChildTradeItem::Chicken, // Chicken
             0x001A => self.inv.child_trade_item = ChildTradeItem::KeatonMask, // Keaton Mask
             0x001B => self.inv.child_trade_item = ChildTradeItem::BunnyHood, // Bunny Hood
             0x001C => self.inv.child_trade_item = ChildTradeItem::MaskOfTruth, // Mask of Truth
@@ -1727,8 +1730,14 @@ impl Protocol for Save {
     fn read<'a, R: AsyncRead + Unpin + Send + 'a>(stream: &'a mut R) -> Pin<Box<dyn Future<Output = Result<Save, ReadError>> + Send + 'a>> {
         Box::pin(async move {
             let mut buf = vec![0; SIZE];
-            stream.read_exact(&mut buf).await?;
-            Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {e:?}")))?)
+            stream.read_exact(&mut buf).await.map_err(|e| ReadError {
+                context: ErrorContext::Custom(format!("oottracker::save::Save::read")),
+                kind: e.into(),
+            })?;
+            Ok(Save::from_save_data(&buf).map_err(|e| ReadError {
+                context: ErrorContext::Custom(format!("oottracker::save::Save::read")),
+                kind: ReadErrorKind::Custom(format!("failed to decode save data: {e:?}")),
+            })?)
         })
     }
 
@@ -1736,21 +1745,33 @@ impl Protocol for Save {
         Box::pin(async move {
             let buf = self.to_save_data();
             assert_eq!(buf.len(), SIZE);
-            sink.write_all(&buf).await?;
+            sink.write_all(&buf).await.map_err(|e| WriteError {
+                context: ErrorContext::Custom(format!("oottracker::save::Save::write")),
+                kind: e.into(),
+            })?;
             Ok(())
         })
     }
 
     fn read_sync(stream: &mut impl Read) -> Result<Self, ReadError> {
         let mut buf = vec![0; SIZE];
-        stream.read_exact(&mut buf)?;
-        Ok(Save::from_save_data(&buf).map_err(|e| ReadError::Custom(format!("failed to decode save data: {e:?}")))?)
+        stream.read_exact(&mut buf).map_err(|e| ReadError {
+            context: ErrorContext::Custom(format!("oottracker::save::Save::read_sync")),
+            kind: e.into(),
+        })?;
+        Ok(Save::from_save_data(&buf).map_err(|e| ReadError {
+            context: ErrorContext::Custom(format!("oottracker::save::Save::read_sync")),
+            kind: ReadErrorKind::Custom(format!("failed to decode save data: {e:?}")),
+        })?)
     }
 
     fn write_sync(&self, sink: &mut impl Write) -> Result<(), WriteError> {
         let buf = self.to_save_data();
         assert_eq!(buf.len(), SIZE);
-        sink.write_all(&buf)?;
+        sink.write_all(&buf).map_err(|e| WriteError {
+            context: ErrorContext::Custom(format!("oottracker::save::Save::write_sync")),
+            kind: e.into(),
+        })?;
         Ok(())
     }
 }
