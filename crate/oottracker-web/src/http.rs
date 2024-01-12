@@ -20,10 +20,7 @@ use {
         State,
         UriDisplayQuery,
         form::Form,
-        fs::{
-            FileServer,
-            relative,
-        },
+        fs::FileServer,
         http::uri::Origin,
         response::{
             Redirect,
@@ -391,7 +388,7 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms:
         port: 24807,
         ..rocket::Config::default()
     })
-    .mount("/static", FileServer::new(relative!("../../assets/web/static"), rocket::fs::Options::None))
+    .mount("/static", FileServer::new("assets/web/static", rocket::fs::Options::None))
     .mount("/", rocket::routes![
         index,
         post_index,

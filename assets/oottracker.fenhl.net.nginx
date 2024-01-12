@@ -28,6 +28,10 @@ server {
         proxy_pass http://localhost:24807;
     }
 
+    location /static/ {
+        root /opt/git/github.com/fenhl/oottracker/branch/web/assets;
+    }
+
     location /websocket {
         proxy_http_version 1.1;
         proxy_buffering off;

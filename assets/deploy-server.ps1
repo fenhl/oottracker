@@ -5,8 +5,6 @@ function ThrowOnNativeFailure {
     }
 }
 
-$env:PYO3_PYTHON = "python"
-
 git push
 ThrowOnNativeFailure
 

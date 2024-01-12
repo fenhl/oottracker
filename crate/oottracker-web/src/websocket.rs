@@ -13,6 +13,7 @@ use {
     rocket_ws::Message,
     sqlx::PgPool,
     tokio::{
+        process::Command,
         sync::Mutex,
         time::sleep,
     },
@@ -383,6 +384,9 @@ pub(crate) async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Res
     let (ws_sink, ws_stream) = ws.split();
     let ws_sink = WsSink::new(Mutex::new(ws_sink));
     if let Err(e) = client_session(&pool, rooms, restreams, mw_rooms, ws_stream, WsSink::clone(&ws_sink)).await {
+        eprintln!("error in WebSocket handler: {e}");
+        eprintln!("debug info: {e:?}");
+        let _ = Command::new("sudo").arg("-u").arg("fenhl").arg("/opt/night/bin/nightd").arg("report").arg("/games/zelda/oot/tracker/error").spawn(); //TODO include error details in report
         let _ = ServerMessage::from_error(e).write_ws(&mut *ws_sink.lock().await).await;
     }
 }
