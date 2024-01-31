@@ -1721,6 +1721,14 @@ impl Save {
             0x202C => {} // Twinrova Soul
             0x202D => {} // Jabu Jabu Tentacle Soul
             0x202E => {} // Dark Link Soul
+            0x2100 => {} // Fishing Rod
+            0x2101 => {} // Fish (child, 6 lb)
+            0x2102 => {} // Fish (child, 8 lb)
+            0x2103 => {} // Fish (child, 10 lb)
+            0x2104 => {} // Fish (adult, 10 lb)
+            0x2105 => {} // Fish (adult, 12 lb)
+            0x2106 => {} // Fish (adult, 16 lb)
+            0x2107 => {} // Hylian Loach
             _ => return Err(()),
         }
         Ok(())
