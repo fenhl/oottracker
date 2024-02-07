@@ -1270,6 +1270,9 @@ impl Save {
             0x000D => self.inv.hammer = true, // Megaton Hammer
             0x000E => self.inv.adult_trade_item = AdultTradeItem::Cojiro, // Cojiro
             0x000F => { self.inv.add_bottle(Bottle::Empty); } // Bottle
+            0x0010 => {} // Red Potion
+            0x0011 => {} // Green Potion
+            0x0012 => {} // Blue Potion
             0x0014 => { self.inv.add_bottle(Bottle::MilkFull); } // Bottle with Milk
             0x0015 => { self.inv.add_bottle(Bottle::RutosLetter); } // Rutos Letter
             0x0016 => self.inv.beans = true, // Magic Bean
