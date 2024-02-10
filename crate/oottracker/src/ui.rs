@@ -2229,7 +2229,7 @@ impl UriDisplay<Path> for TrackerLayout {
 /// A layout for a tracker displaying data from two players at once.
 ///
 /// Used in the web app for more compact dungeon reward layouts on restreams.
-#[derive(Protocol)]
+#[derive(Debug, Protocol)]
 pub enum DoubleTrackerLayout {
     DungeonRewards,
 }

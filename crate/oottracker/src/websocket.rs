@@ -29,7 +29,7 @@ pub struct MwItem {
     pub kind: u16,
 }
 
-#[derive(Protocol)]
+#[derive(Debug, Protocol)]
 pub enum ClientMessage {
     Pong,
     SubscribeRestream {
