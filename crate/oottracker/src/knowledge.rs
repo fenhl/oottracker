@@ -543,3 +543,10 @@ struct Entrance {
     region: String,
     from: String,
 }
+
+#[test]
+fn test_knowledge_protocol_roundtrip() {
+    let mut buf = Vec::default();
+    Knowledge::default().write_sync(&mut buf).unwrap();
+    assert_eq!(Knowledge::read_sync(&mut &*buf).unwrap(), Knowledge::default());
+}

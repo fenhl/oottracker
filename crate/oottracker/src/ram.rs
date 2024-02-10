@@ -427,3 +427,10 @@ impl TryFrom<Vec<Vec<u8>>> for Ram {
         Self::from_range_bufs(ranges)
     }
 }
+
+#[test]
+fn test_ram_protocol_roundtrip() {
+    let mut buf = Vec::default();
+    Ram::default().write_sync(&mut buf).unwrap();
+    assert_eq!(Ram::read_sync(&mut &*buf).unwrap(), Ram::default());
+}
