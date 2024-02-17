@@ -465,29 +465,45 @@ impl Inventory {
     }
 }
 
-impl TryFrom<Vec<u8>> for Inventory {
-    type Error = Vec<u8>;
+#[derive(Debug, Clone, Copy)]
+pub enum InventoryDecodeError {
+    AdultTrade(u8),
+    BoolItem {
+        offset: usize,
+        expected: u8,
+        found: u8,
+    },
+    Bottle(u8),
+    ChildTrade(u8),
+    Hookshot(u8),
+    Index(u16),
+    Ocarina(u8),
+    Size(usize),
+}
 
-    fn try_from(raw_data: Vec<u8>) -> Result<Inventory, Vec<u8>> {
+impl TryFrom<Vec<u8>> for Inventory {
+    type Error = InventoryDecodeError;
+
+    fn try_from(raw_data: Vec<u8>) -> Result<Inventory, InventoryDecodeError> {
         macro_rules! bool_item {
-            ($offset:literal, $value:pat) => {{
-                match *raw_data.get($offset).ok_or_else(|| raw_data.clone())? {
+            ($offset:literal, $value:path) => {{
+                match *raw_data.get($offset).ok_or_else(|| InventoryDecodeError::Index($offset))? {
                     item_ids::NONE => false,
                     $value => true,
-                    _ => return Err(raw_data),
+                    found => return Err(InventoryDecodeError::BoolItem { offset: $offset, expected: $value, found }),
                 }
             }};
         }
 
-        if raw_data.len() != 0x18 { return Err(raw_data) }
+        if raw_data.len() != 0x18 { return Err(InventoryDecodeError::Size(raw_data.len())) }
         Ok(Inventory {
             bow: bool_item!(0x03, item_ids::BOW),
             fire_arrows: bool_item!(0x04, item_ids::FIRE_ARROWS),
             dins_fire: bool_item!(0x05, item_ids::DINS_FIRE),
             slingshot: bool_item!(0x06, item_ids::SLINGSHOT),
-            ocarina: Ocarina::try_from(raw_data[0x07]).map_err(|_| raw_data.clone())?,
+            ocarina: Ocarina::try_from(raw_data[0x07]).map_err(InventoryDecodeError::Ocarina)?,
             bombchus: bool_item!(0x08, item_ids::BOMBCHU_10),
-            hookshot: Hookshot::try_from(raw_data[0x09]).map_err(|_| raw_data.clone())?,
+            hookshot: Hookshot::try_from(raw_data[0x09]).map_err(InventoryDecodeError::Hookshot)?,
             ice_arrows: bool_item!(0x0a, item_ids::ICE_ARROWS),
             farores_wind: bool_item!(0x0b, item_ids::FARORES_WIND),
             boomerang: bool_item!(0x0c, item_ids::BOOMERANG),
@@ -497,13 +513,13 @@ impl TryFrom<Vec<u8>> for Inventory {
             light_arrows: bool_item!(0x10, item_ids::LIGHT_ARROWS),
             nayrus_love: bool_item!(0x11, item_ids::NAYRUS_LOVE),
             bottles: [
-                Bottle::try_from(raw_data[0x12]).map_err(|_| raw_data.clone())?,
-                Bottle::try_from(raw_data[0x13]).map_err(|_| raw_data.clone())?,
-                Bottle::try_from(raw_data[0x14]).map_err(|_| raw_data.clone())?,
-                Bottle::try_from(raw_data[0x15]).map_err(|_| raw_data.clone())?,
+                Bottle::try_from(raw_data[0x12]).map_err(InventoryDecodeError::Bottle)?,
+                Bottle::try_from(raw_data[0x13]).map_err(InventoryDecodeError::Bottle)?,
+                Bottle::try_from(raw_data[0x14]).map_err(InventoryDecodeError::Bottle)?,
+                Bottle::try_from(raw_data[0x15]).map_err(InventoryDecodeError::Bottle)?,
             ],
-            adult_trade_item: AdultTradeItem::try_from(raw_data[0x16]).map_err(|_| raw_data.clone())?,
-            child_trade_item: ChildTradeItem::try_from(raw_data[0x17]).map_err(|_| raw_data)?,
+            adult_trade_item: AdultTradeItem::try_from(raw_data[0x16]).map_err(InventoryDecodeError::AdultTrade)?,
+            child_trade_item: ChildTradeItem::try_from(raw_data[0x17]).map_err(InventoryDecodeError::ChildTrade)?,
         })
     }
 }
@@ -1070,6 +1086,8 @@ pub enum DecodeError {
         value: Vec<u8>,
     },
     #[from]
+    Inventory(InventoryDecodeError),
+    #[from]
     TryFromInt(TryFromIntError),
 }
 
@@ -1180,7 +1198,7 @@ impl Save {
                 let flags: DmtBiggoronCheckedFlags = try_get_offset!("dmt_biggoron_checked", 0x0072, 0x2);
                 flags.contains(DmtBiggoronCheckedFlags::DMT_BIGGORON_CHECKED)
             },
-            inv: try_get_offset!("inv", 0x0074, 0x18),
+            inv: save_data.get(0x0074..0x0074 + 0x18).ok_or(DecodeError::IndexRange { start: 0x0074, end: 0x0074 + 0x18 })?.to_vec().try_into()?,
             inv_amounts: try_get_offset!("inv_amounts", 0x008c, 0xf),
             equipment: try_get_offset!("equipment", 0x009c, 0x2),
             upgrades: try_get_offset!("upgrades", 0x00a0, 0x4),
