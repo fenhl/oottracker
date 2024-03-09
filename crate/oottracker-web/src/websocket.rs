@@ -13,10 +13,10 @@ use {
     rocket_ws::Message,
     sqlx::PgPool,
     tokio::{
-        process::Command,
         sync::Mutex,
         time::sleep,
     },
+    tokio_tungstenite::tungstenite,
     oottracker::websocket::{
         ClientMessage,
         MwItem,
@@ -383,10 +383,15 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
 pub(crate) async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms, ws: rocket_ws::stream::DuplexStream) {
     let (ws_sink, ws_stream) = ws.split();
     let ws_sink = WsSink::new(Mutex::new(ws_sink));
-    if let Err(e) = client_session(&pool, rooms, restreams, mw_rooms, ws_stream, WsSink::clone(&ws_sink)).await {
-        eprintln!("error in WebSocket handler: {e}");
-        eprintln!("debug info: {e:?}");
-        let _ = Command::new("sudo").arg("-u").arg("fenhl").arg("/opt/night/bin/nightd").arg("report").arg("/games/zelda/oot/tracker/error").spawn(); //TODO include error details in report
-        let _ = ServerMessage::from_error(e).write_ws(&mut *ws_sink.lock().await).await;
+    match client_session(&pool, rooms, restreams, mw_rooms, ws_stream, WsSink::clone(&ws_sink)).await {
+        Ok(()) => {}
+        Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::MessageKind(tungstenite::Message::Close(_)), .. })) => {} // client disconnected normally
+        Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::Tungstenite(tungstenite::Error::Protocol(tungstenite::error::ProtocolError::ResetWithoutClosingHandshake)), .. })) => {} // this happens when a player force quits their tracker app (or normally quits on macOS, see https://github.com/iced-rs/iced/issues/1941)
+        Err(e) => {
+            eprintln!("error in WebSocket handler: {e}");
+            eprintln!("debug info: {e:?}");
+            let _ = wheel::night_report("/games/zelda/oot/tracker/error", Some(&format!("error in WebSocket handler: {e}\ndebug info: {e:?}"))).await;
+            let _ = ServerMessage::from_error(e).write_ws(&mut *ws_sink.lock().await).await;
+        }
     }
 }

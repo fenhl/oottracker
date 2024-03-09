@@ -36,7 +36,6 @@ use {
     },
     rocket_ws::WebSocket,
     sqlx::PgPool,
-    tokio::process::Command,
     oottracker::{
         ModelState,
         ui::{
@@ -378,9 +377,9 @@ fn not_found() -> RawHtml<String> {
 }
 
 #[rocket::catch(500)]
-fn internal_server_error() -> RawHtml<String> {
-    let _ = Command::new("sudo").arg("-u").arg("fenhl").arg("/opt/night/bin/nightd").arg("report").arg("/games/zelda/oot/tracker/error").spawn(); //TODO include error details in report
-    RawHtml(format!(include_str!("../../../assets/web/500.html"), env!("CARGO_PKG_VERSION")))
+async fn internal_server_error() -> Result<RawHtml<String>, rocket_util::Error<wheel::Error>> {
+    wheel::night_report("/games/zelda/oot/tracker/error", Some("internal server error")).await?;
+    Ok(RawHtml(format!(include_str!("../../../assets/web/500.html"), env!("CARGO_PKG_VERSION"))))
 }
 
 pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms: MwRooms) -> Rocket<rocket::Build> {
