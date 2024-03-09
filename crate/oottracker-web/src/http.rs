@@ -237,7 +237,7 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
     let Some(mw_room) = mw_rooms.get(room) else { return Ok(None) };
     let mut mw_room = mw_room.write().await;
     let mw_room = &mut *mw_room;
-    let rando_version = Version::from_dev(6, 2, 205); //TODO don't hardcode
+    let rando_version = Version::from_dev(7, 1, 199); //TODO don't hardcode
     let modules = rando_version.py_modules("/usr/bin/python3")?;
     Ok(Some(html! {
         : Doctype;
