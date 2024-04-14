@@ -228,7 +228,11 @@ async fn format_item_kind<'a>(modules: &PyModules, cache: &'a mut HashMap<u16, S
 #[derive(Debug, thiserror::Error, rocket_util::Error)]
 enum NotesError {
     #[error(transparent)] Dir(#[from] ootr_utils::DirError),
-    #[error(transparent)] PyJson(#[from] PyJsonError),
+    #[error("error {ctx}: {source}")]
+    PyJson {
+        ctx: String,
+        source: PyJsonError,
+    },
 }
 
 #[rocket::get("/mw-notes/<room>")]
@@ -271,9 +275,9 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
                                 tbody {
                                     @for MwItem { source, key, kind } in own_items.iter().sorted().chain(queue) {
                                         tr {
-                                            @let item_name = format_item_kind(&modules, &mut mw_room.item_cache, *kind).await?;
+                                            @let item_name = format_item_kind(&modules, &mut mw_room.item_cache, *kind).await.map_err(|source| NotesError::PyJson { ctx: format!("formatting item kind {kind}"), source })?;
                                             td(class? = world_class(*source)) : source.get();
-                                            td(class? = world_class(*source)) : format_override_key(&modules, &mut mw_room.location_cache, &SHUFFLE_CHILD_TRADE, *source, *key, world_id, item_name).await?;
+                                            td(class? = world_class(*source)) : format_override_key(&modules, &mut mw_room.location_cache, &SHUFFLE_CHILD_TRADE, *source, *key, world_id, item_name).await.map_err(|source| NotesError::PyJson { ctx: format!("formatting override key {key}"), source })?;
                                             td(class? = world_class(world_id)) : item_name;
                                         }
                                     }
