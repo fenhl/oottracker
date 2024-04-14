@@ -483,22 +483,24 @@ impl quote::ToTokens for SceneFieldsKind {
 }
 
 enum RegionName {
-    One(LitStr),
-    Multiple(Expr),
+    One,
+    Multiple,
 }
 
 impl Parse for RegionName {
     fn parse(input: ParseStream<'_>) -> Result<RegionName> {
         if input.peek(LitStr) {
-            input.parse().map(RegionName::One)
+            input.parse::<LitStr>()?;
+            Ok(RegionName::One)
         } else {
-            input.parse().map(RegionName::Multiple)
+            input.parse::<Expr>()?;
+            Ok(RegionName::Multiple)
         }
     }
 }
 
 enum SceneData {
-    RegionName(RegionName),
+    RegionName,
     Fields {
         kind: SceneFieldsKind,
         fields: Punctuated<Flag, Token![,]>,
@@ -511,7 +513,8 @@ impl Parse for SceneData {
         Ok(match &*ident.to_string() {
             "region_name" => {
                 input.parse::<Token![:]>()?;
-                SceneData::RegionName(input.parse()?)
+                input.parse::<RegionName>()?;
+                SceneData::RegionName
             }
             _ => {
                 input.parse::<Token![:]>()?;
