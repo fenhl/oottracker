@@ -56,6 +56,9 @@ use {
     },
 };
 
+//TODO don't hardcode
+const RANDO_VERSION: Version = Version::from_dev(7, 1, 199);
+
 //HACK assume all child trade items are shuffled for the purpose of override key generation, not sure if this breaks anything
 const SHUFFLE_CHILD_TRADE: [&str; 11] = [
     "Weird Egg",
@@ -219,7 +222,17 @@ async fn format_item_kind<'a>(modules: &PyModules, cache: &'a mut HashMap<u16, S
     Ok(match cache.entry(kind) {
         hash_map::Entry::Occupied(entry) => entry.into_mut(),
         hash_map::Entry::Vacant(entry) => {
-            let mut entries = modules.py_json::<HashMap<u16, String>>("import json; import ItemList; print(json.dumps({get_item_id: name for name, (_, _, get_item_id, _) in ItemList.item_table.items()}))").await?;
+            let mut entries = modules.py_json::<HashMap<u16, String>>("
+import json
+import ItemList
+
+print(json.dumps({
+    str(get_item_id): name
+    for name, (kind, _, get_item_id, _) in ItemList.item_table.items()
+    if get_item_id is not None
+    and kind != 'Shop'
+}))
+            ").await?;
             entry.insert(entries.remove(&kind).unwrap_or_else(|| format!("0x{kind:04x}"))) //TODO generate entire table in 1 Python call
         }
     })
@@ -227,12 +240,29 @@ async fn format_item_kind<'a>(modules: &PyModules, cache: &'a mut HashMap<u16, S
 
 #[derive(Debug, thiserror::Error, rocket_util::Error)]
 enum NotesError {
+    #[error(transparent)] Clone(#[from] ootr_utils::CloneError),
     #[error(transparent)] Dir(#[from] ootr_utils::DirError),
-    #[error("error {ctx}: {source}")]
-    PyJson {
-        ctx: String,
-        source: PyJsonError,
-    },
+    #[error(transparent)] PyJson(#[from] PyJsonError),
+}
+
+#[tokio::test]
+async fn test_mw_notes() {
+    let python = {
+        #[cfg(windows)] { r"C:\Users\fenhl\scoop\apps\python\current\python.exe" }
+        #[cfg(unix)] { "/usr/bin/python3" }
+    };
+    RANDO_VERSION.clone_repo().await.unwrap();
+    let modules = RANDO_VERSION.py_modules(python).unwrap();
+    let mw_room = crate::mw::MwState::new(Vec::default());
+    let source_world = NonZeroU8::new(1).unwrap();
+    let key = 0x2801_0000_0000_0000;
+    let kind = 0x000D;
+    let target_world = NonZeroU8::new(2).unwrap();
+    let mut mw_room = mw_room.write().await;
+    let item_name = format_item_kind(&modules, &mut mw_room.item_cache, kind).await.unwrap().to_owned();
+    assert_eq!(item_name, "Megaton Hammer");
+    let location_name = format_override_key(&modules, &mut mw_room.location_cache, &SHUFFLE_CHILD_TRADE, source_world, key, target_world, &item_name).await.unwrap();
+    assert_eq!(location_name, "KF Midos Top Left Chest");
 }
 
 #[rocket::get("/mw-notes/<room>")]
@@ -241,8 +271,8 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
     let Some(mw_room) = mw_rooms.get(room) else { return Ok(None) };
     let mut mw_room = mw_room.write().await;
     let mw_room = &mut *mw_room;
-    let rando_version = Version::from_dev(7, 1, 199); //TODO don't hardcode
-    let modules = rando_version.py_modules("/usr/bin/python3")?;
+    RANDO_VERSION.clone_repo().await?;
+    let modules = RANDO_VERSION.py_modules("/usr/bin/python3")?;
     Ok(Some(html! {
         : Doctype;
         html {
@@ -275,9 +305,9 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
                                 tbody {
                                     @for MwItem { source, key, kind } in own_items.iter().sorted().chain(queue) {
                                         tr {
-                                            @let item_name = format_item_kind(&modules, &mut mw_room.item_cache, *kind).await.map_err(|source| NotesError::PyJson { ctx: format!("formatting item kind {kind}"), source })?;
+                                            @let item_name = format_item_kind(&modules, &mut mw_room.item_cache, *kind).await?;
                                             td(class? = world_class(*source)) : source.get();
-                                            td(class? = world_class(*source)) : format_override_key(&modules, &mut mw_room.location_cache, &SHUFFLE_CHILD_TRADE, *source, *key, world_id, item_name).await.map_err(|source| NotesError::PyJson { ctx: format!("formatting override key {key}"), source })?;
+                                            td(class? = world_class(*source)) : format_override_key(&modules, &mut mw_room.location_cache, &SHUFFLE_CHILD_TRADE, *source, *key, world_id, item_name).await?;
                                             td(class? = world_class(world_id)) : item_name;
                                         }
                                     }
