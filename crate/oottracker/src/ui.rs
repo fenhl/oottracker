@@ -1010,12 +1010,12 @@ cells! {
     Bottle: OptionalOverlay {
         main_img: ImageInfo::new("bottle"),
         overlay_img: ImageInfo::new("letter"),
-        active: Box::new(|state| (state.ram.save.inv.emptiable_bottles() > 0, state.ram.save.inv.has_rutos_letter())), //TODO also show Ruto's letter as active if it has been delivered or Open Fountain is known (https://github.com/fenhl/oottracker/issues/21)
+        active: Box::new(|state| (state.ram.save.inv.emptiable_bottles() > 0, state.ram.save.has_rutos_letter())),
         toggle_main: Box::new(|state| {
             let new_val = if state.ram.save.inv.emptiable_bottles() > 0 { 0 } else { 1 };
             state.ram.save.inv.set_emptiable_bottles(new_val);
         }),
-        toggle_overlay: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
+        toggle_overlay: Box::new(|state| state.ram.save.toggle_rutos_letter()),
     },
     NumBottles: Count {
         dimmed_img: ImageInfo::new("bottle"),
@@ -1027,8 +1027,8 @@ cells! {
     },
     RutosLetter: Simple {
         img: ImageInfo::new("UNIMPLEMENTED"),
-        active: Box::new(|state| state.ram.save.inv.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered or Open Fountain is known (https://github.com/fenhl/oottracker/issues/21)
-        toggle: Box::new(|state| state.ram.save.inv.toggle_rutos_letter()),
+        active: Box::new(|state| state.ram.save.has_rutos_letter()), //TODO also show Ruto's letter as active if it has been delivered or Open Fountain is known (https://github.com/fenhl/oottracker/issues/21)
+        toggle: Box::new(|state| state.ram.save.toggle_rutos_letter()),
     },
     Scale: Sequence {
         idx: Box::new(|state| match state.ram.save.upgrades.scale() {

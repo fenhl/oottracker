@@ -40,6 +40,7 @@ use {
     crate::{
         info_tables::{
             EventChkInf,
+            EventChkInf3,
             InfTable,
             ItemGetInf,
         },
@@ -403,10 +404,6 @@ impl Inventory {
         self.bottles.iter().filter(|bottle| bottle.emptiable()).count().try_into().expect("there are only 4 bottles")
     }
 
-    pub fn has_rutos_letter(&self) -> bool {
-        self.bottles.iter().any(|bottle| *bottle == Bottle::RutosLetter)
-    }
-
     pub fn set_emptiable_bottles(&mut self, amount: u8) {
         assert!(amount <= 4);
         'increment: while self.emptiable_bottles() < amount {
@@ -438,29 +435,6 @@ impl Inventory {
                 }
             }
             unreachable!("could not decrement emptiable bottles")
-        }
-    }
-
-    pub fn toggle_rutos_letter(&mut self) {
-        if self.has_rutos_letter() {
-            self.bottles.iter_mut().for_each(|bottle| if *bottle == Bottle::RutosLetter { *bottle = Bottle::None });
-        } else {
-            // First, try to put the letter into a new bottle.
-            for bottle in &mut self.bottles {
-                if *bottle == Bottle::None {
-                    *bottle = Bottle::RutosLetter;
-                    return
-                }
-            }
-            // All 4 bottles obtained, empty one and put Ruto's letter in it.
-            for bottle in &mut self.bottles {
-                if bottle.emptiable() {
-                    *bottle = Bottle::RutosLetter;
-                    return
-                }
-            }
-            // All 4 bottles have big poes in them. Replace one of them with Ruto's letter.
-            self.bottles[0] = Bottle::RutosLetter;
         }
     }
 }
@@ -1270,6 +1244,19 @@ impl Save {
 
     pub fn set_triforce_pieces(&mut self, triforce_pieces: u8) {
         self.scene_flags.windmill_and_dampes_grave.unused = crate::scene::WindmillAndDampesGraveUnused::from_bits_truncate(triforce_pieces.into());
+    }
+
+    pub fn has_rutos_letter(&self) -> bool {
+        self.inv.bottles.iter().any(|bottle| *bottle == Bottle::RutosLetter) || self.event_chk_inf.3.contains(EventChkInf3::DELIVER_RUTOS_LETTER)
+    }
+
+    pub fn toggle_rutos_letter(&mut self) {
+        if self.has_rutos_letter() {
+            self.inv.bottles.iter_mut().for_each(|bottle| if *bottle == Bottle::RutosLetter { *bottle = Bottle::None });
+            self.event_chk_inf.3.remove(EventChkInf3::DELIVER_RUTOS_LETTER);
+        } else {
+            self.event_chk_inf.3.insert(EventChkInf3::DELIVER_RUTOS_LETTER);
+        }
     }
 
     pub fn recv_mw_item(&mut self, item: u16) -> Result<(), ()> {
