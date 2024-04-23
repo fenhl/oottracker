@@ -49,7 +49,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
         }
     });
     loop {
-        match ClientMessage::read_ws(&mut stream).await? {
+        match dbg!(ClientMessage::read_ws(&mut stream).await?) {
             ClientMessage::Pong => {}
             ClientMessage::SubscribeRestream { restream, runner, layout } => {
                 let restreams = Restreams::clone(&restreams);
