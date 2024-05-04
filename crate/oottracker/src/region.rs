@@ -94,17 +94,6 @@ impl<R: Rando> RegionLookup<R> {
     }
 }
 
-#[derive(Debug, Clone)]
-struct MissingRegionError(pub String);
-
-impl fmt::Display for MissingRegionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "missing region: {}", self.0)
-    }
-}
-
-impl std::error::Error for MissingRegionError {}
-
 pub trait RegionExt {
     type R: Rando;
 

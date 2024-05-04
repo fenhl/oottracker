@@ -385,7 +385,7 @@ pub(crate) async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Res
     let ws_sink = WsSink::new(Mutex::new(ws_sink));
     match client_session(&pool, rooms, restreams, mw_rooms, ws_stream, WsSink::clone(&ws_sink)).await {
         Ok(()) => {}
-        Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::MessageKind(tungstenite::Message::Close(_)), .. })) => {} // client disconnected normally
+        Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::MessageKind(Message::Close(_)), .. })) => {} // client disconnected normally
         Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::Tungstenite(tungstenite::Error::Protocol(tungstenite::error::ProtocolError::ResetWithoutClosingHandshake)), .. })) => {} // this happens when a player force quits their tracker app (or normally quits on macOS, see https://github.com/iced-rs/iced/issues/1941)
         Err(e) => {
             eprintln!("error in WebSocket handler: {e}");
