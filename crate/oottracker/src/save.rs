@@ -1267,21 +1267,23 @@ impl Save {
     }
 
     pub fn suns_song_checked(&self) -> bool {
-        //TODO only use this if SONGS_AS_ITEMS is off
-        let num_songs = self.quest_items.intersection(QuestItems::all_songs()).bits().count_ones();
-        let num_other_checks = 0
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_IMPA))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_MALON))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_SARIA))
-            + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SONG_FROM_OCARINA_OF_TIME))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_WINDMILL))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_FOREST))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_CRATER))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_ICE_CAVERN))
-            + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SHEIK_AT_COLOSSUS))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_KAKARIKO))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_AT_TEMPLE));
-        num_songs > num_other_checks
+        self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB) || {
+            //TODO only use this if SONGS_AS_ITEMS is off
+            let num_songs = self.quest_items.intersection(QuestItems::all_songs()).bits().count_ones();
+            let num_other_checks = 0
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_IMPA))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_MALON))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_SARIA))
+                + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SONG_FROM_OCARINA_OF_TIME))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_WINDMILL))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_FOREST))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_CRATER))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_ICE_CAVERN))
+                + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SHEIK_AT_COLOSSUS))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_KAKARIKO))
+                + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_AT_TEMPLE));
+            num_songs > num_other_checks
+        }
     }
 
     pub fn recv_mw_item(&mut self, item: u16) -> Result<(), ()> {
