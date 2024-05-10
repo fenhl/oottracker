@@ -288,6 +288,8 @@ pub enum TrackerCellKind {
         check: &'static str,
         toggle_overlay: Box<dyn Fn(&mut EventChkInf)>,
     },
+    SunsSong,
+    SunsSongCheck,
     Spells, // composite Din's Fire & Farore's Wind, but auto-trackers/shift-click also toggle Nayru's Love
     Stone(Stone),
     StoneLocation(Stone),
@@ -576,6 +578,24 @@ impl TrackerCellKind {
                     CellOverlay::None
                 },
             },
+            SunsSong => CellRender {
+                img: ImageInfo::new("sun"),
+                style: if state.ram.save.quest_items.contains(QuestItems::SUNS_SONG) { CellStyle::Normal } else { CellStyle::Dimmed },
+                overlay: if state.ram.save.suns_song_checked() {
+                    CellOverlay::Image(ImageInfo::new("check"))
+                } else {
+                    CellOverlay::None
+                },
+            },
+            SunsSongCheck => CellRender {
+                img: ImageInfo::extra("blank"),
+                style: CellStyle::Normal,
+                overlay: if state.ram.save.suns_song_checked() {
+                    CellOverlay::Image(ImageInfo::new("check"))
+                } else {
+                    CellOverlay::None
+                },
+            },
             Spells => CellRender {
                 img: match (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind, state.ram.save.inv.nayrus_love) {
                     (false, false, false) | (true, true, false) => ImageInfo::new("composite_magic"), //TODO use "spells" for dimmed instead if shift-click is available or auto-tracking?
@@ -710,6 +730,7 @@ impl TrackerCellKind {
                 }
             }
             Song { song: quest_item, .. } => state.ram.save.quest_items.toggle(*quest_item),
+            SunsSong => state.ram.save.quest_items.toggle(QuestItems::SUNS_SONG),
             Spells => {
                 if state.ram.save.inv.dins_fire { state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind }
                 state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
@@ -718,7 +739,7 @@ impl TrackerCellKind {
             StoneLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
             StoneWithLocation(stone) => state.knowledge.dungeon_reward_locations.increment(DungeonReward::Stone(*stone)),
             FreeReward => {}
-            BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
+            BigPoeTriforce | BossKey { .. } | SongCheck { .. } | SunsSongCheck => unimplemented!(),
         }
     }
 
@@ -804,11 +825,12 @@ impl TrackerCellKind {
                     }
                 }
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
+                SunsSong => state.ram.save.event_chk_inf.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB), //TODO this is a derived cell display
                 Spells => state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind,
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
                 StoneWithLocation(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
                 FreeReward | FortressMq | Mq(_) | Simple { .. } | Stone(_) => {}
-                BigPoeTriforce | BossKey { .. } | SongCheck { .. } => unimplemented!(),
+                BigPoeTriforce | BossKey { .. } | SongCheck { .. } | SunsSongCheck => unimplemented!(),
             }
         }
         false
@@ -1647,15 +1669,8 @@ cells! {
         check: "Song from Saria",
         toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_SARIA)),
     },
-    SunsSong: Song {
-        song: QuestItems::SUNS_SONG,
-        check: "Song from Royal Familys Tomb",
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB)),
-    },
-    SunsSongCheck: SongCheck {
-        check: "Song from Royal Familys Tomb",
-        toggle_overlay: Box::new(|eci| eci.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB)),
-    },
+    SunsSong: SunsSong,
+    SunsSongCheck: SunsSongCheck,
     SongOfTime: Song {
         song: QuestItems::SONG_OF_TIME,
         check: "Song from Ocarina of Time",

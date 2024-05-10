@@ -40,7 +40,9 @@ use {
     crate::{
         info_tables::{
             EventChkInf,
+            EventChkInf10,
             EventChkInf3,
+            EventChkInf5,
             InfTable,
             ItemGetInf,
         },
@@ -748,6 +750,11 @@ bitflags! {
 }
 
 impl QuestItems {
+    fn all_songs() -> Self {
+        Self::ZELDAS_LULLABY | Self::EPONAS_SONG | Self::SARIAS_SONG | Self::SUNS_SONG | Self::SONG_OF_TIME | Self::SONG_OF_STORMS
+        | Self::MINUET_OF_FOREST | Self::BOLERO_OF_FIRE | Self::SERENADE_OF_WATER | Self::REQUIEM_OF_SPIRIT | Self::NOCTURNE_OF_SHADOW | Self::PRELUDE_OF_LIGHT
+    }
+
     pub fn has(&self, items: impl Into<QuestItems>) -> bool {
         self.contains(items.into())
     }
@@ -1257,6 +1264,24 @@ impl Save {
         } else {
             self.event_chk_inf.3.insert(EventChkInf3::DELIVER_RUTOS_LETTER);
         }
+    }
+
+    pub fn suns_song_checked(&self) -> bool {
+        //TODO only use this if SONGS_AS_ITEMS is off
+        let num_songs = self.quest_items.intersection(QuestItems::all_songs()).bits().count_ones();
+        let num_other_checks = 0
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_IMPA))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_MALON))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_SARIA))
+            + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SONG_FROM_OCARINA_OF_TIME))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_WINDMILL))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_FOREST))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_CRATER))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_ICE_CAVERN))
+            + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SHEIK_AT_COLOSSUS))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_KAKARIKO))
+            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_AT_TEMPLE));
+        num_songs > num_other_checks
     }
 
     pub fn recv_mw_item(&mut self, item: u16) -> Result<(), ()> {
