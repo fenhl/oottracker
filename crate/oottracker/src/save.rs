@@ -1591,27 +1591,36 @@ impl Save {
             0x0118 => self.small_keys.treasure_chest_game += 1, // Small Key (Treasure Chest Game)
             0x0119 => {} // Fairy
             0x011A => {} // Nothing :)
-            0x011B => {} // Stalfos Soul
-            0x011C => {} // Octorok Soul
-            0x011D => {} // Wallmaster Soul
-            0x011E => {} // Dodongo Soul
-            0x011F => {} // Keese Soul
-            0x0120 => {} // Tektite Soul
-            0x0121 => {} // Peahat Soul
-            0x0122 => {} // Lizalfos and Dinalfos Soul
-            0x0123 => {} // Gohma Larvae Soul
-            0x0124 => {} // Shabom Soul
-            0x0125 => {} // Baby Dodongo Soul
-            0x0126 => {} // Biri and Bari Soul
-            0x0127 => {} // Tailpasaran Soul
-            0x0128 => {} // Skulltula Soul
-            0x0129 => {} // Torch Slug Soul
-            0x012A => {} // Moblin Soul
-            0x012B => {} // Armos Soul
-            0x012C => {} // Deku Baba Soul
-            0x012D => {} // Deku Scrub Soul
-            0x012E => {} // Bubble Soul
-            0x012F => {} // Beamos Soul
+            0x011B => self.inv.hookshot = Hookshot::Longshot, // Max Upgrade Hookshot
+            0x011C => self.upgrades.set_strength(Upgrades::GOLD_GAUNTLETS), // Max Upgrade Strength
+            0x011D => self.upgrades.set_bomb_bag(Upgrades::BOMB_BAG_40), // Max Upgrade Bomb Bag
+            0x011E => { // Max Upgrade Bow
+                self.inv.bow = true;
+                self.upgrades.set_quiver(Upgrades::QUIVER_50);
+            }
+            0x011F => { // Max Upgrade Slingshot
+                self.inv.slingshot = true;
+                self.upgrades.set_bullet_bag(Upgrades::BULLET_BAG_50);
+            }
+            0x0120 => self.upgrades.set_wallet(Upgrades::TYCOONS_WALLET), // Max Upgrade Wallet
+            0x0121 => self.upgrades.set_scale(Upgrades::GOLD_SCALE), // Max Upgrade Scale
+            0x0122 => self.upgrades.set_nut_capacity(Upgrades::DEKU_NUT_CAPACITY_40), // Max Upgrade Nut
+            0x0123 => self.upgrades.set_stick_capacity(Upgrades::DEKU_STICK_CAPACITY_30), // Max Upgrade Stick
+            0x0124 => { // Max Upgrade Bombchu
+                self.inv.bombchus = true;
+                self.inv_amounts.bombchus = 50.min(self.inv_amounts.bombchus + 20);
+            }
+            0x0125 => self.magic = MagicCapacity::Large, // Max Upgrade Magic
+            0x0126 => self.inv.ocarina = Ocarina::OcarinaOfTime, // Max Upgrade Ocarina
+            0x0127 => self.quest_items.insert(QuestItems::KOKIRI_EMERALD), // Kokiri Emerald
+            0x0128 => self.quest_items.insert(QuestItems::GORON_RUBY), // Goron Ruby
+            0x0129 => self.quest_items.insert(QuestItems::ZORA_SAPPHIRE), // Zora Sapphire
+            0x012A => self.quest_items.insert(QuestItems::LIGHT_MEDALLION), // Light Medallion
+            0x012B => self.quest_items.insert(QuestItems::FOREST_MEDALLION), // Forest Medallion
+            0x012C => self.quest_items.insert(QuestItems::FIRE_MEDALLION), // Fire Medallion
+            0x012D => self.quest_items.insert(QuestItems::WATER_MEDALLION), // Water Medallion
+            0x012E => self.quest_items.insert(QuestItems::SHADOW_MEDALLION), // Shadow Medallion
+            0x012F => self.quest_items.insert(QuestItems::SPIRIT_MEDALLION), // Spirit Medallion
             0x0130 => {} // Floormaster Soul
             0x0131 => {} // Redead and Gibdo Soul
             0x0132 => {} // Skullwalltula Soul
@@ -1754,6 +1763,28 @@ impl Save {
             0x202C => {} // Twinrova Soul
             0x202D => {} // Jabu Jabu Tentacle Soul
             0x202E => {} // Dark Link Soul
+            0x202F => {} // Deku Tree Souls
+            0x2030 => {} // Dodongos Cavern Souls
+            0x2031 => {} // Jabu Jabus Belly Souls
+            0x2032 => {} // Forest Temple Souls
+            0x2033 => {} // Fire Temple Souls
+            0x2034 => {} // Water Temple Souls
+            0x2035 => {} // Shadow Temple Souls
+            0x2036 => {} // Spirit Temple Souls
+            0x2037 => {} // Bottom of the Well Souls
+            0x2038 => {} // Ice Cavern Souls
+            0x2039 => {} // Gerudo Training Ground Souls
+            0x203A => {} // Ganons Castle Souls
+            0x203B => {} // Forest Area Souls
+            0x203C => {} // Hyrule Field Souls
+            0x203D => {} // Lake Hylia Souls
+            0x203E => {} // Gerudo Area Souls
+            0x203F => {} // Market Area Souls
+            0x2040 => {} // Kakariko Area Souls
+            0x2041 => {} // Goron Area Souls
+            0x2042 => {} // Zora Area Souls
+            0x2043 => {} // Lon Lon Ranch Souls
+            0x2044 => {} // Grottos Souls
             0x2100 => {} // Fishing Rod
             0x2101 => {} // Fish (child, 6 lb)
             0x2102 => {} // Fish (child, 8 lb)
