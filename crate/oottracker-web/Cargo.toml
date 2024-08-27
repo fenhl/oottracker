@@ -16,12 +16,11 @@ thiserror = "1"
 tokio-tungstenite = "0.21"
 
 [dependencies.async-proto]
-version = "0.22"
+version = "0.23"
 features = ["tokio-tungstenite"]
 
 [dependencies.derive_more]
-version = "0.99"
-default-features = false
+version = "1"
 features = ["from"]
 
 [dependencies.ootr]
@@ -40,7 +39,7 @@ git = "https://github.com/fenhl/rocket-util"
 branch = "main"
 
 [dependencies.sqlx]
-version = "0.7"
+version = "0.8"
 default-features = false
 features = ["json", "macros", "postgres", "runtime-tokio-rustls"]
 
