@@ -16,8 +16,8 @@ thiserror = "1"
 tokio-tungstenite = "0.21"
 
 [dependencies.async-proto]
-version = "0.23"
-features = ["tokio-tungstenite"]
+version = "0.24"
+features = ["tokio-tungstenite021"]
 
 [dependencies.derive_more]
 version = "1"

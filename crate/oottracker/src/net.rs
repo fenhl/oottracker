@@ -136,7 +136,7 @@ impl WebConnection {
             context: async_proto::ErrorContext::Custom(format!("oottracker::net::WebConnection::new")),
             kind: e.into(),
         })?.0.split();
-        websocket::ClientMessage::SubscribeRaw { room: room.to_string() }.write_ws(&mut sink).await?;
+        websocket::ClientMessage::SubscribeRaw { room: room.to_string() }.write_ws021(&mut sink).await?;
         Ok(WebConnection {
             room: room.to_string(),
             sink: Arc::new(Mutex::new(sink)),
@@ -167,7 +167,7 @@ impl Connection for WebConnection {
         Box::pin(stream::unfold(stream, |stream| async move {
             loop {
                 let stream_clone = Arc::clone(&stream);
-                break match websocket::ServerMessage::read_ws(&mut *stream_clone.lock().await).await {
+                break match websocket::ServerMessage::read_ws021(&mut *stream_clone.lock().await).await {
                     Ok(websocket::ServerMessage::Ping) => continue,
                     Ok(websocket::ServerMessage::Error { debug, display }) => Some((Err(Error::Websocket { debug, display }), stream)),
                     Ok(websocket::ServerMessage::Init(_)) | Ok(websocket::ServerMessage::Update { .. }) => Some((Err(Error::UnexpectedWebsocketMessage), stream)),
@@ -185,7 +185,7 @@ impl Connection for WebConnection {
         let sink = Arc::clone(&self.sink);
         Box::pin(async move {
             websocket::ClientMessage::SetRaw { room, state }
-                .write_ws(&mut *sink.lock().await)
+                .write_ws021(&mut *sink.lock().await)
                 .await?;
             Ok(())
         })
