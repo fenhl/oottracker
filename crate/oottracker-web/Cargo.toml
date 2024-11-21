@@ -12,7 +12,7 @@ lazy-regex = "3"
 rocket = "0.5"
 rocket_ws = "0.1"
 serde_json = "1"
-thiserror = "1"
+thiserror = "2"
 tokio-tungstenite = "0.21"
 
 [dependencies.async-proto]

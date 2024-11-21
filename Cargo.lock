@@ -4250,7 +4250,7 @@ dependencies = [
  "rocket_ws",
  "serde_json",
  "sqlx",
- "thiserror 1.0.69",
+ "thiserror 2.0.3",
  "tokio",
  "tokio-tungstenite",
  "wheel",
