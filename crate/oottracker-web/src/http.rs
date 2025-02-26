@@ -57,7 +57,7 @@ use {
 };
 
 //TODO don't hardcode
-const RANDO_VERSION: Version = Version::from_dev(7, 1, 199);
+const RANDO_VERSION: Version = Version::from_dev(8, 2, 57);
 
 //HACK assume all child trade items are shuffled for the purpose of override key generation, not sure if this breaks anything
 const SHUFFLE_CHILD_TRADE: [&str; 11] = [
