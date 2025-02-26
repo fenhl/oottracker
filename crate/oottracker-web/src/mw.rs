@@ -31,7 +31,10 @@ use {
     },
     oottracker::{
         ModelState,
-        Save,
+        save::{
+            Bottle,
+            Save,
+        },
         websocket::MwItem,
     },
 };
@@ -111,9 +114,32 @@ impl MwState {
 
     fn handle_auto_update(&mut self, update: AutoUpdate) -> Result<(), ()> {
         match update {
-            AutoUpdate::Queue { item, target_world } => if item.kind == TRIFORCE_PIECE {
-                for (idx, (tx, _, model, queue, own_items)) in self.worlds.iter_mut().enumerate() {
-                    if idx == usize::from(item.source.get()) - 1 {
+            AutoUpdate::Queue { item, target_world } => {
+                if item.key == 0x4d00_0000_0000_000f { // Market 10 Big Poes
+                    let (tx, _, model, _, _) = self.world_mut(item.source).ok_or(())?;
+                    for bottle in &mut model.ram.save.inv.bottles {
+                        if *bottle == Bottle::BigPoe {
+                            *bottle = Bottle::Empty;
+                            tx.send(()).expect("failed to notify websockets about state change");
+                            break
+                        }
+                    }
+                }
+                if item.kind == TRIFORCE_PIECE {
+                    for (idx, (tx, _, model, queue, own_items)) in self.worlds.iter_mut().enumerate() {
+                        if idx == usize::from(item.source.get()) - 1 {
+                            own_items.insert(item);
+                        } else {
+                            if !queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
+                                queue.push(item);
+                            }
+                        }
+                        model.ram.save.recv_mw_item(item.kind)?;
+                        tx.send(()).expect("failed to notify websockets about state change");
+                    }
+                } else {
+                    let (tx, _, model, queue, own_items) = self.world_mut(target_world).ok_or(())?;
+                    if item.source == target_world {
                         own_items.insert(item);
                     } else {
                         if !queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
@@ -123,18 +149,7 @@ impl MwState {
                     model.ram.save.recv_mw_item(item.kind)?;
                     tx.send(()).expect("failed to notify websockets about state change");
                 }
-            } else {
-                let (tx, _, model, queue, own_items) = self.world_mut(target_world).ok_or(())?;
-                if item.source == target_world {
-                    own_items.insert(item);
-                } else {
-                    if !queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
-                        queue.push(item);
-                    }
-                }
-                model.ram.save.recv_mw_item(item.kind)?;
-                tx.send(()).expect("failed to notify websockets about state change");
-            },
+            }
             AutoUpdate::Reset { world, save } => if let Some((tx, _, model, queue, _)) = self.world_mut(world) {
                 model.ram.save = save;
                 for &item in &queue[model.ram.save.inv_amounts.num_received_mw_items.into()..] {
