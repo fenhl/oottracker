@@ -5,7 +5,7 @@ use {
             HashSet,
             VecDeque,
         },
-        num::NonZeroU8,
+        num::NonZero,
         sync::Arc,
         time::Duration,
     },
@@ -41,14 +41,14 @@ const TRIFORCE_PIECE: u16 = 0x00ca;
 pub(crate) enum AutoUpdate {
     Queue {
         item: MwItem,
-        target_world: NonZeroU8,
+        target_world: NonZero<u8>,
     },
     Reset {
-        world: NonZeroU8,
+        world: NonZero<u8>,
         save: Save,
     },
     DungeonRewardLocation {
-        world: NonZeroU8,
+        world: NonZero<u8>,
         reward: DungeonReward,
         location: DungeonRewardLocation,
     },
@@ -58,7 +58,7 @@ pub(crate) struct MwState {
     pub(crate) worlds: Vec<(watch::Sender<()>, watch::Receiver<()>, ModelState, Vec<MwItem>, HashSet<MwItem>)>,
     pub(crate) autotracker_delay: Duration,
     pub(crate) incoming_queue: mpsc::UnboundedSender<AutoUpdate>,
-    pub(crate) location_cache: HashMap<NonZeroU8, HashMap<u64, String>>,
+    pub(crate) location_cache: HashMap<NonZero<u8>, HashMap<u64, String>>,
     pub(crate) item_cache: HashMap<u16, String>,
 }
 
@@ -101,11 +101,11 @@ impl MwState {
         this
     }
 
-    pub(crate) fn world(&self, world: NonZeroU8) -> Option<(&watch::Sender<()>, &watch::Receiver<()>, &ModelState, &[MwItem], &HashSet<MwItem>)> {
+    pub(crate) fn world(&self, world: NonZero<u8>) -> Option<(&watch::Sender<()>, &watch::Receiver<()>, &ModelState, &[MwItem], &HashSet<MwItem>)> {
         self.worlds.get(usize::from(world.get() - 1)).map(|(tx, rx, model, queue, own_items)| (tx, rx, model, &**queue, own_items))
     }
 
-    pub(crate) fn world_mut(&mut self, world: NonZeroU8) -> Option<(&watch::Sender<()>, &watch::Receiver<()>, &mut ModelState, &mut Vec<MwItem>, &mut HashSet<MwItem>)> {
+    pub(crate) fn world_mut(&mut self, world: NonZero<u8>) -> Option<(&watch::Sender<()>, &watch::Receiver<()>, &mut ModelState, &mut Vec<MwItem>, &mut HashSet<MwItem>)> {
         self.worlds.get_mut(usize::from(world.get() - 1)).map(|(tx, rx, model, queue, own_items)| (&*tx, &*rx, model, queue, own_items))
     }
 

@@ -4,7 +4,7 @@ use {
             self,
             HashMap,
         },
-        num::NonZeroU8,
+        num::NonZero,
         time::Duration,
     },
     itertools::Itertools as _,
@@ -143,12 +143,12 @@ fn post_index(form: Form<GoRoomForm<'_>>) -> Redirect {
 }
 
 #[rocket::get("/mw/<room>/<world>?<theme>&<delay>")]
-async fn mw_room_input(room: &str, world: NonZeroU8, theme: Option<Theme>, delay: Option<f64>) -> Redirect {
+async fn mw_room_input(room: &str, world: NonZero<u8>, theme: Option<Theme>, delay: Option<f64>) -> Redirect {
     Redirect::permanent(uri!(mw_room_view(room, world, TrackerLayout::default(), theme, delay)))
 }
 
 #[rocket::get("/mw/<room>/<world>/<layout>?<theme>&<delay>")]
-async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layout: TrackerLayout, theme: Option<Theme>, delay: Option<f64>) -> Option<RawHtml<String>> {
+async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZero<u8>, layout: TrackerLayout, theme: Option<Theme>, delay: Option<f64>) -> Option<RawHtml<String>> {
     let mw_rooms = mw_rooms.read().await;
     let mw_room = mw_rooms.get(room)?;
     if let Some(delay) = delay {
@@ -165,7 +165,7 @@ async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, l
 }
 
 #[rocket::get("/mw/<room>/<world>/<layout>/click/<cell_id>")]
-async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
+async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZero<u8>, layout: TrackerLayout, cell_id: u8) -> Result<Redirect, NotFound<&'static str>> {
     {
         let mw_rooms = mw_rooms.read().await;
         let mw_room = mw_rooms.get(room).ok_or(NotFound("No such multiworld room"))?;
@@ -177,7 +177,7 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZeroU8, layou
     Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout, _, _))))
 }
 
-fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
+fn world_class(world_id: NonZero<u8>) -> Option<&'static str> {
     match world_id.get() {
         0 => unreachable!(),
         1 => Some("power"),
@@ -187,7 +187,7 @@ fn world_class(world_id: NonZeroU8) -> Option<&'static str> {
     }
 }
 
-async fn format_override_key<'a>(modules: &PyModules, cache: &'a mut HashMap<NonZeroU8, HashMap<u64, String>>, shuffle_child_trade: &[&str], source_world: NonZeroU8, key: u64, target_world: NonZeroU8, item: &str) -> Result<&'a str, PyJsonError> {
+async fn format_override_key<'a>(modules: &PyModules, cache: &'a mut HashMap<NonZero<u8>, HashMap<u64, String>>, shuffle_child_trade: &[&str], source_world: NonZero<u8>, key: u64, target_world: NonZero<u8>, item: &str) -> Result<&'a str, PyJsonError> {
     Ok(match cache.entry(source_world) {
         hash_map::Entry::Occupied(entry) => entry.into_mut(),
         hash_map::Entry::Vacant(entry) => {
@@ -254,10 +254,10 @@ async fn test_mw_notes() {
     RANDO_VERSION.clone_repo().await.unwrap();
     let modules = RANDO_VERSION.py_modules(python).unwrap();
     let mw_room = crate::mw::MwState::new(Vec::default());
-    let source_world = NonZeroU8::new(1).unwrap();
+    let source_world = NonZero::new(1).unwrap();
     let key = 0x2801_0000_0000_0000;
     let kind = 0x000D;
-    let target_world = NonZeroU8::new(2).unwrap();
+    let target_world = NonZero::new(2).unwrap();
     let mut mw_room = mw_room.write().await;
     let item_name = format_item_kind(&modules, &mut mw_room.item_cache, kind).await.unwrap().to_owned();
     assert_eq!(item_name, "Megaton Hammer");
@@ -288,7 +288,7 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
             body {
                 div(class = "table-wrapper") {
                     @for (idx, (_, _, _, queue, own_items)) in mw_room.worlds.iter().enumerate() {
-                        @let world_id = NonZeroU8::new((idx + 1).try_into().unwrap()).unwrap();
+                        @let world_id = NonZero::new((idx + 1).try_into().unwrap()).unwrap();
                         div {
                             h1(class? = world_class(world_id)) {
                                 : "For player ";

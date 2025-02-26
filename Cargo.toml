@@ -1,8 +1,9 @@
 [workspace]
 members = ["crate/*"]
-default-members = ["crate/oottracker"] #TODO change to CLI?
-resolver = "2"
+default-members = ["crate/oottracker-web"]
+resolver = "3"
 
 [profile.release]
-lto = "fat"
+codegen-units = 1
+lto = true
 strip = true

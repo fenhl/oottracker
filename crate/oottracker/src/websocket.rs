@@ -3,7 +3,7 @@
 use {
     std::{
         fmt,
-        num::NonZeroU8,
+        num::NonZero,
     },
     async_proto::Protocol,
     ootr::model::{
@@ -24,7 +24,7 @@ use {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Protocol)]
 pub struct MwItem {
-    pub source: NonZeroU8,
+    pub source: NonZero<u8>,
     pub key: u64,
     pub kind: u16,
 }
@@ -76,26 +76,26 @@ pub enum ClientMessage {
     },
     MwResetPlayer {
         room: String,
-        world: NonZeroU8,
+        world: NonZero<u8>,
         save: Save,
     },
     /// No longer supported. Use `MwQueueItem` instead.
     #[deprecated]
     MwGetItem {
         room: String,
-        world: NonZeroU8,
+        world: NonZero<u8>,
         item: u16,
     },
     ClickMw {
         room: String,
-        world: NonZeroU8,
+        world: NonZero<u8>,
         layout: TrackerLayout,
         cell_id: u8,
         right: bool,
     },
     SubscribeMw {
         room: String,
-        world: NonZeroU8,
+        world: NonZero<u8>,
         layout: TrackerLayout,
     },
     /// No longer supported. Use `MwQueueItem` instead.
@@ -106,14 +106,14 @@ pub enum ClientMessage {
     },
     MwQueueItem {
         room: String,
-        source_world: NonZeroU8,
+        source_world: NonZero<u8>,
         key: u64,
         kind: u16,
-        target_world: NonZeroU8,
+        target_world: NonZero<u8>,
     },
     MwDungeonRewardLocation {
         room: String,
-        world: NonZeroU8,
+        world: NonZero<u8>,
         reward: DungeonReward,
         location: DungeonRewardLocation,
     },
