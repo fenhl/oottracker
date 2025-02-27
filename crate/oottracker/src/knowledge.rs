@@ -4,7 +4,6 @@ use {
             HashMap,
             HashSet,
         },
-        fmt,
         future::Future,
         io::prelude::*,
         ops::BitAnd,
@@ -19,7 +18,6 @@ use {
     },
     collect_mac::collect,
     derivative::Derivative,
-    derive_more::From,
     itertools::Itertools as _,
     serde::{
         Deserialize,
@@ -457,26 +455,17 @@ impl From<Knowledge> for KnowledgeJson {
     }
 }
 
-#[derive(From)]
+#[derive(Debug, thiserror::Error)]
 enum KnowledgeFromJsonError {
-    #[from]
-    Json(serde_json::Error),
+    #[error(transparent)] Json(#[from] serde_json::Error),
+    #[error("unknown dungeon: {0}")]
     UnknownDungeon(String),
+    #[error("unknown item: {}", .0.0)]
     UnknownItem(Item),
+    #[error("unknown location: {0}")]
     UnknownLocation(String),
+    #[error("unexpected JSON value type for value {0}")]
     ValueType(Json),
-}
-
-impl fmt::Display for KnowledgeFromJsonError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Json(e) => e.fmt(f),
-            Self::UnknownDungeon(name) => write!(f, "unknown dungeon: {}", name),
-            Self::UnknownItem(item) => write!(f, "unknown item: {}", item.0),
-            Self::UnknownLocation(name) => write!(f, "unknown location: {}", name),
-            Self::ValueType(value) => write!(f, "unexpected JSON value type for value {}", value),
-        }
-    }
 }
 
 impl TryFrom<KnowledgeJson> for Knowledge {

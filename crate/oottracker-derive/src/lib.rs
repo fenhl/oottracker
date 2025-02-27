@@ -119,9 +119,9 @@ enum FlagName {
 impl FlagName {
     fn to_ident(&self) -> Ident {
         match self {
-            FlagName::Event(lit) | FlagName::Lit(lit) => Ident::new(&lit.value().replace('&', "AND").to_case(Case::ScreamingSnake), lit.span()),
+            FlagName::Event(lit) | FlagName::Lit(lit) => Ident::new(&lit.value().replace('&', "AND").to_case(Case::UpperSnake), lit.span()),
             FlagName::Ident(ident) => ident.clone(),
-            FlagName::Entrance(from, to) => Ident::new(&format!("ENTRANCE_{}_TO_{}", from.value().to_case(Case::ScreamingSnake), to.value().to_case(Case::ScreamingSnake)), to.span()),
+            FlagName::Entrance(from, to) => Ident::new(&format!("ENTRANCE_{}_TO_{}", from.value().to_case(Case::UpperSnake), to.value().to_case(Case::UpperSnake)), to.span()),
             FlagName::Prereq(id, at_check) => Ident::new(&format!("REQ_{}_FOR_{}", id, at_check.to_ident()), id.span()),
         }
     }

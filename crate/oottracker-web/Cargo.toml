@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 futures = "0.3"
 iced_core = "0.5"
-itertools = "0.13"
+itertools = "0.14"
 lazy-regex = "3"
 rocket = "0.5"
 rocket_ws = "0.1"
@@ -18,10 +18,6 @@ tokio-tungstenite = "0.21"
 [dependencies.async-proto]
 version = "0.24"
 features = ["tokio-tungstenite021"]
-
-[dependencies.derive_more]
-version = "1"
-features = ["from"]
 
 [dependencies.ootr]
 path = "../ootr"

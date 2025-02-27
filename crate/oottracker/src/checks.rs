@@ -1,11 +1,9 @@
 use {
     std::{
-        fmt,
         io,
         sync::Arc,
     },
     derivative::Derivative,
-    derive_more::From,
     ootr::Rando,
     crate::{
         Check,
@@ -39,24 +37,16 @@ pub enum CheckStatus {
     NotYetReachable, //TODO split into definitely/possibly/not reachable later in order to determine ALR setting
 }
 
-#[derive(Derivative, From)]
+#[derive(Derivative, thiserror::Error)]
 #[derivative(Debug(bound = ""), Clone(bound = ""))]
 pub enum CheckStatusError<R: Rando> {
-    Io(Arc<io::Error>),
-    RegionLookup(RegionLookupError<R>),
+    #[error("I/O error: {0}")]
+    Io(#[from] Arc<io::Error>),
+    #[error(transparent)] RegionLookup(#[from] RegionLookupError<R>),
 }
 
 impl<R: Rando> From<io::Error> for CheckStatusError<R> { //TODO add support for generics to FromArc derive macro
     fn from(e: io::Error) -> CheckStatusError<R> {
         CheckStatusError::Io(Arc::new(e))
-    }
-}
-
-impl<R: Rando> fmt::Display for CheckStatusError<R> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CheckStatusError::Io(e) => write!(f, "I/O error: {}", e),
-            CheckStatusError::RegionLookup(e) => e.fmt(f),
-        }
     }
 }

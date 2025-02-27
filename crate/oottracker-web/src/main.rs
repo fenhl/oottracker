@@ -8,7 +8,6 @@ use {
             self,
             HashMap,
         },
-        fmt,
         sync::Arc,
         time::{
             Duration,
@@ -19,7 +18,6 @@ use {
         ReadError,
         WriteError,
     },
-    derive_more::From,
     futures::stream::TryStreamExt as _,
     lazy_regex::regex_is_match,
     rocket::{
@@ -119,33 +117,26 @@ async fn edit_room(pool: &PgPool, rooms: &Rooms, name: String, f: impl FnOnce(&m
     Ok(())
 }
 
-#[derive(Debug, From)]
+#[derive(Debug, thiserror::Error)]
 enum Error {
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("error decoding RAM: {0}")]
+    RamDecode(#[from] oottracker::ram::DecodeError),
+    #[error("read error: {0}")]
+    Read(#[from] ReadError),
+    #[error("rocket error: {0}")]
+    Rocket(#[from] rocket::error::Error),
+    #[error("database error: {0}")]
+    Sql(#[from] sqlx::Error),
+    #[error("task error: {0}")]
+    Task(#[from] tokio::task::JoinError),
+    #[error("write error: {0}")]
+    Write(#[from] WriteError),
+    #[error("no such cell")]
     CellId,
-    Json(serde_json::Error),
-    RamDecode(oottracker::ram::DecodeError),
-    Read(ReadError),
-    Rocket(rocket::error::Error),
+    #[error("invalid room name")]
     RoomName,
-    Sql(sqlx::Error),
-    Task(tokio::task::JoinError),
-    Write(WriteError),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::CellId => write!(f, "no such cell"),
-            Self::Json(e) => write!(f, "JSON error: {e}"),
-            Self::RamDecode(e) => write!(f, "error decoding RAM: {e}"),
-            Self::Read(e) => write!(f, "read error: {e}"),
-            Self::Rocket(e) => write!(f, "rocket error: {e}"),
-            Self::RoomName => write!(f, "invalid room name"),
-            Self::Sql(e) => write!(f, "database error: {e}"),
-            Self::Task(e) => write!(f, "task error: {e}"),
-            Self::Write(e) => write!(f, "write error: {e}"),
-        }
-    }
 }
 
 impl<'r> rocket::response::Responder<'r, 'static> for Error {
