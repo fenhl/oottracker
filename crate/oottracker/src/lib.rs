@@ -25,6 +25,7 @@ use {
             DungeonItems,
             GameMode,
         },
+        websocket::MwItem,
     },
 };
 pub use crate::{
@@ -57,7 +58,36 @@ pub struct ModelState {
     pub ram: Ram,
 }
 
+fn is_song_location_key(key: u64) -> bool {
+    // up to date as of Dev 8.2.61
+    matches!(key,
+        | 0xff05_0000_0000_0026 // Song from Impa
+        | 0xff05_0000_0000_0027 // Song from Malon
+        | 0xff05_0000_0000_0028 // Song from Saria
+        | 0xff05_0000_0000_0029 // Song from Royal Familys Tomb
+        | 0xff05_0000_0000_002a // Song from Ocarina of Time
+        | 0xff05_0000_0000_002b // Song from Windmill
+        | 0xff05_0000_0000_0020 // Sheik in Forest
+        | 0xff05_0000_0000_0021 // Sheik in Crater
+        | 0xff05_0000_0000_0022 // Sheik in Ice Cavern
+        | 0xff05_0000_0000_0023 // Sheik at Colossus
+        | 0xff05_0000_0000_0024 // Sheik in Kakariko
+        | 0xff05_0000_0000_0025 // Sheik at Temple
+    )
+}
+
 impl ModelState {
+    pub fn recv_mw_item(&mut self, item: MwItem) -> Result<(), ()> {
+        self.ram.save.recv_mw_item(item.kind)?;
+        if is_song_location_key(item.key) { // some randomizer versions don't notify about own songs when songs-as-items is off, so keep this as `None` until we know song locations are being reported
+            let song_locations = self.knowledge.song_locations.get_or_insert_default();
+            if !song_locations.contains(&item) {
+                song_locations.insert(item);
+            }
+        }
+        Ok(())
+    }
+
     pub fn update_knowledge(&mut self) {
         if self.ram.save.game_mode != GameMode::Gameplay { return } //TODO read knowledge from inventory preview on file select?
         // immediate knowledge

@@ -46,6 +46,7 @@ use {
         info_tables::*,
         knowledge::ProgressionMode,
         save::*,
+        websocket::MwItem,
     },
 };
 #[cfg(feature = "iced")] use iced::keyboard::Modifiers as KeyboardModifiers;
@@ -294,6 +295,25 @@ pub enum TrackerCellKind {
     Stone(Stone),
     StoneLocation(Stone),
     StoneWithLocation(Stone),
+}
+
+fn song_location_key(location: &str) -> u64 {
+    // up to date as of Dev 8.2.61
+    match location {
+        "Song from Impa" => 0xff05_0000_0000_0026,
+        "Song from Malon" => 0xff05_0000_0000_0027,
+        "Song from Saria" => 0xff05_0000_0000_0028,
+        "Song from Royal Familys Tomb" => 0xff05_0000_0000_0029,
+        "Song from Ocarina of Time" => 0xff05_0000_0000_002a,
+        "Song from Windmill" => 0xff05_0000_0000_002b,
+        "Sheik in Forest" => 0xff05_0000_0000_0020,
+        "Sheik in Crater" => 0xff05_0000_0000_0021,
+        "Sheik in Ice Cavern" => 0xff05_0000_0000_0022,
+        "Sheik at Colossus" => 0xff05_0000_0000_0023,
+        "Sheik in Kakariko" => 0xff05_0000_0000_0024,
+        "Sheik at Temple" => 0xff05_0000_0000_0025,
+        _ => unreachable!("not a song location: {location:?}"),
+    }
 }
 
 impl TrackerCellKind {
@@ -563,38 +583,82 @@ impl TrackerCellKind {
                     _ => unreachable!(),
                 }),
                 style: if state.ram.save.quest_items.contains(*song) { CellStyle::Normal } else { CellStyle::Dimmed },
-                overlay: if Check::Location(check.to_string()).checked(state).unwrap_or(false) {
-                    CellOverlay::Image(ImageInfo::new("check"))
-                } else {
-                    CellOverlay::None
-                },
+                overlay: {
+                    let checked = if let Some(song_locations) = &state.knowledge.song_locations {
+                        if let Some(&MwItem { kind, .. }) = song_locations.iter().find(|loc| loc.key == song_location_key(check)) {
+                            if let Some(song) = QuestItems::from_get_item_id(kind) {
+                                state.ram.save.quest_items.contains(song)
+                            } else {
+                                Check::Location(check.to_string()).checked(state).unwrap_or(false)
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        Check::Location(check.to_string()).checked(state).unwrap_or(false)
+                    };
+                    if checked { CellOverlay::Image(ImageInfo::new("check")) } else { CellOverlay::None }
+                }
             },
             SongCheck { check, .. } => CellRender {
                 img: ImageInfo::extra("blank"),
                 style: CellStyle::Normal,
-                overlay: if Check::Location(check.to_string()).checked(state).unwrap_or(false) {
-                    CellOverlay::Image(ImageInfo::new("check"))
-                } else {
-                    CellOverlay::None
-                },
+                overlay: {
+                    let checked = if let Some(song_locations) = &state.knowledge.song_locations {
+                        if let Some(&MwItem { kind, .. }) = song_locations.iter().find(|loc| loc.key == song_location_key(check)) {
+                            if let Some(song) = QuestItems::from_get_item_id(kind) {
+                                state.ram.save.quest_items.contains(song)
+                            } else {
+                                Check::Location(check.to_string()).checked(state).unwrap_or(false)
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        Check::Location(check.to_string()).checked(state).unwrap_or(false)
+                    };
+                    if checked { CellOverlay::Image(ImageInfo::new("check")) } else { CellOverlay::None }
+                }
             },
             SunsSong => CellRender {
                 img: ImageInfo::new("sun"),
                 style: if state.ram.save.quest_items.contains(QuestItems::SUNS_SONG) { CellStyle::Normal } else { CellStyle::Dimmed },
-                overlay: if state.ram.save.suns_song_checked() {
-                    CellOverlay::Image(ImageInfo::new("check"))
-                } else {
-                    CellOverlay::None
-                },
+                overlay: {
+                    let checked = if let Some(song_locations) = &state.knowledge.song_locations {
+                        if let Some(&MwItem { kind, .. }) = song_locations.iter().find(|loc| loc.key == song_location_key("Song from Royal Familys Tomb")) {
+                            if let Some(song) = QuestItems::from_get_item_id(kind) {
+                                state.ram.save.quest_items.contains(song)
+                            } else {
+                                state.ram.save.suns_song_checked(state.knowledge.songs_as_items)
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        state.ram.save.suns_song_checked(state.knowledge.songs_as_items)
+                    };
+                    if checked { CellOverlay::Image(ImageInfo::new("check")) } else { CellOverlay::None }
+                }
             },
             SunsSongCheck => CellRender {
                 img: ImageInfo::extra("blank"),
                 style: CellStyle::Normal,
-                overlay: if state.ram.save.suns_song_checked() {
-                    CellOverlay::Image(ImageInfo::new("check"))
-                } else {
-                    CellOverlay::None
-                },
+                overlay: {
+                    let checked = if let Some(song_locations) = &state.knowledge.song_locations {
+                        if let Some(&MwItem { kind, .. }) = song_locations.iter().find(|loc| loc.key == song_location_key("Song from Royal Familys Tomb")) {
+                            if let Some(song) = QuestItems::from_get_item_id(kind) {
+                                state.ram.save.quest_items.contains(song)
+                            } else {
+                                state.ram.save.suns_song_checked(state.knowledge.songs_as_items)
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        state.ram.save.suns_song_checked(state.knowledge.songs_as_items)
+                    };
+                    if checked { CellOverlay::Image(ImageInfo::new("check")) } else { CellOverlay::None }
+                }
             },
             Spells => CellRender {
                 img: match (state.ram.save.inv.dins_fire, state.ram.save.inv.farores_wind, state.ram.save.inv.nayrus_love) {

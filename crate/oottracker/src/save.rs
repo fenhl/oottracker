@@ -764,6 +764,24 @@ impl QuestItems {
         + if self.contains(QuestItems::GORON_RUBY) { 1 } else { 0 }
         + if self.contains(QuestItems::ZORA_SAPPHIRE) { 1 } else { 0 }
     }
+
+    pub fn from_get_item_id(id: u16) -> Option<Self> {
+        match id {
+            0x00BB => Some(Self::MINUET_OF_FOREST),
+            0x00BC => Some(Self::BOLERO_OF_FIRE),
+            0x00BD => Some(Self::SERENADE_OF_WATER),
+            0x00BE => Some(Self::REQUIEM_OF_SPIRIT),
+            0x00BF => Some(Self::NOCTURNE_OF_SHADOW),
+            0x00C0 => Some(Self::PRELUDE_OF_LIGHT),
+            0x00C1 => Some(Self::ZELDAS_LULLABY),
+            0x00C2 => Some(Self::EPONAS_SONG),
+            0x00C3 => Some(Self::SARIAS_SONG),
+            0x00C4 => Some(Self::SUNS_SONG),
+            0x00C5 => Some(Self::SONG_OF_TIME),
+            0x00C6 => Some(Self::SONG_OF_STORMS),
+            _ => None,
+        }
+    }
 }
 
 impl From<Medallion> for QuestItems {
@@ -1266,22 +1284,26 @@ impl Save {
         }
     }
 
-    pub fn suns_song_checked(&self) -> bool {
-        //TODO only use this if SONGS_AS_ITEMS is off
-        let num_songs = self.quest_items.intersection(QuestItems::all_songs()).bits().count_ones();
-        let num_other_checks = 0
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_IMPA))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_MALON))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_SARIA))
-            + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SONG_FROM_OCARINA_OF_TIME))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_WINDMILL))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_FOREST))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_CRATER))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_ICE_CAVERN))
-            + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SHEIK_AT_COLOSSUS))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_KAKARIKO))
-            + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_AT_TEMPLE));
-        num_songs > num_other_checks
+    pub fn suns_song_checked(&self, songs_as_items: Option<bool>) -> bool {
+        match songs_as_items {
+            None | Some(false) => {
+                let num_songs = self.quest_items.intersection(QuestItems::all_songs()).bits().count_ones();
+                let num_other_checks = 0
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_IMPA))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_MALON))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_SARIA))
+                    + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SONG_FROM_OCARINA_OF_TIME))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_WINDMILL))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_FOREST))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_CRATER))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_ICE_CAVERN))
+                    + u32::from(self.event_chk_inf.10.contains(EventChkInf10::SHEIK_AT_COLOSSUS))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_IN_KAKARIKO))
+                    + u32::from(self.event_chk_inf.5.contains(EventChkInf5::SHEIK_AT_TEMPLE));
+                num_songs > num_other_checks
+            }
+            Some(true) => self.event_chk_inf.5.contains(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB),
+        }
     }
 
     pub fn toggle_suns_song_checked(&mut self) {

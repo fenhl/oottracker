@@ -36,6 +36,7 @@ use {
         model::*,
         region::Mq,
     },
+    crate::websocket::MwItem,
 };
 
 #[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq, Protocol, Deserialize, Serialize)]
@@ -63,6 +64,11 @@ pub struct Knowledge {
     pub mq: HashMap<Dungeon, Mq>,
     pub dungeon_reward_locations: HashMap<DungeonReward, DungeonRewardLocation>,
     pub progression_mode: ProgressionMode, //TODO automatically determine from remaining model state
+    pub songs_as_items: Option<bool>,
+    /// Filled by the multiworld plugin, if any, with items sent from song locations in this world.
+    ///
+    /// Can be used for more accurate song location check tracking when present.
+    pub song_locations: Option<HashSet<MwItem>>,
 }
 
 impl Knowledge {
@@ -70,33 +76,7 @@ impl Knowledge {
     pub fn vanilla() -> Knowledge {
         Knowledge {
             string_settings: collect![
-                format!("open_forest") => collect![format!("closed")],
-                format!("open_kakariko") => collect![format!("closed")],
-                format!("zora_fountain") => collect![format!("closed")],
                 format!("gerudo_fortress") => collect![format!("normal")],
-                format!("bridge") => collect![format!("vanilla")],
-                format!("logic_rules") => collect![format!("glitchless")],
-                format!("shuffle_song_items") => collect![format!("song")],
-                format!("shuffle_interior_entrances") => collect![format!("off")],
-                format!("mix_entrance_pools") => collect![format!("off")],
-                format!("shuffle_scrubs") => collect![format!("off")],
-                format!("shopsanity") => collect![format!("off")],
-                format!("tokensanity") => collect![format!("off")],
-                format!("shuffle_mapcompass") => collect![format!("vanilla")],
-                format!("shuffle_smallkeys") => collect![format!("vanilla")],
-                format!("shuffle_fortresskeys") => collect![format!("vanilla")],
-                format!("shuffle_bosskeys") => collect![format!("vanilla")],
-                format!("shuffle_ganon_bosskey") => collect![format!("vanilla")],
-                format!("logic_earliest_adult_trade") => collect![format!("pocket_egg")],
-                format!("logic_latest_adult_trade") => collect![format!("pocket_egg")],
-                format!("hints") => collect![format!("none")],
-                format!("hint_dist") => collect![format!("useless")],
-                format!("text_shuffle") => collect![format!("none")],
-                format!("ice_trap_appearance") => collect![format!("junk_only")],
-                format!("junk_ice_traps") => collect![format!("normal")],
-                format!("item_pool_value") => collect![format!("balanced")],
-                format!("damage_multiplier") => collect![format!("normal")],
-                format!("starting_tod") => collect![format!("default")],
             ],
             dungeon_reward_locations: collect![
                 DungeonReward::Stone(Stone::KokiriEmerald) => DungeonRewardLocation::Dungeon(MainDungeon::DekuTree),
@@ -124,36 +104,34 @@ impl Knowledge {
                 Dungeon::GanonsCastle => Mq::Vanilla,
             ],
             progression_mode: ProgressionMode::Go,
+            songs_as_items: Some(false),
+            song_locations: None,
         }
     }
 }
 
 pub enum Contradiction {
-    BoolSetting {
-        name: String,
-        lhs_enabled: bool,
-    },
     StringSetting {
         name: String,
         lhs_values: HashSet<String>,
         rhs_values: HashSet<String>,
     },
-    Trick {
-        name: String,
-        lhs_enabled: bool,
-    },
     Mq {
         dungeon: Dungeon,
         lhs_mq: Mq,
-    },
-    Trial {
-        trial: Medallion,
-        lhs_active: bool,
     },
     DungeonRewardLocation {
         reward: DungeonReward,
         lhs_location: DungeonRewardLocation,
         rhs_location: DungeonRewardLocation,
+    },
+    SongsAsItems {
+        lhs_enabled: bool,
+    },
+    SongLocation {
+        key: u64,
+        lhs_kind: u16,
+        rhs_kind: u16,
     },
 }
 
@@ -161,7 +139,7 @@ impl BitAnd for Knowledge {
     type Output = Result<Knowledge, Contradiction>;
 
     fn bitand(self, rhs: Knowledge) -> Result<Knowledge, Contradiction> {
-        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode: _ /*TODO*/ } = self;
+        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode: _ /*TODO*/, songs_as_items, song_locations } = self;
         Ok(Knowledge {
             string_settings: {
                 let mut string_settings = string_settings;
@@ -208,6 +186,29 @@ impl BitAnd for Knowledge {
                 dungeon_reward_locations
             },
             progression_mode: ProgressionMode::Normal, //TODO this should actually be recalculated from the rest of the knowledge, use a dummy value for now
+            songs_as_items: match (songs_as_items, rhs.songs_as_items) {
+                (None, None) => None,
+                (None, Some(value)) | (Some(value), None) => Some(value),
+                (Some(false), Some(false)) => Some(false),
+                (Some(true), Some(true)) => Some(true),
+                (Some(lhs_enabled), Some(_)) => return Err(Contradiction::SongsAsItems { lhs_enabled }),
+            },
+            song_locations: if let Some(mut song_locations) = song_locations {
+                if let Some(rhs_song_locations) = rhs.song_locations {
+                    for MwItem { source, key, kind: rhs_kind } in rhs_song_locations {
+                        if let Some(&MwItem { kind: lhs_kind, .. }) = song_locations.iter().find(|loc| loc.key == key) {
+                            if lhs_kind != rhs_kind {
+                                return Err(Contradiction::SongLocation { key, lhs_kind, rhs_kind })
+                            }
+                        } else {
+                            song_locations.insert(MwItem { source, key, kind: rhs_kind });
+                        }
+                    }
+                }
+                Some(song_locations)
+            } else {
+                rhs.song_locations
+            },
         })
     }
 }
@@ -221,6 +222,8 @@ impl Protocol for Knowledge {
                     mq: HashMap::read(stream).await?,
                     string_settings: HashMap::read(stream).await?,
                     progression_mode: ProgressionMode::read(stream).await?,
+                    songs_as_items: Option::read(stream).await?,
+                    song_locations: Option::read(stream).await?,
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
@@ -244,6 +247,8 @@ impl Protocol for Knowledge {
                 self.mq.write(sink).await?;
                 self.string_settings.write(sink).await?;
                 self.progression_mode.write(sink).await?;
+                self.songs_as_items.write(sink).await?;
+                self.song_locations.write(sink).await?;
             }
             Ok(())
         })
@@ -256,6 +261,8 @@ impl Protocol for Knowledge {
                 mq: HashMap::read_sync(stream)?,
                 string_settings: HashMap::read_sync(stream)?,
                 progression_mode: ProgressionMode::read_sync(stream)?,
+                songs_as_items: Option::read_sync(stream)?,
+                song_locations: Option::read_sync(stream)?,
             },
             1 => Knowledge::default(),
             2 => Knowledge::vanilla(),
@@ -276,6 +283,8 @@ impl Protocol for Knowledge {
             self.dungeon_reward_locations.write_sync(sink)?;
             self.mq.write_sync(sink)?;
             self.string_settings.write_sync(sink)?;
+            self.songs_as_items.write_sync(sink)?;
+            self.song_locations.write_sync(sink)?;
         }
         Ok(())
     }
@@ -293,7 +302,7 @@ struct KnowledgeJson { // knowledge in what should eventually be a superset of t
 
 impl From<Knowledge> for KnowledgeJson {
     fn from(knowledge: Knowledge) -> Self {
-        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode } = knowledge;
+        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode, songs_as_items: _, song_locations: _ } = knowledge;
         let mut settings = HashMap::default();
         settings.extend(string_settings.into_iter().map(|(setting, values)| (setting, json!(values))));
         let mut locations = HashMap::<_, Vec<Item>>::new();
@@ -344,6 +353,8 @@ impl TryFrom<KnowledgeJson> for Knowledge {
         Ok(Self {
             string_settings, dungeon_reward_locations, progression_mode,
             mq: dungeons.into_iter().map(|(dungeon, mq)| Ok::<_, KnowledgeFromJsonError>((dungeon.parse().map_err(|()| KnowledgeFromJsonError::UnknownDungeon(dungeon))?, mq))).try_collect()?,
+            songs_as_items: None,
+            song_locations: None,
         })
     }
 }

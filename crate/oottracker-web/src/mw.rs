@@ -160,7 +160,7 @@ impl MwState {
                                 world.queue.push(item);
                             }
                         }
-                        world.model.ram.save.recv_mw_item(item.kind)?;
+                        world.model.recv_mw_item(item)?;
                         world.tx.send(()).expect("failed to notify websockets about state change");
                     }
                 } else {
@@ -172,14 +172,14 @@ impl MwState {
                             world.queue.push(item);
                         }
                     }
-                    world.model.ram.save.recv_mw_item(item.kind)?;
+                    world.model.recv_mw_item(item)?;
                     world.tx.send(()).expect("failed to notify websockets about state change");
                 }
             }
             AutoUpdate::Reset { world, save } => if let Some(world) = self.world_mut(world) {
                 world.model.ram.save = save;
                 for &item in &world.queue[world.model.ram.save.inv_amounts.num_received_mw_items.into()..] {
-                    world.model.ram.save.recv_mw_item(item.kind)?;
+                    world.model.recv_mw_item(item)?;
                 }
                 world.tx.send(()).expect("failed to notify websockets about state change");
             } else {
