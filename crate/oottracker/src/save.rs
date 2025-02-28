@@ -1284,6 +1284,10 @@ impl Save {
         num_songs > num_other_checks
     }
 
+    pub fn toggle_suns_song_checked(&mut self) {
+        self.event_chk_inf.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB); //TODO this is a derived cell display
+    }
+
     pub fn recv_mw_item(&mut self, item: u16) -> Result<(), ()> {
         self.inv_amounts.num_received_mw_items += 1;
         match item {

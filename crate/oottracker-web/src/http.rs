@@ -52,6 +52,7 @@ use {
         Rooms,
         edit_room,
         get_room,
+        mw,
         restream::render_double_cell,
     },
 };
@@ -155,7 +156,7 @@ async fn mw_room_view(mw_rooms: &State<MwRooms>, room: &str, world: NonZero<u8>,
         mw_room.write().await.autotracker_delay = Duration::try_from_secs_f64(delay).ok()?;
     }
     let mw_room = mw_room.read().await;
-    let (_, _, model, _, _) = mw_room.world(world)?;
+    let mw::WorldStateRef { model, .. } = mw_room.world(world)?;
     Some(tracker_page(&layout.to_string(), theme, html! {
         @for cell in layout.cells() {
             @let cell_id = cell.idx.try_into().expect("too many cells");
@@ -170,7 +171,7 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZero<u8>, lay
         let mw_rooms = mw_rooms.read().await;
         let mw_room = mw_rooms.get(room).ok_or(NotFound("No such multiworld room"))?;
         let mut mw_room = mw_room.write().await;
-        let (tx, _, model, _, _) = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
+        let mw::WorldStateMut { tx, model, .. } = mw_room.world_mut(world).ok_or(NotFound("No such world"))?;
         layout.cells().get(usize::from(cell_id)).ok_or(NotFound("No such cell"))?.id.kind().click(model);
         tx.send(()).expect("failed to notify websockets about state change");
     }
@@ -253,7 +254,7 @@ async fn test_mw_notes() {
     };
     RANDO_VERSION.clone_repo().await.unwrap();
     let modules = RANDO_VERSION.py_modules(python).unwrap();
-    let mw_room = crate::mw::MwState::new(Vec::default());
+    let mw_room = mw::MwState::new(Vec::default());
     let source_world = NonZero::new(1).unwrap();
     let key = 0x2801_0000_0000_0000;
     let kind = 0x000D;
@@ -287,7 +288,7 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
             }
             body {
                 div(class = "table-wrapper") {
-                    @for (idx, (_, _, _, queue, own_items)) in mw_room.worlds.iter().enumerate() {
+                    @for (idx, mw::WorldState { queue, own_items, .. }) in mw_room.worlds.iter().enumerate() {
                         @let world_id = NonZero::new((idx + 1).try_into().unwrap()).unwrap();
                         div {
                             h1(class? = world_class(world_id)) {

@@ -57,8 +57,34 @@ pub(crate) enum AutoUpdate {
     },
 }
 
+pub(crate) struct WorldState {
+    tx: watch::Sender<()>,
+    rx: watch::Receiver<()>,
+    model: ModelState,
+    pub(crate) queue: Vec<MwItem>,
+    pub(crate) own_items: HashSet<MwItem>,
+}
+
+#[allow(unused)] // for consistency with `WorldState` and `WorldStateMut`
+pub(crate) struct WorldStateRef<'a> {
+    pub(crate) tx: &'a watch::Sender<()>,
+    pub(crate) rx: &'a watch::Receiver<()>,
+    pub(crate) model: &'a ModelState,
+    pub(crate) queue: &'a [MwItem],
+    pub(crate) own_items: &'a HashSet<MwItem>,
+}
+
+#[allow(unused)] // for consistency with `WorldState` and `WorldStateRef`
+pub(crate) struct WorldStateMut<'a> {
+    pub(crate) tx: &'a watch::Sender<()>,
+    pub(crate) rx: &'a watch::Receiver<()>,
+    pub(crate) model: &'a mut ModelState,
+    pub(crate) queue: &'a mut Vec<MwItem>,
+    pub(crate) own_items: &'a mut HashSet<MwItem>,
+}
+
 pub(crate) struct MwState {
-    pub(crate) worlds: Vec<(watch::Sender<()>, watch::Receiver<()>, ModelState, Vec<MwItem>, HashSet<MwItem>)>,
+    pub(crate) worlds: Vec<WorldState>,
     pub(crate) autotracker_delay: Duration,
     pub(crate) incoming_queue: mpsc::UnboundedSender<AutoUpdate>,
     pub(crate) location_cache: HashMap<NonZero<u8>, HashMap<u64, String>>,
@@ -71,7 +97,7 @@ impl MwState {
         let this = Arc::new(RwLock::new(Self {
             worlds: worlds.into_iter().map(|(model, queue)| {
                 let (tx, rx) = watch::channel(());
-                (tx, rx, model, queue, HashSet::default())
+                WorldState { tx, rx, model, queue, own_items: HashSet::default() }
             }).collect(),
             autotracker_delay: Duration::default(),
             location_cache: HashMap::default(),
@@ -104,64 +130,64 @@ impl MwState {
         this
     }
 
-    pub(crate) fn world(&self, world: NonZero<u8>) -> Option<(&watch::Sender<()>, &watch::Receiver<()>, &ModelState, &[MwItem], &HashSet<MwItem>)> {
-        self.worlds.get(usize::from(world.get() - 1)).map(|(tx, rx, model, queue, own_items)| (tx, rx, model, &**queue, own_items))
+    pub(crate) fn world(&self, world: NonZero<u8>) -> Option<WorldStateRef<'_>> {
+        self.worlds.get(usize::from(world.get() - 1)).map(|WorldState { tx, rx, model, queue, own_items }| WorldStateRef { tx, rx, model, queue: &**queue, own_items })
     }
 
-    pub(crate) fn world_mut(&mut self, world: NonZero<u8>) -> Option<(&watch::Sender<()>, &watch::Receiver<()>, &mut ModelState, &mut Vec<MwItem>, &mut HashSet<MwItem>)> {
-        self.worlds.get_mut(usize::from(world.get() - 1)).map(|(tx, rx, model, queue, own_items)| (&*tx, &*rx, model, queue, own_items))
+    pub(crate) fn world_mut(&mut self, world: NonZero<u8>) -> Option<WorldStateMut<'_>> {
+        self.worlds.get_mut(usize::from(world.get() - 1)).map(|WorldState { tx, rx, model, queue, own_items }| WorldStateMut { tx: &*tx, rx: &*rx, model, queue, own_items })
     }
 
     fn handle_auto_update(&mut self, update: AutoUpdate) -> Result<(), ()> {
         match update {
             AutoUpdate::Queue { item, target_world } => {
                 if item.key == 0x4d00_0000_0000_000f { // Market 10 Big Poes
-                    let (tx, _, model, _, _) = self.world_mut(item.source).ok_or(())?;
-                    for bottle in &mut model.ram.save.inv.bottles {
+                    let source_world = self.world_mut(item.source).ok_or(())?;
+                    for bottle in &mut source_world.model.ram.save.inv.bottles {
                         if *bottle == Bottle::BigPoe {
                             *bottle = Bottle::Empty;
-                            tx.send(()).expect("failed to notify websockets about state change");
+                            source_world.tx.send(()).expect("failed to notify websockets about state change");
                             break
                         }
                     }
                 }
                 if item.kind == TRIFORCE_PIECE {
-                    for (idx, (tx, _, model, queue, own_items)) in self.worlds.iter_mut().enumerate() {
+                    for (idx, world) in self.worlds.iter_mut().enumerate() {
                         if idx == usize::from(item.source.get()) - 1 {
-                            own_items.insert(item);
+                            world.own_items.insert(item);
                         } else {
-                            if !queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
-                                queue.push(item);
+                            if !world.queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
+                                world.queue.push(item);
                             }
                         }
-                        model.ram.save.recv_mw_item(item.kind)?;
-                        tx.send(()).expect("failed to notify websockets about state change");
+                        world.model.ram.save.recv_mw_item(item.kind)?;
+                        world.tx.send(()).expect("failed to notify websockets about state change");
                     }
                 } else {
-                    let (tx, _, model, queue, own_items) = self.world_mut(target_world).ok_or(())?;
+                    let world = self.world_mut(target_world).ok_or(())?;
                     if item.source == target_world {
-                        own_items.insert(item);
+                        world.own_items.insert(item);
                     } else {
-                        if !queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
-                            queue.push(item);
+                        if !world.queue.iter().any(|iter_item| iter_item.source == item.source && iter_item.key == item.key) {
+                            world.queue.push(item);
                         }
                     }
-                    model.ram.save.recv_mw_item(item.kind)?;
-                    tx.send(()).expect("failed to notify websockets about state change");
+                    world.model.ram.save.recv_mw_item(item.kind)?;
+                    world.tx.send(()).expect("failed to notify websockets about state change");
                 }
             }
-            AutoUpdate::Reset { world, save } => if let Some((tx, _, model, queue, _)) = self.world_mut(world) {
-                model.ram.save = save;
-                for &item in &queue[model.ram.save.inv_amounts.num_received_mw_items.into()..] {
-                    model.ram.save.recv_mw_item(item.kind)?;
+            AutoUpdate::Reset { world, save } => if let Some(world) = self.world_mut(world) {
+                world.model.ram.save = save;
+                for &item in &world.queue[world.model.ram.save.inv_amounts.num_received_mw_items.into()..] {
+                    world.model.ram.save.recv_mw_item(item.kind)?;
                 }
-                tx.send(()).expect("failed to notify websockets about state change");
+                world.tx.send(()).expect("failed to notify websockets about state change");
             } else {
                 return Err(())
             },
-            AutoUpdate::DungeonRewardLocation { world, reward, location } => if let Some((tx, _, model, _, _)) = self.world_mut(world) {
-                if model.knowledge.dungeon_reward_locations.insert(reward, location) != Some(location) {
-                    tx.send(()).expect("failed to notify websockets about state change");
+            AutoUpdate::DungeonRewardLocation { world, reward, location } => if let Some(world) = self.world_mut(world) {
+                if world.model.knowledge.dungeon_reward_locations.insert(reward, location) != Some(location) {
+                    world.tx.send(()).expect("failed to notify websockets about state change");
                 }
             } else {
                 return Err(())

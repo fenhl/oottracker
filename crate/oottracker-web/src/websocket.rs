@@ -30,6 +30,7 @@ use {
         edit_room,
         get_room,
         mw::{
+            self,
             AutoUpdate,
             MwState,
         },
@@ -286,7 +287,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 };
                 let mut mw_room = mw_room.write().await;
                 let (tx, model) = match mw_room.world_mut(world) {
-                    Some((tx, _, model, _, _)) => (tx, model),
+                    Some(mw::WorldStateMut { tx, model, .. }) => (tx, model),
                     None => {
                         let _ = ServerMessage::from_error("no such world").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
                         return Ok(())
@@ -321,7 +322,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                         };
                         let mw_room = mw_room.read().await;
                         let (rx, model) = match mw_room.world(world) {
-                            Some((_, rx, model, _, _)) => (rx, model),
+                            Some(mw::WorldStateRef { rx, model, .. }) => (rx, model),
                             None => {
                                 let _ = ServerMessage::from_error("no such world").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
                                 return
@@ -345,7 +346,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                             };
                             let mw_room = mw_room.read().await;
                             let model = match mw_room.world(world) {
-                                Some((_, _, model, _, _)) => model,
+                                Some(mw::WorldStateRef { model, .. }) => model,
                                 None => {
                                     let _ = ServerMessage::from_error("no such world").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
                                     return

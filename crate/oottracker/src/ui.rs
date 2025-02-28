@@ -825,7 +825,7 @@ impl TrackerCellKind {
                     }
                 }
                 Song { toggle_overlay, .. } => toggle_overlay(&mut state.ram.save.event_chk_inf),
-                SunsSong => state.ram.save.event_chk_inf.5.toggle(EventChkInf5::SONG_FROM_ROYAL_FAMILYS_TOMB), //TODO this is a derived cell display
+                SunsSong => state.ram.save.toggle_suns_song_checked(),
                 Spells => state.ram.save.inv.farores_wind = !state.ram.save.inv.farores_wind,
                 StoneLocation(stone) => state.knowledge.dungeon_reward_locations.decrement(DungeonReward::Stone(*stone)),
                 StoneWithLocation(stone) => state.ram.save.quest_items.toggle(QuestItems::from(stone)),
