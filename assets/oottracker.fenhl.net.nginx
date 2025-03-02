@@ -32,6 +32,14 @@ server {
         root /opt/git/github.com/fenhl/oottracker/branch/mw/assets/web;
     }
 
+    error_page 502 /error/502.html;
+    error_page 504 /error/504.html;
+
+    location /error/ {
+        root /opt/git/github.com/fenhl/oottracker/branch/mw/assets;
+        internal;
+    }
+
     location /websocket {
         proxy_http_version 1.1;
         proxy_buffering off;
