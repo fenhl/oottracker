@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3"
-iced_core = "0.5"
 itertools = "0.14"
 lazy-regex = "3"
 rocket = "0.5"
@@ -28,7 +27,7 @@ branch = "main"
 
 [dependencies.oottracker]
 path = "../oottracker"
-features = ["iced", "rocket"]
+features = ["rocket"]
 
 [dependencies.rocket-util]
 git = "https://github.com/fenhl/rocket-util"

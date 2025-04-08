@@ -49,7 +49,6 @@ use {
         websocket::MwItem,
     },
 };
-#[cfg(feature = "iced")] use iced::keyboard::Modifiers as KeyboardModifiers;
 #[cfg(feature = "rocket")] use {
     rocket::{
         http::uri::fmt::{
@@ -807,9 +806,8 @@ impl TrackerCellKind {
         }
     }
 
-    #[cfg(feature = "iced")]
     /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn left_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
+    #[must_use] pub fn left_click(&self, can_change_state: bool, shift: bool, state: &mut ModelState) -> bool {
         #[cfg(target_os = "macos")] if keyboard_modifiers.control() {
             return self.right_click(can_change_state, keyboard_modifiers, state)
         }
@@ -823,7 +821,7 @@ impl TrackerCellKind {
                 },
                 Count { get, set, max, step, .. } => {
                     let current = get(state);
-                    set(state, if current == *max { 0 } else { current.saturating_add(step * if keyboard_modifiers.shift() && *max >= 10 { 10 } else { 1 }).min(*max) });
+                    set(state, if current == *max { 0 } else { current.saturating_add(step * if shift && *max >= 10 { 10 } else { 1 }).min(*max) });
                 }
                 GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
                     ProgressionMode::Normal => ProgressionMode::Go,
@@ -831,13 +829,13 @@ impl TrackerCellKind {
                     ProgressionMode::Bk => ProgressionMode::Done,
                     ProgressionMode::Done => ProgressionMode::Bk,
                 },
-                MagicLens => state.ram.save.magic = match (keyboard_modifiers.shift(), state.ram.save.magic) {
+                MagicLens => state.ram.save.magic = match (shift, state.ram.save.magic) {
                     (true, MagicCapacity::Large) => MagicCapacity::Small,
                     (true, _) => MagicCapacity::Large,
                     (false, MagicCapacity::None) => MagicCapacity::Small,
                     (false, _) => MagicCapacity::None,
                 },
-                Spells => if keyboard_modifiers.shift() {
+                Spells => if shift {
                     state.ram.save.inv.nayrus_love = !state.ram.save.inv.nayrus_love;
                 } else {
                     state.ram.save.inv.dins_fire = !state.ram.save.inv.dins_fire;
@@ -848,9 +846,8 @@ impl TrackerCellKind {
         false
     }
 
-    #[cfg(feature = "iced")]
     /// Returns `true` if the menu should be opened.
-    #[must_use] pub fn right_click(&self, can_change_state: bool, keyboard_modifiers: KeyboardModifiers, state: &mut ModelState) -> bool { //TODO shift-click support
+    #[must_use] pub fn right_click(&self, can_change_state: bool, shift: bool, state: &mut ModelState) -> bool {
         if let Medallion(_) = self { return true }
         if can_change_state {
             match self {
@@ -867,7 +864,7 @@ impl TrackerCellKind {
                 },
                 Count { get, set, max, step, .. } => {
                     let current = get(state);
-                    set(state, if current == 0 { *max } else { current.saturating_sub(step * if keyboard_modifiers.shift() && *max >= 10 { 10 } else { 1 }) });
+                    set(state, if current == 0 { *max } else { current.saturating_sub(step * if shift && *max >= 10 { 10 } else { 1 }) });
                 }
                 GoBk => state.knowledge.progression_mode = match state.knowledge.progression_mode {
                     ProgressionMode::Normal => ProgressionMode::Bk,
@@ -2510,13 +2507,6 @@ impl OverlayImageInfo {
 
 pub trait FromEmbeddedImage {
     fn from_embedded_image(contents: &'static [u8]) -> Self;
-}
-
-#[cfg(feature = "iced")]
-impl FromEmbeddedImage for iced::widget::Image {
-    fn from_embedded_image(contents: &'static [u8]) -> iced::widget::Image {
-        iced::widget::Image::new(iced::widget::image::Handle::from_memory(contents.to_vec()))
-    }
 }
 
 impl FromEmbeddedImage for DynamicImage {

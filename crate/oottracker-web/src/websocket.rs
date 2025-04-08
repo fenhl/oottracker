@@ -9,7 +9,6 @@ use {
         SplitStream,
         StreamExt as _,
     },
-    iced_core::keyboard::Modifiers as KeyboardModifiers,
     rocket_ws::Message,
     sqlx::PgPool,
     tokio::{
@@ -198,9 +197,9 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 };
                 if right {
-                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), runner);
+                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, false, runner);
                 } else {
-                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), runner);
+                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, false, runner);
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
@@ -254,9 +253,9 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 };
                 edit_room(pool, &rooms, room, |room| {
                     if right {
-                        let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
+                        let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, false, &mut room.model);
                     } else {
-                        let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), &mut room.model);
+                        let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, false, &mut room.model);
                     }
                     Ok(())
                 }).await?;
@@ -301,9 +300,9 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 };
                 if right {
-                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), model);
+                    let _ /* no med right-click menu in web app */ = cell.kind().right_click(true /*TODO verify that the client has access?*/, false, model);
                 } else {
-                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, KeyboardModifiers::default(), model);
+                    let _ /* no med right-click menu in web app */ = cell.kind().left_click(true /*TODO verify that the client has access?*/, false, model);
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
