@@ -376,6 +376,11 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             },
+            ClientMessage::MwCurrentScene { room, world, scene } => if let Some(room) = mw_rooms.read().await.get(&room) {
+                let _ = room.read().await.incoming_queue.send(AutoUpdate::CurrentScene { world, scene });
+            } else {
+                let _ = ServerMessage::from_error("no such multiworld room").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
+            },
         }
     }
 }

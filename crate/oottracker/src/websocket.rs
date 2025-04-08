@@ -117,6 +117,11 @@ pub enum ClientMessage {
         reward: DungeonReward,
         location: DungeonRewardLocation,
     },
+    MwCurrentScene {
+        room: String,
+        world: NonZero<u8>,
+        scene: u8,
+    },
 }
 
 #[derive(Protocol)]

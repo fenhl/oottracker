@@ -77,6 +77,23 @@ pub enum DungeonReward {
     Stone(Stone),
 }
 
+impl DungeonReward {
+    pub fn from_get_item_id(id: u16) -> Option<Self> {
+        match id {
+            0x0127 => Some(Self::Stone(Stone::KokiriEmerald)),
+            0x0128 => Some(Self::Stone(Stone::GoronRuby)),
+            0x0129 => Some(Self::Stone(Stone::ZoraSapphire)),
+            0x012A => Some(Self::Medallion(Medallion::Light)),
+            0x012B => Some(Self::Medallion(Medallion::Forest)),
+            0x012C => Some(Self::Medallion(Medallion::Fire)),
+            0x012D => Some(Self::Medallion(Medallion::Water)),
+            0x012E => Some(Self::Medallion(Medallion::Shadow)),
+            0x012F => Some(Self::Medallion(Medallion::Spirit)),
+            _ => None,
+        }
+    }
+}
+
 impl FromStr for DungeonReward {
     type Err = ();
 
@@ -121,6 +138,21 @@ pub enum DungeonRewardLocation {
 }
 
 impl DungeonRewardLocation {
+    pub fn from_override_key(key: u64) -> Option<Self> {
+        match key {
+            0xff05_0000_0000_0004 => Some(Self::LinksPocket),
+            0xff05_0000_0000_0005 => Some(Self::Dungeon(MainDungeon::DekuTree)),
+            0xff05_0000_0000_0006 => Some(Self::Dungeon(MainDungeon::DodongosCavern)),
+            0xff05_0000_0000_0007 => Some(Self::Dungeon(MainDungeon::JabuJabu)),
+            0xff05_0000_0000_0008 => Some(Self::Dungeon(MainDungeon::ForestTemple)),
+            0xff05_0000_0000_0009 => Some(Self::Dungeon(MainDungeon::FireTemple)),
+            0xff05_0000_0000_000a => Some(Self::Dungeon(MainDungeon::WaterTemple)),
+            0xff05_0000_0000_000c => Some(Self::Dungeon(MainDungeon::ShadowTemple)),
+            0xff05_0000_0000_000b => Some(Self::Dungeon(MainDungeon::SpiritTemple)),
+            _ => None,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::LinksPocket => "Links Pocket",
@@ -163,6 +195,35 @@ pub enum MainDungeon {
 }
 
 impl MainDungeon {
+    pub fn from_scene(scene: u8) -> Option<Self> {
+        match scene {
+            0x00 => Some(Self::DekuTree),
+            0x01 => Some(Self::DodongosCavern),
+            0x02 => Some(Self::JabuJabu),
+            0x03 => Some(Self::ForestTemple),
+            0x04 => Some(Self::FireTemple),
+            0x05 => Some(Self::WaterTemple),
+            0x07 => Some(Self::ShadowTemple),
+            0x06 => Some(Self::SpiritTemple),
+            _ => None,
+        }
+    }
+
+    //HACK: there should be a separate Boss type for better type safety in boss ER
+    pub fn from_boss_room(scene: u8) -> Option<Self> {
+        match scene {
+            0x11 => Some(Self::DekuTree),
+            0x12 => Some(Self::DodongosCavern),
+            0x13 => Some(Self::JabuJabu),
+            0x14 => Some(Self::ForestTemple),
+            0x15 => Some(Self::FireTemple),
+            0x16 => Some(Self::WaterTemple),
+            0x18 => Some(Self::ShadowTemple),
+            0x17 => Some(Self::SpiritTemple),
+            _ => None,
+        }
+    }
+
     pub fn from_reward_location(loc: &str) -> Option<Self> {
         match loc {
             "Queen Gohma" => Some(Self::DekuTree),

@@ -28,6 +28,7 @@ use {
     ootr::model::{
         DungeonReward,
         DungeonRewardLocation,
+        MainDungeon,
     },
     oottracker::{
         ModelState,
@@ -54,6 +55,10 @@ pub(crate) enum AutoUpdate {
         world: NonZero<u8>,
         reward: DungeonReward,
         location: DungeonRewardLocation,
+    },
+    CurrentScene {
+        world: NonZero<u8>,
+        scene: u8,
     },
 }
 
@@ -163,6 +168,21 @@ impl MwState {
                         world.model.recv_mw_item(item)?;
                         world.tx.send(()).expect("failed to notify websockets about state change");
                     }
+                } else if let Some(reward) = DungeonReward::from_get_item_id(item.kind) {
+                    if item.source == target_world {
+                        if let Some(location) = DungeonRewardLocation::from_override_key(item.key) {
+                            let target_world = self.world_mut(target_world).ok_or(())?;
+                            if let Some(location) = match location {
+                                DungeonRewardLocation::LinksPocket => Some(DungeonRewardLocation::LinksPocket),
+                                //HACK: check target world instead of source world since they've been checked to be equal above
+                                DungeonRewardLocation::Dungeon(boss_room) => target_world.model.knowledge.boss_entrances.iter().find(|(_, v)| **v == boss_room).map(|(k, _)| DungeonRewardLocation::Dungeon(*k)),
+                            } {
+                                if target_world.model.knowledge.dungeon_reward_locations.insert(reward, location) != Some(location) {
+                                    target_world.tx.send(()).expect("failed to notify websockets about state change");
+                                }
+                            }
+                        }
+                    }
                 } else {
                     let world = self.world_mut(target_world).ok_or(())?;
                     if item.source == target_world {
@@ -188,6 +208,17 @@ impl MwState {
             AutoUpdate::DungeonRewardLocation { world, reward, location } => if let Some(world) = self.world_mut(world) {
                 if world.model.knowledge.dungeon_reward_locations.insert(reward, location) != Some(location) {
                     world.tx.send(()).expect("failed to notify websockets about state change");
+                }
+            } else {
+                return Err(())
+            },
+            AutoUpdate::CurrentScene { world, scene } => if let Some(world) = self.world_mut(world) {
+                if let Some(boss_room) = MainDungeon::from_boss_room(scene) {
+                    if let Some(dungeon) = world.model.knowledge.last_dungeon.take() {
+                        world.model.knowledge.boss_entrances.insert(dungeon, boss_room);
+                    }
+                } else {
+                    world.model.knowledge.last_dungeon = MainDungeon::from_scene(scene);
                 }
             } else {
                 return Err(())

@@ -192,6 +192,5 @@ pub(crate) fn read_knowledge(mut text: &[u8]) -> Knowledge {
             knowledge.dungeon_reward_locations.insert(reward, loc);
         }
     }
-    //TODO other info (e.g. Jabu dungeon reward)
     knowledge
 }

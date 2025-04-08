@@ -69,6 +69,11 @@ pub struct Knowledge {
     ///
     /// Can be used for more accurate song location check tracking when present.
     pub song_locations: Option<HashSet<MwItem>>,
+    /// Filled by the multiworld plugin, if any, with data to help display dungeon reward locations accurately in boss ER.
+    pub last_dungeon: Option<MainDungeon>,
+    /// Filled by the multiworld plugin, if any, with data to help display dungeon reward locations accurately in boss ER.
+    //HACK: values should be boss rooms, not main dungeons; need to untangle usages of MainDungeon with respect to reward locations
+    pub boss_entrances: HashMap<MainDungeon, MainDungeon>,
 }
 
 impl Knowledge {
@@ -106,6 +111,8 @@ impl Knowledge {
             progression_mode: ProgressionMode::Go,
             songs_as_items: Some(false),
             song_locations: None,
+            last_dungeon: None,
+            boss_entrances: HashMap::default(),
         }
     }
 }
@@ -133,13 +140,18 @@ pub enum Contradiction {
         lhs_kind: u16,
         rhs_kind: u16,
     },
+    BossEntrance {
+        dungeon: MainDungeon,
+        lhs_boss_room: MainDungeon,
+        rhs_boss_room: MainDungeon,
+    },
 }
 
 impl BitAnd for Knowledge {
     type Output = Result<Knowledge, Contradiction>;
 
     fn bitand(self, rhs: Knowledge) -> Result<Knowledge, Contradiction> {
-        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode: _ /*TODO*/, songs_as_items, song_locations } = self;
+        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode: _ /*TODO*/, songs_as_items, song_locations, last_dungeon, boss_entrances } = self;
         Ok(Knowledge {
             string_settings: {
                 let mut string_settings = string_settings;
@@ -209,6 +221,20 @@ impl BitAnd for Knowledge {
             } else {
                 rhs.song_locations
             },
+            last_dungeon: rhs.last_dungeon.or(last_dungeon),
+            boss_entrances: {
+                let mut boss_entrances = boss_entrances;
+                for (dungeon, rhs_boss_room) in rhs.boss_entrances {
+                    if let Some(&lhs_boss_room) = boss_entrances.get(&dungeon) {
+                        if lhs_boss_room != rhs_boss_room {
+                            return Err(Contradiction::BossEntrance { dungeon, lhs_boss_room, rhs_boss_room })
+                        }
+                    } else {
+                        boss_entrances.insert(dungeon, rhs_boss_room);
+                    }
+                }
+                boss_entrances
+            },
         })
     }
 }
@@ -224,6 +250,8 @@ impl Protocol for Knowledge {
                     progression_mode: ProgressionMode::read(stream).await?,
                     songs_as_items: Option::read(stream).await?,
                     song_locations: Option::read(stream).await?,
+                    last_dungeon: Option::read(stream).await?,
+                    boss_entrances: HashMap::read(stream).await?,
                 },
                 1 => Knowledge::default(),
                 2 => Knowledge::vanilla(),
@@ -249,6 +277,8 @@ impl Protocol for Knowledge {
                 self.progression_mode.write(sink).await?;
                 self.songs_as_items.write(sink).await?;
                 self.song_locations.write(sink).await?;
+                self.last_dungeon.write(sink).await?;
+                self.boss_entrances.write(sink).await?;
             }
             Ok(())
         })
@@ -263,6 +293,8 @@ impl Protocol for Knowledge {
                 progression_mode: ProgressionMode::read_sync(stream)?,
                 songs_as_items: Option::read_sync(stream)?,
                 song_locations: Option::read_sync(stream)?,
+                last_dungeon: Option::read_sync(stream)?,
+                boss_entrances: HashMap::read_sync(stream)?,
             },
             1 => Knowledge::default(),
             2 => Knowledge::vanilla(),
@@ -285,6 +317,8 @@ impl Protocol for Knowledge {
             self.string_settings.write_sync(sink)?;
             self.songs_as_items.write_sync(sink)?;
             self.song_locations.write_sync(sink)?;
+            self.last_dungeon.write_sync(sink)?;
+            self.boss_entrances.write_sync(sink)?;
         }
         Ok(())
     }
@@ -302,7 +336,7 @@ struct KnowledgeJson { // knowledge in what should eventually be a superset of t
 
 impl From<Knowledge> for KnowledgeJson {
     fn from(knowledge: Knowledge) -> Self {
-        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode, songs_as_items: _, song_locations: _ } = knowledge;
+        let Knowledge { string_settings, mq, dungeon_reward_locations, progression_mode, songs_as_items: _, song_locations: _, last_dungeon: _, boss_entrances: _ } = knowledge;
         let mut settings = HashMap::default();
         settings.extend(string_settings.into_iter().map(|(setting, values)| (setting, json!(values))));
         let mut locations = HashMap::<_, Vec<Item>>::new();
@@ -355,6 +389,8 @@ impl TryFrom<KnowledgeJson> for Knowledge {
             mq: dungeons.into_iter().map(|(dungeon, mq)| Ok::<_, KnowledgeFromJsonError>((dungeon.parse().map_err(|()| KnowledgeFromJsonError::UnknownDungeon(dungeon))?, mq))).try_collect()?,
             songs_as_items: None,
             song_locations: None,
+            last_dungeon: None,
+            boss_entrances: HashMap::default(),
         })
     }
 }
