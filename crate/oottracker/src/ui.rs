@@ -808,9 +808,6 @@ impl TrackerCellKind {
 
     /// Returns `true` if the menu should be opened.
     #[must_use] pub fn left_click(&self, can_change_state: bool, shift: bool, state: &mut ModelState) -> bool {
-        #[cfg(target_os = "macos")] if keyboard_modifiers.control() {
-            return self.right_click(can_change_state, keyboard_modifiers, state)
-        }
         if can_change_state {
             match self {
                 Composite { toggle_left, .. } | Overlay { toggle_main: toggle_left, .. } => toggle_left(state),
