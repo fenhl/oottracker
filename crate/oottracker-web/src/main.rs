@@ -176,12 +176,14 @@ async fn main() -> Result<(), Error> {
     let restreams = {
         //TODO remove hardcoded restream, allow configuring active restreams somehow
         let mut map = HashMap::default();
-        let multiworld_3v3 = vec![
-            vec!["a1", "b1"],
-            vec!["a2", "b2"],
-            vec!["a3", "b3"],
-        ];
-        map.insert(format!("fenhl"), RestreamState::new(multiworld_3v3));
+        for restreamer in ["fenhl", "utz"] {
+            let multiworld_3v3 = vec![
+                vec!["a1", "b1"],
+                vec!["a2", "b2"],
+                vec!["a3", "b3"],
+            ];
+            map.insert(restreamer.to_owned(), RestreamState::new(multiworld_3v3));
+        }
         Restreams::new(RwLock::new(map))
     };
     let mw_rooms = MwRooms::default();
