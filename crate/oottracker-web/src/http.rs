@@ -178,6 +178,30 @@ async fn mw_click(mw_rooms: &State<MwRooms>, room: &str, world: NonZero<u8>, lay
     Ok(Redirect::to(rocket::uri!(mw_room_view(room, world, layout, _, _))))
 }
 
+#[rocket::get("/mw/<room1>/<world>/<layout>/with/<room2>?<theme>&<delay>")]
+async fn mw_double_room_layout(mw_rooms: &State<MwRooms>, room1: &str, world: NonZero<u8>, layout: DoubleTrackerLayout, room2: &str, theme: Option<Theme>, delay: Option<f64>) -> Option<RawHtml<String>> {
+    let mw_rooms = mw_rooms.read().await;
+    let mw_room1 = mw_rooms.get(room1)?;
+    let mw_room2 = mw_rooms.get(room2)?;
+    if let Some(delay) = delay {
+        mw_room1.write().await.autotracker_delay = Duration::try_from_secs_f64(delay).ok()?;
+        mw_room2.write().await.autotracker_delay = Duration::try_from_secs_f64(delay).ok()?;
+    }
+    let mw_room1 = mw_room1.read().await;
+    let mw_room2 = mw_room2.read().await;
+    let mw::WorldStateRef { model: model1, .. } = mw_room1.world(world)?;
+    let mw::WorldStateRef { model: model2, .. } = mw_room2.world(world)?;
+    let cells = layout.cells()
+        .into_iter()
+        .map(|reward| Some(render_double_cell(model1, model2, reward)))
+        .collect::<Option<Vec<_>>>()?;
+    Some(tracker_page(&layout.to_string(), theme, html! {
+        @for (cell_id, render) in cells.into_iter().enumerate() {
+            div(id = format!("cell{cell_id}"), class = "cols3") : render;
+        }
+    }))
+}
+
 fn world_class(world_id: NonZero<u8>) -> Option<&'static str> {
     match world_id.get() {
         0 => unreachable!(),
@@ -429,6 +453,7 @@ pub(crate) fn rocket(pool: PgPool, rooms: Rooms, restreams: Restreams, mw_rooms:
         mw_room_input,
         mw_room_view,
         mw_click,
+        mw_double_room_layout,
         mw_notes,
         restream_room_input,
         restream_room_view,
