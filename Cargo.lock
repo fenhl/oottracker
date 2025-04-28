@@ -5548,6 +5548,7 @@ name = "wheel"
 version = "0.15.0"
 source = "git+https://github.com/fenhl/wheel?branch=main#e83a20ea6a6249184ef007172dba7207f23a37d8"
 dependencies = [
+ "async-proto",
  "async-trait",
  "clap",
  "console-subscriber",

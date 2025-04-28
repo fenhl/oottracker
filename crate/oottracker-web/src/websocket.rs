@@ -16,6 +16,7 @@ use {
         time::sleep,
     },
     tokio_tungstenite::tungstenite,
+    wheel::traits::IsNetworkError as _,
     oottracker::websocket::{
         ClientMessage,
         MwItem,
@@ -392,6 +393,11 @@ pub(crate) async fn client_connection(pool: PgPool, rooms: Rooms, restreams: Res
         Ok(()) => {}
         Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::MessageKind021(Message::Close(_)), .. })) => {} // client disconnected normally
         Err(Error::Read(async_proto::ReadError { kind: async_proto::ReadErrorKind::Tungstenite021(tungstenite::Error::Protocol(tungstenite::error::ProtocolError::ResetWithoutClosingHandshake)), .. })) => {} // this happens when a player force quits their tracker app (or normally quits on macOS, see https://github.com/iced-rs/iced/issues/1941)
+        Err(e) if e.is_network_error() => {
+            eprintln!("network error in WebSocket handler: {e}");
+            eprintln!("debug info: {e:?}");
+            let _ = ServerMessage::from_error(e).write_ws021(&mut *ws_sink.lock().await).await;
+        }
         Err(e) => {
             eprintln!("error in WebSocket handler: {e}");
             eprintln!("debug info: {e:?}");

@@ -34,6 +34,7 @@ use {
         RwLock,
         watch::*,
     },
+    wheel::traits::IsNetworkError,
     oottracker::{
         Knowledge,
         ModelState,
@@ -142,15 +143,34 @@ enum Error {
 impl<'r> rocket::response::Responder<'r, 'static> for Error {
     fn respond_to(self, _: &rocket::Request<'_>) -> rocket::response::Result<'static> {
         match self {
-            Self::CellId => Err(Status::NotFound),
             Self::Json(_) => Err(Status::InternalServerError),
             Self::RamDecode(_) => Err(Status::InternalServerError),
             Self::Read(_) => Err(Status::InternalServerError),
             Self::Rocket(_) => Err(Status::InternalServerError),
-            Self::RoomName => Err(Status::NotFound),
             Self::Sql(_) => Err(Status::InternalServerError),
             Self::Task(_) => Err(Status::InternalServerError),
             Self::Write(_) => Err(Status::InternalServerError),
+            Self::CellId => Err(Status::NotFound),
+            Self::RoomName => Err(Status::NotFound),
+        }
+    }
+}
+
+impl IsNetworkError for Error {
+    fn is_network_error(&self) -> bool {
+        match self {
+            Self::Json(_) => false,
+            Self::RamDecode(_) => false,
+            Self::Read(e) => e.is_network_error(),
+            Self::Rocket(e) => match e.kind() {
+                rocket::error::ErrorKind::Bind(e) | rocket::error::ErrorKind::Io(e) => e.is_network_error(),
+                _ => false,
+            },
+            Self::Sql(_) => false,
+            Self::Task(_) => false,
+            Self::Write(e) => e.is_network_error(),
+            Self::CellId => false,
+            Self::RoomName => false,
         }
     }
 }
