@@ -276,8 +276,8 @@ async fn test_mw_notes() {
         #[cfg(windows)] { r"C:\Users\fenhl\scoop\apps\python\current\python.exe" }
         #[cfg(unix)] { "/usr/bin/python3" }
     };
-    RANDO_VERSION.clone_repo().await.unwrap();
-    let modules = RANDO_VERSION.py_modules(python).unwrap();
+    RANDO_VERSION.clone_repo(false).await.unwrap();
+    let modules = RANDO_VERSION.py_modules(python, false).unwrap();
     let mw_room = mw::MwState::new(Vec::default());
     let source_world = NonZero::new(1).unwrap();
     let key = 0x2801_0000_0000_0000;
@@ -296,8 +296,8 @@ async fn mw_notes(mw_rooms: &State<MwRooms>, room: &str) -> Result<Option<RawHtm
     let Some(mw_room) = mw_rooms.get(room) else { return Ok(None) };
     let mut mw_room = mw_room.write().await;
     let mw_room = &mut *mw_room;
-    RANDO_VERSION.clone_repo().await?;
-    let modules = RANDO_VERSION.py_modules("/usr/bin/python3")?;
+    RANDO_VERSION.clone_repo(false).await?;
+    let modules = RANDO_VERSION.py_modules("/usr/bin/python3", false)?;
     Ok(Some(html! {
         : Doctype;
         html {
