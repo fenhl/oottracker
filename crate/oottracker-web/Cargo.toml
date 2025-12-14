@@ -23,7 +23,6 @@ path = "../ootr"
 
 [dependencies.ootr-utils]
 git = "https://github.com/midoshouse/rust-ootr-utils"
-branch = "main"
 
 [dependencies.oottracker]
 path = "../oottracker"
@@ -31,7 +30,6 @@ features = ["rocket"]
 
 [dependencies.rocket-util]
 git = "https://github.com/fenhl/rocket-util"
-branch = "main"
 
 [dependencies.sqlx]
 version = "0.8"
@@ -44,5 +42,4 @@ features = ["macros", "process", "sync", "time"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
-branch = "main"
 features = ["async-proto", "rocket"]

@@ -12,7 +12,6 @@ serde_plain = "1"
 
 [dependencies.quote-value]
 git = "https://github.com/fenhl/quote-value" #TODO publish
-branch = "main"
 
 [dependencies.serde]
 version = "1"

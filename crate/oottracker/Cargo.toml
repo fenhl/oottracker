@@ -47,7 +47,6 @@ optional = true
 
 [dependencies.rocket-util]
 git = "https://github.com/fenhl/rocket-util"
-branch = "main"
 optional = true
 
 [dependencies.serde]
@@ -72,5 +71,4 @@ features = ["serde"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
-branch = "main"
 default-features = false
