@@ -4,10 +4,13 @@ use {
         time::Duration,
     },
     async_proto::Protocol,
-    futures::stream::{
-        SplitSink,
-        SplitStream,
-        StreamExt as _,
+    futures::{
+        sink::SinkExt as _,
+        stream::{
+            SplitSink,
+            SplitStream,
+            StreamExt as _,
+        },
     },
     rocket_ws::Message,
     sqlx::PgPool,
@@ -50,9 +53,9 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
         }
     });
     loop {
-        match dbg!(ClientMessage::read_ws021(&mut stream).await?) {
-            ClientMessage::Pong => {}
-            ClientMessage::SubscribeRestream { restream, runner, layout } => {
+        match ClientMessage::read_ws021(&mut stream).await {
+            Ok(ClientMessage::Pong) => {}
+            Ok(ClientMessage::SubscribeRestream { restream, runner, layout }) => {
                 let restreams = Restreams::clone(&restreams);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
@@ -106,7 +109,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 });
             }
-            ClientMessage::SubscribeDoubleRestream { restream, runner1, runner2, layout } => {
+            Ok(ClientMessage::SubscribeDoubleRestream { restream, runner1, runner2, layout }) => {
                 let restreams = Restreams::clone(&restreams);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
@@ -174,7 +177,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     }
                 });
             }
-            ClientMessage::ClickRestream { restream, runner, layout, cell_id, right } => {
+            Ok(ClientMessage::ClickRestream { restream, runner, layout, cell_id, right }) => {
                 let mut restreams = restreams.write().await;
                 let restream = match restreams.get_mut(&restream) {
                     Some(restream) => restream,
@@ -204,7 +207,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
-            ClientMessage::SubscribeRaw { room } => {
+            Ok(ClientMessage::SubscribeRaw { room }) => {
                 let rooms = Rooms::clone(&rooms);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
@@ -220,7 +223,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     Ok::<_, Error>(())
                 }); //TODO send errors from task to client
             }
-            ClientMessage::SubscribeRoom { room, layout } => {
+            Ok(ClientMessage::SubscribeRoom { room, layout }) => {
                 let rooms = Rooms::clone(&rooms);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
@@ -243,8 +246,8 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     Ok::<_, Error>(())
                 }); //TODO send errors from task to client
             }
-            ClientMessage::SetRaw { room, state } => edit_room(pool, &rooms, room, |room| { room.model = state; Ok(()) }).await?,
-            ClientMessage::ClickRoom { room, layout, cell_id, right } => {
+            Ok(ClientMessage::SetRaw { room, state }) => edit_room(pool, &rooms, room, |room| { room.model = state; Ok(()) }).await?,
+            Ok(ClientMessage::ClickRoom { room, layout, cell_id, right }) => {
                 let cell = match layout.cells().get(usize::from(cell_id)) {
                     Some(cell) => cell.id,
                     None => {
@@ -261,22 +264,22 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                     Ok(())
                 }).await?;
             }
-            ClientMessage::MwCreateRoom { room, worlds } => {
+            Ok(ClientMessage::MwCreateRoom { room, worlds }) => {
                 mw_rooms.write().await.insert(room, MwState::new(worlds));
             }
-            ClientMessage::MwDeleteRoom { room } => {
+            Ok(ClientMessage::MwDeleteRoom { room }) => {
                 mw_rooms.write().await.remove(&room);
             }
-            ClientMessage::MwResetPlayer { room, world, save } => if let Some(room) = mw_rooms.read().await.get(&room) {
+            Ok(ClientMessage::MwResetPlayer { room, world, save }) => if let Some(room) = mw_rooms.read().await.get(&room) {
                 let _ = room.read().await.incoming_queue.send(AutoUpdate::Reset { world, save });
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             },
             #[allow(deprecated)]
-            ClientMessage::MwGetItem { .. } => {
+            Ok(ClientMessage::MwGetItem { .. }) => {
                 let _ = ServerMessage::from_error("MwGetItem command is no longer supported, use MwQueueItem instead").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             }
-            ClientMessage::ClickMw { room, world, layout, cell_id, right } => {
+            Ok(ClientMessage::ClickMw { room, world, layout, cell_id, right }) => {
                 let mw_rooms = mw_rooms.read().await;
                 let mw_room = match mw_rooms.get(&room) {
                     Some(mw_room) => mw_room,
@@ -307,7 +310,7 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 }
                 tx.send(()).expect("failed to notify websockets about state change");
             }
-            ClientMessage::SubscribeMw { room, world, layout } => {
+            Ok(ClientMessage::SubscribeMw { room, world, layout }) => {
                 let mw_rooms = MwRooms::clone(&mw_rooms);
                 let sink = WsSink::clone(&sink);
                 tokio::spawn(async move {
@@ -364,24 +367,28 @@ async fn client_session(pool: &PgPool, rooms: Rooms, restreams: Restreams, mw_ro
                 });
             }
             #[allow(deprecated)]
-            ClientMessage::MwGetItemAll { .. } => {
+            Ok(ClientMessage::MwGetItemAll { .. }) => {
                 let _ = ServerMessage::from_error("MwGetItemAll command is no longer supported, use MwQueueItem instead").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             }
-            ClientMessage::MwQueueItem { room, source_world, key, kind, target_world } => if let Some(room) = mw_rooms.read().await.get(&room) {
+            Ok(ClientMessage::MwQueueItem { room, source_world, key, kind, target_world }) => if let Some(room) = mw_rooms.read().await.get(&room) {
                 let _ = room.read().await.incoming_queue.send(AutoUpdate::Queue { item: MwItem { source: source_world, key, kind }, target_world });
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             },
-            ClientMessage::MwDungeonRewardLocation { room, world, reward, location } => if let Some(room) = mw_rooms.read().await.get(&room) {
+            Ok(ClientMessage::MwDungeonRewardLocation { room, world, reward, location }) => if let Some(room) = mw_rooms.read().await.get(&room) {
                 let _ = room.read().await.incoming_queue.send(AutoUpdate::DungeonRewardLocation { world, reward, location });
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             },
-            ClientMessage::MwCurrentScene { room, world, scene } => if let Some(room) = mw_rooms.read().await.get(&room) {
+            Ok(ClientMessage::MwCurrentScene { room, world, scene }) => if let Some(room) = mw_rooms.read().await.get(&room) {
                 let _ = room.read().await.incoming_queue.send(AutoUpdate::CurrentScene { world, scene });
             } else {
                 let _ = ServerMessage::from_error("no such multiworld room").write_ws021(&mut *sink.lock().await).await; //TODO better error handling
             },
+            Err(async_proto::ReadError { context: _, kind: async_proto::ReadErrorKind::MessageKind021(Message::Ping(payload)) }) => {
+                sink.lock().await.send(Message::Pong(payload)).await?;
+            }
+            Err(e) => return Err(e.into()),
         }
     }
 }

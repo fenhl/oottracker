@@ -5767,6 +5767,7 @@ dependencies = [
  "rocket-util",
  "thiserror 2.0.17",
  "tokio",
+ "tungstenite",
  "wheel-derive",
 ]
 

@@ -132,6 +132,8 @@ enum Error {
     Sql(#[from] sqlx::Error),
     #[error("task error: {0}")]
     Task(#[from] tokio::task::JoinError),
+    #[error("WebSocket error: {0}")]
+    Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
     #[error("write error: {0}")]
     Write(#[from] WriteError),
     #[error("no such cell")]
@@ -149,6 +151,7 @@ impl<'r> rocket::response::Responder<'r, 'static> for Error {
             Self::Rocket(_) => Err(Status::InternalServerError),
             Self::Sql(_) => Err(Status::InternalServerError),
             Self::Task(_) => Err(Status::InternalServerError),
+            Self::Tungstenite(_) => Err(Status::InternalServerError),
             Self::Write(_) => Err(Status::InternalServerError),
             Self::CellId => Err(Status::NotFound),
             Self::RoomName => Err(Status::NotFound),
@@ -168,6 +171,7 @@ impl IsNetworkError for Error {
             },
             Self::Sql(_) => false,
             Self::Task(_) => false,
+            Self::Tungstenite(e) => e.is_network_error(),
             Self::Write(e) => e.is_network_error(),
             Self::CellId => false,
             Self::RoomName => false,

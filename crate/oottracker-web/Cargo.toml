@@ -42,4 +42,4 @@ features = ["macros", "process", "sync", "time"]
 
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
-features = ["async-proto", "rocket"]
+features = ["async-proto", "rocket", "tungstenite021"]
